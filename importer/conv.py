@@ -1,7 +1,7 @@
 import json, sys, os, glob
 from PIL import Image
 pid = sys.argv[1]; maxd = int(sys.argv[2]) if len(sys.argv) > 2 else 1000
-src = f'/tmp/imgraw/{pid}'; dst = f'/home/claude/site/data/img/{pid}'; os.makedirs(dst, exist_ok=True)
+src = f'/tmp/imgraw/{pid}'; dst = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),'site','data','img',pid); os.makedirs(dst, exist_ok=True)
 tot = 0
 for j in sorted(glob.glob(src + '/*.json'), key=lambda p: int(os.path.basename(p)[:-5])):
     k = os.path.basename(j)[:-5]; m = json.load(open(j)); raw = open(f'{src}/{k}.raw', 'rb').read()

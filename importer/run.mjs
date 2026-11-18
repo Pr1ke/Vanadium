@@ -1,4 +1,4 @@
-import * as pdfjs from '/opt/npm-tools/node_modules/pdfjs-dist/legacy/build/pdf.mjs';
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import fs from 'fs';
 import { extractPages, parsePack } from './dsparse.mjs';
 const [,, pdf, out, title, kind, id] = process.argv;

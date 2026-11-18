@@ -1,0 +1,7 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Build site", "type": "shell", "command": "python3 src/mksite.py && python3 src/mkrespite.py", "group": { "kind": "build", "isDefault": true }, "problemMatcher": [] },
+    { "label": "Serve site (8765)", "type": "shell", "command": "python3 -m http.server 8765 --directory site", "isBackground": true, "problemMatcher": [] }
+  ]
+}
