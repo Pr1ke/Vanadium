@@ -1,4 +1,8 @@
-import os
+import os,builtins
+def open(p,m='r',*a,**k):
+    # UTF-8 and no newline translation, so the build is identical on Windows/macOS/Linux
+    if 'b' not in m: k.setdefault('encoding','utf-8'); k.setdefault('newline','')
+    return builtins.open(p,m,*a,**k)
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC=ROOT+'/src'; SITE=ROOT+'/site'
 import re,shutil
@@ -14,9 +18,12 @@ open(SITE+'/index.html','w').write(html)
 js=open(SRC+'/app.js').read(); enc=open(SRC+'/enc.js').read()
 i=js.rindex('boot();'); neg=open(SRC+'/neg.js').read()+'\n'+open(SRC+'/mtg.js').read()+'\n'+open(SRC+'/print.js').read()+'\n'+open(SRC+'/sess.js').read()+'\n'+open(SRC+'/cards.js').read()
 import hashlib,glob,gzip
-h=hashlib.md5(b''.join(open(f,'rb').read() for f in sorted(glob.glob(SITE+'/data/*.json')))).hexdigest()[:10]
+rj=lambda f: open(f,'rb').read().replace(b'\r\n',b'\n')  # a Windows checkout has CRLF; build the same bytes everywhere
+h=hashlib.md5(b''.join(rj(f) for f in sorted(glob.glob(SITE+'/data/*.json')))).hexdigest()[:10]
 for f in glob.glob(SITE+'/data/*.json'):
-    open(f[:-5]+'.gz.txt','wb').write(__import__('base64').b64encode(gzip.compress(open(f,'rb').read(),9,mtime=0)))
+    open(f[:-5]+'.gz.txt','wb').write(__import__('base64').b64encode(gzip.compress(rj(f),9,mtime=0)))
 open(SITE+'/app.js','w').write((js[:i]+enc+'\n'+neg+'\n'+js[i:]).replace('__DATAV__',h))
-shutil.copy('/opt/npm-tools/node_modules/pdf-lib/dist/pdf-lib.esm.min.js',SITE+'/lib/pdf-lib.esm.min.js')
+for p in (ROOT+'/node_modules/pdf-lib/dist/pdf-lib.esm.min.js','/opt/npm-tools/node_modules/pdf-lib/dist/pdf-lib.esm.min.js'):
+    if os.path.exists(p): shutil.copy(p,SITE+'/lib/pdf-lib.esm.min.js'); break
 shutil.copy(ROOT+'/importer/dsparse.mjs',SITE+'/lib/dsparse.mjs')
+shutil.copy(SRC+'/update.php',SITE+'/update.php')  # self-updater for PHP hosts

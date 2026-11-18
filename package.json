@@ -4,8 +4,9 @@
   "type": "module",
   "description": "Draw Steel reference and Director's toolkit (static site)",
   "scripts": {
-    "build": "python3 src/mksite.py && python3 src/mkrespite.py",
-    "serve": "python3 -m http.server 8765 --directory site"
+    "build": "python src/mksite.py && python src/mkrespite.py && python src/mkversion.py",
+    "serve": "python serve.py",
+    "update": "python serve.py --check"
   },
   "devDependencies": {
     "pdfjs-dist": "6.2.108"

@@ -95,6 +95,64 @@ function removePack(id) {
   for (const k of Object.keys(PAB)) if (k.startsWith(id + ':')) delete PAB[k];
 }
 
+// ---- update check: site/version.json changes whenever a new build lands (update.php or
+// serve.py swaps the files in, or a host redeploys). Checked at most every 5 minutes across
+// all tabs; update.php also has its own 5-minute cooldown shared by every visitor.
+const UPD_COOLDOWN = 5 * 60 * 1000;
+let bootBuild = null, updSeen = null;
+async function fetchBuild() {
+  try { const r = await fetch('version.json', { cache: 'no-store' }); return r.ok ? ((await r.json()).build || null) : null; } catch (e) { return null; }
+}
+async function checkForUpdate() {
+  if (!bootBuild || document.hidden || Date.now() - store.get('updchk', 0) < UPD_COOLDOWN) return;
+  store.set('updchk', Date.now());
+  await callUpdater();
+  const b = await fetchBuild();
+  if (b && b !== bootBuild && b !== updSeen) showUpdateBar(b);
+}
+// On a PHP host update.php pulls a new build from GitHub (5-min cooldown shared by all visitors).
+// Elsewhere (static host, serve.py) it 404s or isn't JSON, and this returns null.
+async function callUpdater() {
+  try { const r = await fetch('update.php', { cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); return j && j.status ? j : null; } catch (e) { return null; }
+}
+let updRunning = false;
+async function manualUpdate() {  // Utilities → Check for updates
+  if (updRunning) { toast('Already checking for updates…'); return; }
+  updRunning = true; toast('Checking for updates…', 300000);  // stays up until the result replaces it
+  const say = h => toast(h, 6000);
+  try {
+    store.set('updchk', Date.now());
+    const r = await callUpdater();
+    const b = await fetchBuild();
+    const newer = b && bootBuild && b !== bootBuild;
+    if (newer) showUpdateBar(b);
+    if (r && r.status === 'error') say('Update failed: ' + esc(r.error || 'unknown error'));
+    else if (r && r.status === 'busy') say('An update is already running on the server. Try again in a minute.');
+    else if (newer) say('A new version was installed. Reload to use it.');
+    else if (r && r.status === 'cooldown') { const s = r.retry_in || 0; say(`Already checked in the last 5 minutes. Next check possible in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}.`); }
+    else if (r) say('Vanadium is up to date.');
+    else say(b ? 'No new version found. (This server doesn’t run update.php.)' : 'Updates are not available on this server.');
+  } finally { updRunning = false; }
+}
+function showUpdateBar(b) {
+  let el = $('#updbar');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'updbar'; el.setAttribute('role', 'status');
+    el.innerHTML = '<span>A new version of Vanadium is available.</span><button class="upd-go">Reload</button><button class="upd-x" aria-label="Dismiss">×</button>';
+    document.body.appendChild(el);
+    el.querySelector('.upd-go').onclick = () => location.reload();
+    el.querySelector('.upd-x').onclick = () => { el.hidden = true; };
+  }
+  updSeen = b; el.hidden = false;
+}
+async function initUpdateCheck() {
+  bootBuild = await fetchBuild();  // the build this page was loaded from
+  if (!bootBuild) return;          // no version.json (old build or file://): nothing to compare
+  checkForUpdate();                        // first visit after a while triggers the server check
+  setInterval(checkForUpdate, 60 * 1000);  // cheap tick; the cooldown decides when to fetch
+  document.addEventListener('visibilitychange', checkForUpdate);
+}
+
 async function boot() {
   applyTheme(store.get('theme2', 'light'));
   setupMobile();
@@ -105,6 +163,7 @@ async function boot() {
   addPack(heroesPack);
   buildMenu(); updatePins(); route();
   $('#loading').style.display = 'none';
+  initUpdateCheck();
   // packs in the background
   const loads = BUILTIN.map(b => getJSON(b.file).then(p => { p.builtin = true; p.title = b.title; p.kind = b.kind; p.id = b.id; addPack(p); }).catch(e => console.warn('pack', b.id, e)));
   const user = IDB.all().then(list => list.forEach(p => { p.builtin = false; addPack(p); }));
@@ -323,13 +382,14 @@ function MENU() {
     ['Heroes', [['classes'], ['ancestries'], ['cultures'], ['careers'], ['complications'], ['-'], ['kits'], ['perks'], ['abilities'], ['-'], ['respite', 'Respite & Downtime']]],
     ['Director', [['sessions', 'Sessions'], ['encounter', 'Encounter Builder'], ['negotiation', 'Negotiation Tracker'], ['montage', 'Montage Tests'], ['monsters'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title]), ['book--monsters', 'Monsters Book'], ['book--encounters', 'Encounters Book'], ['-'], ['book--heroes--for-the-director', 'For the Director'], ['gods']]],
     ['Rewards', [['treasures'], ['cards', 'Cards: items, quests, followers'], ['titles']]],
-    ['Utilities', [['import', 'Import a PDF'], ['roller', 'Power Roller'], ['pinned', 'Pinned Items']]]
+    ['Utilities', [['import', 'Import a PDF'], ['roller', 'Power Roller'], ['pinned', 'Pinned Items'], ['-'], ['!update', 'Check for updates']]]
   ];
 }
 function buildMenu() {
   $('#menu').innerHTML = MENU().map(([lab, items]) => `<div class="mi"><button>${lab}</button><div class="dd">${items.filter(([k]) => k === '-' || TYPES[k] || !k.startsWith('book--') || PK[k.split('--')[1]]).map(([k, l]) => k === '-' ? '<hr>' : `<a href="#${k}">${esc(l || TYPES[k].label)}${TYPES[k] ? `<span>${itemsOf(k).length}</span>` : ''}</a>`).join('')}</div></div>`).join('');
   $$('.mi>button').forEach(b => b.onclick = e => { e.stopPropagation(); const m = b.parentElement; const was = m.classList.contains('open'); $$('.mi').forEach(x => x.classList.remove('open')); if (!was) m.classList.add('open'); });
   $$('#menu a').forEach(a => a.addEventListener('click', () => { $$('.mi').forEach(x => x.classList.remove('open')); $('#menu').classList.remove('on'); }));
+  const upd = $('#menu a[href="#!update"]'); if (upd) upd.addEventListener('click', e => { e.preventDefault(); manualUpdate(); });
 }
 document.addEventListener('click', e => { if (!e.target.closest('.mi')) $$('.mi').forEach(x => x.classList.remove('open')); });
 $('#burger').onclick = () => $('#menu').classList.toggle('on');
@@ -921,7 +981,7 @@ document.addEventListener('mouseover', e => {
 });
 document.addEventListener('mouseout', e => { if (e.target.closest('.lnk[data-go]')) hideHov(); });
 let toastT;
-function toast(h) { const t = $('#toast'); t.innerHTML = h; t.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(() => t.style.display = 'none', 2200); }
+function toast(h, ms = 2200) { const t = $('#toast'); t.innerHTML = h; t.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(() => t.style.display = 'none', ms); }
 
 // theme & mobile
 function applyTheme(th) { document.documentElement.dataset.theme = th; store.set('theme2', th); const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = th === 'dark' ? '#18191c' : '#ffffff'; try { document.querySelectorAll('iframe').forEach(f => f.contentWindow && f.contentWindow.__stTheme && f.contentWindow.__stTheme()); } catch (e) {} }

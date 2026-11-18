@@ -85,9 +85,11 @@ package.json           ← npm scripts + pdfjs-dist for the node importer script
 You need Python 3.10+. Node 18+ is only needed for the importer scripts. The tests need `pip install playwright` and `playwright install chromium`; `conv.py` needs Pillow.
 
 ```bash
-npm run build      # or: python3 src/mksite.py && python3 src/mkrespite.py
-npm run serve      # python3 -m http.server 8765 --directory site → http://127.0.0.1:8765/
+npm run build      # python src/mksite.py && python src/mkrespite.py && python src/mkversion.py
+npm run serve      # python serve.py → http://127.0.0.1:8765/
+npm run update     # python serve.py --check: one update check now, then exit
 ```
+(The scripts call `python`, because on Windows `python3` is often only the Microsoft Store stub. The build scripts read and write UTF-8 with no newline translation, so a Windows build produces the same files as a Linux one.)
 VS Code: **Terminal → Run Build Task** (Ctrl/Cmd+Shift+B) builds. Run the "Serve site (8765)" task to start the server.
 
 **Important rules:**
@@ -96,6 +98,27 @@ VS Code: **Terminal → Run Build Task** (Ctrl/Cmd+Shift+B) builds. Run the "Ser
 - `mksite.py` replaces `__DATAV__` in app.js with an md5 hash of `site/data/*.json`. That hash busts the browser's Cache API copy, so changing any data JSON automatically invalidates caches.
 - The site must be served over HTTP. `file://` breaks module imports and fetch.
 - `importer/dsparse.mjs` is loaded by the browser from `site/lib/dsparse.mjs`, so copy it there after editing: `cp importer/dsparse.mjs site/lib/`.
+- `src/mkversion.py` runs last and writes `site/version.json` (`{build, built}`), where `build` is a hash of every generated file. Commit it together with the rest of `site/`, because the auto-updater relies on it.
+
+### Auto-update
+- **PHP hosts (the real server): `site/update.php`**, with its source in `src/update.php`; the build copies it into `site/`. Upload the contents of `site/` to the web root, and make sure PHP can write to that folder.
+  - **Needs:** PHP 7.4+, the `zip` extension, and `curl` or `allow_url_fopen`.
+  - **Trigger:** the app calls `update.php` with a GET request at most every 5 minutes per browser. The script also has its own **5-minute cooldown shared by all visitors**, plus a lock, stored in `.vanadium-update.json` in the web root.
+  - **Update:** it compares `version.json` with the copy on GitHub. If the build differs, it downloads the repo zip from codeload, stages `site/` in `.vanadium-new-*`, moves the files in with `version.json` last, and cleans up.
+  - **Deleting old files:** it only deletes files that an earlier run installed and the new build dropped. That list is kept in the same state file, so other files on the host, such as `.htaccess`, are never touched.
+  - **Checking it:** open `/update.php` in a browser and it returns JSON: `cooldown`, `uptodate`, `updated` or `error` with a message.
+  - **Optional cron:** if the host has cron, `curl -s https://your.site/update.php` every 5 minutes keeps the site current even when nobody visits.
+- **`serve.py`** (local Python alternative) serves `site/` with `Cache-Control: no-cache` and correct `.js`/`.mjs` MIME types.
+  - At startup, and when `/`, `/index.html` or `/version.json` is requested, it checks `https://raw.githubusercontent.com/Pr1ke/Vanadium/main/site/version.json`.
+  - It checks **at most once every 5 minutes**. The time of the last check is saved in `.vanadium-update.json`, which is gitignored, so restarting doesn't reset the wait, and failed checks count toward it too.
+  - If the `build` differs, it downloads the repo zip from codeload and stages `site/` in `.vanadium-new-*/`. It then replaces the files one by one (retrying files Windows has locked), writes `version.json` last, and deletes files the new build no longer has. If anything fails, the current files are kept.
+  - Only GET requests go to GitHub, and none of them carry user data.
+- **Git checkouts:** auto-update is off when `.git` exists, because it would overwrite your own builds; use `git pull` instead. `--update` turns it on anyway and `--no-update` turns it off everywhere.
+- **In the app**, `initUpdateCheck()` in app.js records the `version.json` build the page loaded with.
+  - It re-fetches the file at most every 5 minutes (`st_updchk`, shared by all tabs), and only while the tab is visible.
+  - When the build changes, it shows a "new version — Reload" bar (`#updbar`).
+  - This also works on static hosts such as GitHub Pages, where it notices a redeploy.
+- **Releasing an update:** run `npm run build` and commit `site/`, including `version.json`, then push to `main`.
 
 ## 5. Architecture notes
 
@@ -150,4 +173,4 @@ VS Code: **Terminal → Run Build Task** (Ctrl/Cmd+Shift+B) builds. Run the "Ser
 - The Heroes book data was built by a one-off `pdftohtml` pipeline (`src/parse.py`, `src/build.py`). Rebuilding it needs `pdftohtml -xml` from poppler.
 - The IndexedDB name is still `steeltools`. Don't rename it without a migration, or users lose their imports.
 - Big imports with images can take tens of MB of IndexedDB space; browsers may ask the user for permission.
-- Pushing from the Claude session failed because the Claude GitHub App isn't installed on `Pr1ke/vanadium`. This repo already has a local commit and `origin` set, so a plain `git push -u origin main` from your machine works.
+- The repo is at https://github.com/Pr1ke/Vanadium (`origin`, branch `main`).

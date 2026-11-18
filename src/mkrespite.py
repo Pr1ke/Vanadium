@@ -1,4 +1,8 @@
-import os
+import os,builtins
+def open(p,m='r',*a,**k):
+    # UTF-8 and no newline translation, so the build is identical on Windows/macOS/Linux
+    if 'b' not in m: k.setdefault('encoding','utf-8'); k.setdefault('newline','')
+    return builtins.open(p,m,*a,**k)
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC=ROOT+'/src'; SITE=ROOT+'/site'
 import re
