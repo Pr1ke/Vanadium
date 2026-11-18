@@ -771,7 +771,7 @@ function confirmSheet(msg, okLabel) {
 window.__stSave = (name, blob) => deliverFile(name, blob);
 window.__stGotoPage = pg => gotoPage(String(pg));
 function respitePage() {
-  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=35e8e99869" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
+  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=0f34f447f2" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
   document.title = 'Respite — Vanadium';
 }
 
@@ -3537,7 +3537,7 @@ async function buildCardsPdf(opt = {}) {
 // ---- QR codes → public card JPGs (uploaded through sync.php, served by card.php) ----
 let qrLoad = null;
 function loadQr() {  // lib/qrcode.js: qrcode-generator 1.4.4 (MIT), defines window.qrcode
-  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=35e8e99869'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
+  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=0f34f447f2'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
 }
 // 22-char id from the key's private salt + what the face looks like: stable, but unguessable
 async function cardImageId(salt, content) {
@@ -3557,7 +3557,7 @@ async function exportCardsPdf(btn) {
   const need = []; ids.forEach((id, i) => { if (!have.has(id) && !need.some(n => n.id === id)) need.push({ id, i }); });
   if (need.length) {
     const pdfjs = await loadPdfjs();
-    const doc = await pdfjs.getDocument({ data: fronts }).promise;
+    const task = pdfjs.getDocument({ data: fronts, isEvalSupported: false, verbosity: 0 }), doc = await task.promise;
     const g = col.geo, scale = 3.5;  // ≈ 250 dpi
     let pageNo = 0, pageCanvas = null, done = 0;
     for (const { id, i } of need) {
@@ -3576,7 +3576,7 @@ async function exportCardsPdf(btn) {
       say(`Uploading card pictures ${++done}/${need.length}…`);
       await V.cardPut(id, blob);
     }
-    doc.destroy();
+    try { await task.destroy(); } catch (e) { }  // cleanup only; never fail the export over it
   }
   const base = new URL('card.php', location.href); base.hash = ''; base.search = '';
   say('Building PDF…');

@@ -540,7 +540,7 @@ async function exportCardsPdf(btn) {
   const need = []; ids.forEach((id, i) => { if (!have.has(id) && !need.some(n => n.id === id)) need.push({ id, i }); });
   if (need.length) {
     const pdfjs = await loadPdfjs();
-    const doc = await pdfjs.getDocument({ data: fronts }).promise;
+    const task = pdfjs.getDocument({ data: fronts, isEvalSupported: false, verbosity: 0 }), doc = await task.promise;
     const g = col.geo, scale = 3.5;  // ≈ 250 dpi
     let pageNo = 0, pageCanvas = null, done = 0;
     for (const { id, i } of need) {
@@ -559,7 +559,7 @@ async function exportCardsPdf(btn) {
       say(`Uploading card pictures ${++done}/${need.length}…`);
       await V.cardPut(id, blob);
     }
-    doc.destroy();
+    try { await task.destroy(); } catch (e) { }  // cleanup only; never fail the export over it
   }
   const base = new URL('card.php', location.href); base.hash = ''; base.search = '';
   say('Building PDF…');
