@@ -1,0 +1,25 @@
+import asyncio, time
+from playwright.async_api import async_playwright
+async def main():
+    async with async_playwright() as p:
+        b = await p.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--no-sandbox'])
+        ctx = await b.new_context(viewport={'width':1440,'height':900})
+        pg = await ctx.new_page()
+        errs=[]; pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append('console:'+m.text) if m.type in ('error',) else None)
+        await pg.goto('http://127.0.0.1:8765/index.html#import'); await pg.wait_for_timeout(2500)
+        t=time.time()
+        await pg.set_input_files('#pdffile', '/mnt/user-data/uploads/10602b2c-Fall_of_Blackbottom_v1.0.pdf')
+        await pg.wait_for_timeout(2000)
+        await pg.wait_for_selector('#pvsave', timeout=60000)
+        print('parsed in', round(time.time()-t,1),'s')
+        await pg.screenshot(path='shots/imp2.png')
+        await pg.fill('#pvtitle','Blackbottom (imported test)')
+        await pg.click('#pvsave'); await pg.wait_for_timeout(1500)
+        print('hash', await pg.evaluate('location.hash'))
+        await pg.screenshot(path='shots/imp3.png')
+        await pg.reload(); await pg.wait_for_timeout(3000)
+        await pg.evaluate("location.hash='library'"); await pg.wait_for_timeout(800)
+        await pg.screenshot(path='shots/imp4.png')
+        print('ERRORS', errs[:10])
+        await b.close()
+asyncio.run(main())

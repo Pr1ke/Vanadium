@@ -1,0 +1,51 @@
+<body>
+<div id="loading"><div>Vanadium</div><div class="bar"><div></div></div><div id="loadmsg" style="font-size:13px;font-family:var(--ui);text-transform:none;letter-spacing:0">Loading the rules…</div></div>
+<header id="top">
+  <button class="tbtn" id="burger" aria-label="Menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+  <a id="brand" href="#"><svg width="26" height="26" viewBox="0 0 32 32"><path d="M16 2 L19 18 L16 22 L13 18Z" fill="#cfd6de"/><path d="M9 20h14v3H9z" fill="#e0703a"/><path d="M15 23h2v6h-2z" fill="#8a6a46"/><circle cx="16" cy="30" r="1.6" fill="#e0703a"/></svg><span>Vanadium</span></a>
+  <nav class="menu" id="menu"></nav>
+  <div id="searchwrap">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+    <input id="q" placeholder="Search everything…" autocomplete="off" spellcheck="false">
+    <div id="sres"></div>
+  </div>
+  <button class="mbtn" id="msearchbtn" aria-label="Search"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></button>
+  <button class="tbtn" id="pinsbtn" title="Pinned"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 20.9l1.6-7L2 9.2l7.1-.6z"/></svg><span id="pincount">0</span></button>
+  <button class="tbtn" id="themebtn" title="Toggle theme"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+</header>
+<div id="main"></div>
+<footer>Vanadium is an independent product published under the DRAW STEEL Creator License and is not affiliated with MCDM Productions, LLC. DRAW STEEL © 2024 MCDM Productions, LLC.</footer>
+
+<nav id="tabbar">
+  <button data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+  <button data-tab="browse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Browse</button>
+  <button data-tab="library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21a2 2 0 0 1 2-2h13v2z"/></svg>Library</button>
+  <button data-tab="pinned"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.6 5.9 6.4.6-4.9 4.3 1.5 6.3L12 16.9 6.4 20.1l1.5-6.3L3 9.5l6.4-.6z"/></svg>Pinned<span id="mpincount" style="display:none"></span></button>
+  <button data-tab="roll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 21 7v10l-9 5-9-5V7z"/><path d="M12 2v20M3 7l9 5 9-5"/></svg>Roll</button>
+</nav>
+<div id="scrim"></div>
+<div id="sheet"></div>
+<div id="peek"></div>
+<div id="msearch"><div class="mh"><input id="mq" placeholder="Search abilities, monsters, rules…" autocomplete="off" spellcheck="false" enterkeyhint="search"><button id="mqclose">Cancel</button></div><div id="mres"><div class="hint">Type to search across every book, monster, ability and rule.</div></div></div>
+
+<button id="fab" title="Power roll (2d10)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M12 2 21 7v10l-9 5-9-5V7z"/><path d="M12 2v20M3 7l9 5 9-5"/></svg></button>
+<div id="roller">
+  <div class="rh">Power Roll <button id="rclose">×</button></div>
+  <div class="rb">
+    <div class="chars" id="chars"></div>
+    <div class="rrow">
+      <select id="rchar"><option value="">No characteristic</option><option>Might</option><option>Agility</option><option>Reason</option><option>Intuition</option><option>Presence</option></select>
+      <label>Bonus <input id="rbonus" type="number" value="0" style="width:52px"></label>
+    </div>
+    <div class="rrow">
+      <select id="redge"><option value="0">No edge/bane</option><option value="1">Edge (+2)</option><option value="2">Double edge (tier up)</option><option value="-1">Bane (−2)</option><option value="-2">Double bane (tier down)</option></select>
+    </div>
+    <button class="bigroll" id="rgo">Roll 2d10</button>
+    <div id="rlog"></div>
+  </div>
+</div>
+<div id="hov"></div>
+<div id="toast"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

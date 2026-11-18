@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Respite · Vanadium</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --mat:#c20f1e; --acc:#a8101c; --vig:rgba(60,0,6,.42); --sheen:rgba(255,255,255,.13); --cta:#c9a24a; --tint:#eadfbf; --focus:#f0cf7a;
+  --ink:#1d1710; --paper:#f8f2e4; --edge:#d8caa6;
+  --text:#f6ecd4; --soft:#ecd9c4; --muted:#ffe0d6; --dim:#f3b9ae;
+  --line:rgba(255,226,160,.32); --line2:rgba(255,226,160,.6);
+  --gold:#f0cf7a; --gold2:#f0cf7a; --ember:#ffc9a8; --moss:#b4ecc6; --sky:#f0cf7a; --violet:#e2cdfc;
+  --display:"Bodoni Moda","Bodoni MT",Didot,Georgia,serif;
+  --sans:"Jost","Century Gothic","Avenir Next",system-ui,sans-serif; --serif:var(--sans);
+  --lift:0 2px 3px rgba(0,0,0,.25),0 10px 22px rgba(0,0,0,.28);
+  --leather:repeating-linear-gradient(91deg,transparent 0 7px,rgba(0,0,0,.2) 7px 8px,transparent 8px 19px,rgba(255,240,220,.06) 19px 20px,transparent 20px 37px,rgba(0,0,0,.16) 37px 39px,transparent 39px 58px),linear-gradient(180deg,#4a4038,#2b2420);
+  --cherry:repeating-linear-gradient(92deg,transparent 0 6px,rgba(40,5,0,.22) 6px 7px,transparent 7px 17px,rgba(255,200,170,.08) 17px 18px,transparent 18px 31px,rgba(40,5,0,.18) 31px 33px),linear-gradient(180deg,#8a3a22,#5c2212);
+  --noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .3 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.night{--mat:#0b0a0c;--acc:#a8101c;--muted:#bdb6ae;--dim:#8c867f;--soft:#ddd5c8;--vig:rgba(0,0,0,.6);--sheen:rgba(255,255,255,.07);--line:rgba(226,189,98,.28);--line2:rgba(226,189,98,.55);--noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .13 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.card,.tile,.pick,.contcard,.res,.callout,.celebrate,.chip,.btn.gold,.seg button,.stepper{
+  --text:var(--ink);--soft:#40372a;--muted:#6f634e;--dim:#a3977f;--line:rgba(60,45,15,.13);--line2:rgba(60,45,15,.32);
+  --gold:var(--acc);--gold2:var(--acc);--ember:#a8441a;--moss:#1b7a47;--sky:var(--acc);--violet:#6d3fc4;--focus:var(--acc);
+  color:var(--text)}
+*{box-sizing:border-box}
+html{background:var(--mat)}
+html,body{margin:0;color:var(--text);font-family:var(--sans);font-size:15.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.matbg,body{background:var(--noise),radial-gradient(120% 80% at 50% 0%,var(--sheen),transparent 55%),radial-gradient(115% 115% at 50% 45%,transparent 55%,var(--vig)),var(--mat);background-attachment:fixed}
+body{min-height:100vh}
+h1,h2,h3{font-family:var(--display);font-weight:700;margin:0;letter-spacing:-.01em;line-height:1.1}
+button{font:inherit;cursor:pointer;color:inherit}
+input,select,textarea{font:inherit;color:var(--ink);background:#fff;border:1px solid #c3ccd8;border-radius:7px;padding:8px 11px;width:100%}
+input::placeholder,textarea::placeholder{color:#9aa5a1}
+input:focus,select:focus,textarea:focus,button:focus-visible,.tip:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+input:disabled{background:#eef1f5;color:#5d6878}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--acc);flex:none}
+label.l{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-bottom:5px;font-weight:400}
+.wrap{max-width:1080px;margin:0 auto;padding:22px 18px 100px}
+
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.brand{margin-right:auto;display:flex;align-items:center;gap:12px}
+.moon{width:34px;height:34px;border-radius:50%;background:var(--acc);position:relative;overflow:hidden;flex:none}
+.moon::after{content:"";position:absolute;width:100%;height:100%;border-radius:50%;background:var(--mat);left:30%;top:-14%}
+.brand h1{font-size:27px}
+.brand small{display:block;color:var(--muted);font-size:13px}
+.btn{border:1px solid var(--edge);background:var(--paper);padding:8px 15px;border-radius:7px;font-weight:700;font-size:14.5px;box-shadow:var(--lift)}
+.btn:hover{background:#f5f7fb}
+.btn:active{box-shadow:none;transform:translateY(1px)}
+.btn.gold{background:var(--cta);border-color:var(--cta);color:#fff}
+.btn.gold:hover{background:#c23a27}
+.btn.ghost{background:transparent;box-shadow:none;color:var(--muted);font-weight:400}
+.btn.ghost:hover{color:var(--text);text-decoration:underline}
+.btn.danger{color:#b42318}
+.btn.sm{padding:5px 11px;font-size:13.5px}
+.btn.lg{padding:13px 26px;font-size:17px}
+.btn:disabled{opacity:.4;pointer-events:none}
+.respite-cta{font-size:15.5px;padding:9px 18px}
+.tabs{display:flex;gap:2px;margin-bottom:22px;overflow-x:auto;border-bottom:1px solid var(--line2)}
+.tab{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;color:var(--muted);padding:9px 14px;white-space:nowrap;font-weight:700}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--ink);border-bottom-color:var(--cta)}
+.tab .n{font-size:12px;background:var(--acc);color:#fff;border-radius:99px;padding:0 7px;margin-left:6px}
+
+.card{background:var(--paper);border:1px solid var(--edge);border-radius:9px;padding:18px;position:relative;box-shadow:var(--lift)}
+.card.glow{border-top:3px solid var(--acc)}
+.card h3[style]{font-size:17px!important;color:var(--ink)!important}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}.g5{grid-template-columns:repeat(5,1fr)}
+@media(max-width:780px){.g3,.g4{grid-template-columns:1fr 1fr}.g5{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:480px){.g2,.g3{grid-template-columns:1fr}.g4{grid-template-columns:1fr 1fr}.num button{width:32px}}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.muted{color:var(--muted)}.soft{color:var(--soft)}.dim{color:var(--dim)}.small{font-size:13.5px}.tiny{font-size:12.5px}
+.orn{display:flex;align-items:center;gap:12px;margin:28px 0 12px}
+.orn h3{font-size:17px;white-space:nowrap}
+.orn::after{content:"";height:1px;flex:1;background:var(--line)}
+.orn span.d{display:none}
+
+.banner{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.sigil{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:30px;color:var(--acc);background:var(--tint);flex:none}
+.banner h2{font-size:30px}
+.banner .sub{color:var(--muted);font-size:15px;margin-top:2px}
+.xp{margin-top:10px;max-width:360px}
+.gems{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.gem{text-align:center;padding:9px 13px;border-radius:8px;background:#f3f5f9;min-width:90px}
+.gem b{display:block;font-family:var(--display);font-size:22px;font-weight:700;line-height:1.15}
+.gem span{font-size:12.5px;color:var(--muted);display:inline-flex;gap:5px;align-items:center}
+.gem.st b{color:var(--ember)}.gem.rc b{color:var(--moss)}.gem.vi b{color:var(--sky)}
+.gem .mini{display:flex;justify-content:center;gap:4px;margin-top:5px}
+.gem .mini button{width:26px;height:22px;border-radius:5px;border:1px solid #c3ccd8;background:#fff;font-size:14px;line-height:1;padding:0}
+.gem .mini button:hover{background:var(--tint)}
+.char{text-align:center;padding:12px 8px}
+.char label{font-size:13px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--paper);border:1px solid #c3ccd8;border-radius:999px;padding:3px 11px;font-size:13.5px;display:inline-flex;align-items:center;gap:6px}
+.chip.gold{background:var(--tint);border-color:transparent;color:#1a3fa8}
+.chip button{background:none;border:none;color:var(--muted);padding:0;font-size:15px;line-height:1}
+.chip button:hover{color:var(--ember)}
+button.chip:hover{border-color:var(--acc);color:var(--acc)}
+
+.num{display:flex;align-items:stretch;border:1px solid #c3ccd8;border-radius:7px;overflow:hidden;background:#fff;color:var(--ink)}
+.num button{background:#f3f5f9;color:var(--muted);border:none;width:36px;font-size:18px;flex:none;user-select:none}
+.num button:hover{background:var(--tint);color:var(--acc)}
+.num input{border:none;border-radius:0;text-align:center;background:transparent;padding:8px 2px;min-width:0;font-weight:700;-moz-appearance:textfield}
+.num input:focus{outline:none}
+.num:focus-within{outline:2px solid var(--focus);outline-offset:1px}
+.num input::-webkit-outer-spin-button,.num input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.char .num{border:none;background:transparent}
+.char .num input{font-family:var(--display);font-weight:700;font-size:32px;padding:0}
+.char .num button{width:32px;height:32px;border-radius:50%;align-self:center;font-size:17px}
+
+.bar{height:8px;border-radius:2px;overflow:hidden;position:relative;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 1.5px),var(--line2) calc(10% - 1.5px) 10%),var(--line)}
+.bar>i{display:block;height:100%;background:var(--gold);transition:width .5s}
+.bar.done>i{background:var(--moss)}
+.bar.thin{height:6px}
+.pts{font-family:var(--display);font-weight:700;color:var(--gold2);white-space:nowrap;font-size:17px}
+.pts small{color:var(--muted);font-family:var(--sans);font-size:12.5px;font-weight:400}
+.tag{font-size:12px;color:var(--soft);background:var(--line);border-radius:4px;padding:1px 7px;white-space:nowrap}
+.empty{padding:26px;text-align:center;color:var(--muted);border:1px dashed var(--line2);border-radius:9px}
+.star{background:none;border:none;font-size:19px;color:var(--dim);padding:0 2px;line-height:1}
+.star.on{color:var(--cta)}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+td,th{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{color:var(--muted);font-size:13px}
+.proj-t,.serif{font-family:var(--display);font-size:19px;font-weight:700;line-height:1.2}
+
+.wiz{position:fixed;inset:0;z-index:50;display:none;overflow-y:auto;color:var(--text)}
+#wiz{z-index:60}
+.wiz.open{display:block}
+.wiz-in{max-width:860px;margin:0 auto;padding:14px 18px 90px}
+.wbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 0;margin-bottom:14px;background:var(--mat);border-bottom:1px solid var(--line2)}
+.wbar h2{font-size:20px;display:flex;align-items:baseline;gap:10px}
+.wbar h2 .who{font-family:var(--sans);font-weight:400;color:var(--muted);font-size:16px;letter-spacing:0}
+.phases{display:flex;gap:6px;align-items:center;margin-left:auto}
+.ph{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--text)}
+.ph.done{background:var(--text)}
+.ph.cur{background:linear-gradient(90deg,var(--text) 50%,transparent 50%)}
+.stepper{display:inline-flex;align-items:center;border-radius:7px;overflow:hidden;background:var(--paper);border:1px solid var(--edge);box-shadow:var(--lift)}
+.stepper button{background:none;border:none;width:34px;height:34px;font-size:18px}
+.stepper button:hover{background:var(--tint)}
+.stepper b{min-width:30px;text-align:center;font-family:var(--display);font-size:19px}
+.lead{font-family:var(--display);font-weight:700;font-size:22px;line-height:1.2;margin:10px 0 16px}
+.lead em{font-style:normal;color:var(--gold2)}
+.lead .small{font-family:var(--sans);font-weight:400}
+.restcard{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.tile{display:flex;gap:12px;align-items:center;text-align:left;padding:12px 14px;border-radius:9px;border:1px solid var(--edge);background:var(--paper);box-shadow:var(--lift)}
+.tile:hover{box-shadow:0 0 0 2px var(--acc)}
+.tile .ic{font-size:19px;width:36px;height:36px;border-radius:8px;background:#f3f5f9;display:grid;place-items:center;flex:none;filter:grayscale(1)}
+.night .tile:hover,.night .pick:hover{box-shadow:0 0 0 2px #fff}
+.tile b{font-family:var(--display);font-size:16px;font-weight:700;display:block;line-height:1.15}
+.tile span.d{font-size:12.5px;color:var(--muted)}
+.contcard{display:flex;flex-direction:column;gap:8px;padding:15px 16px;border-radius:9px;background:var(--paper);border:1px solid var(--edge);box-shadow:var(--lift);border-left:3px solid var(--acc);text-align:left;width:100%}
+.quick{display:flex;gap:6px}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px}
+.callout{background:#eef3ff;border-left:3px solid var(--acc);padding:9px 13px;border-radius:0 7px 7px 0;margin:12px 0;font-size:14px}
+.callout.warn{background:#fff4e8;border-color:#b4531a}
+.callout.good{background:#eaf7ef;border-color:#17834a}
+.list{display:flex;flex-direction:column;gap:7px;max-height:58vh;overflow-y:auto;padding:2px 6px 8px 2px}
+.pick{display:flex;gap:12px;align-items:center;padding:10px 14px;border-radius:9px;background:var(--paper);border:1px solid var(--edge);cursor:pointer}
+.pick:hover{box-shadow:0 0 0 2px var(--acc)}
+.pick.off{opacity:.5;cursor:not-allowed;box-shadow:none!important}
+.pick .nm{font-family:var(--display);font-size:18px;font-weight:700;line-height:1.2}
+.pick .meta{font-size:13px;color:var(--muted)}
+.pick .eff{font-size:14px;color:var(--soft)}
+.seg{display:inline-flex;flex-wrap:wrap;gap:6px}
+.seg button{border:1px solid #c3ccd8;background:var(--paper);padding:6px 12px;border-radius:7px;font-size:14px}
+.seg button.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+.seg button b{font-family:var(--display);margin-left:5px}
+.counter{display:inline-flex;align-items:center;gap:6px}
+.counter button{width:28px;height:28px;border-radius:6px;border:1px solid #c3ccd8;background:#fff}
+.counter button:hover{background:var(--tint)}
+.counter span{min-width:16px;text-align:center;font-family:var(--display);font-weight:700;font-size:17px}
+.cfgsum{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+.checks{display:flex;flex-direction:column;gap:6px}
+.checks label{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;color:var(--soft);cursor:pointer}
+.kv{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--soft)}
+.kv b{font-family:var(--display);color:var(--gold2)}
+
+.d10{width:58px;height:66px;position:relative;display:grid;place-items:center;flex:none}
+.d10::before{content:"";position:absolute;inset:0;background:var(--acc);clip-path:polygon(50% 0,100% 42%,50% 100%,0 42%)}
+.d10::after{content:"";position:absolute;inset:2px 3px;background:#fff;clip-path:polygon(50% 0,100% 42%,50% 100%,0 42%)}
+.d10 b{position:relative;z-index:1;font-family:var(--display);font-weight:700;font-size:22px;color:var(--acc);margin-top:6px}
+.d10.sm{width:30px;height:34px}.d10.sm b{font-size:13px;margin-top:3px}.d10.sm::after{inset:1.5px 2px}
+.d10.spin{animation:spin .45s ease-out}
+@keyframes spin{0%{transform:rotate(-180deg) scale(.6)}100%{transform:none}}
+.rollzone{display:flex;align-items:center;justify-content:center;gap:16px;padding:6px 0}
+.bigtotal{font-family:var(--display);font-weight:700;font-size:52px;color:var(--gold2);line-height:1;min-width:70px;text-align:center}
+.results{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.res{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:8px;background:var(--paper);border:1px solid var(--edge)}
+.card .res,.celebrate .res{background:#f3f5f9;border-color:transparent}
+.res .rn{font-size:13px;color:var(--muted);width:76px;flex:none}
+.res .tot{font-family:var(--display);font-weight:700;font-size:20px;color:var(--gold2);min-width:40px;text-align:right}
+.res .why{font-size:13px;color:var(--muted);flex:1}
+.badge{font-size:12px;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap}
+.badge.bt{background:#fdebe7;color:#b42318}.badge.ev{background:#efe8fb;color:#5b34a8}.badge.ok{background:#e3f4ea;color:#12693b}
+.celebrate{text-align:center;padding:24px 18px 20px;border-radius:9px;background:var(--paper);border:1px solid var(--edge);border-top:3px solid var(--cta);box-shadow:var(--lift);margin-top:16px}
+.celebrate h3{font-size:24px;margin:6px 0}
+.sparkle{font-size:20px;letter-spacing:10px;color:var(--cta)}
+.actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+details>summary{cursor:pointer;color:var(--muted);font-size:13.5px;list-style:none;text-decoration:underline}
+details>summary::-webkit-details-marker{display:none}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 20px;border-radius:8px;z-index:99;opacity:0;transition:.25s;pointer-events:none;font-size:14.5px}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.pageref{font-size:12.5px;color:var(--dim)}
+.linkbtn{background:none;border:none;color:var(--muted);text-decoration:underline;text-underline-offset:3px;font-size:13.5px;padding:0}
+.linkbtn:hover{color:var(--text)}
+.summary-list{font-size:15.5px;color:var(--soft);line-height:1.6}
+.summary-list div{padding-left:14px;text-indent:-14px}
+.summary-list div::before{content:"– "}
+.fcard .fhead{display:flex;gap:12px;align-items:center}
+.fav-ic{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:19px;background:var(--tint);flex:none;filter:grayscale(1)}
+.tip{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;border:1px solid currentColor;font:700 10.5px/1 var(--sans);opacity:.65;cursor:help;flex:none;vertical-align:middle;text-indent:0;letter-spacing:0}
+.tip:hover,.tip:focus{opacity:1;background:var(--acc);color:#fff;border-color:var(--acc)}
+.night .tip:hover,.night .tip:focus{background:#fff;color:#143a80;border-color:#fff}
+.night .card .tip:hover,.night .card .tip:focus{background:var(--acc);color:#fff;border-color:var(--acc)}
+#tipbox{position:fixed;z-index:200;max-width:290px;background:var(--ink);color:#fff;padding:9px 12px;border-radius:8px;font-size:13.5px;line-height:1.4;box-shadow:0 6px 18px rgba(0,0,0,.35);pointer-events:none;display:none}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- phones ---------- */
+html,body{overflow-x:hidden;max-width:100%}
+.wiz{overflow-x:hidden}
+.grid>*,.row>*,.spread>*{min-width:0}
+input,select,textarea{min-width:0;max-width:100%}
+.orn h3{white-space:normal;text-align:center;max-width:72%}
+.card:has(>table){overflow-x:auto}
+.proj-t,.pick .nm,.banner h2,.tile b{overflow-wrap:anywhere}
+@media(max-width:780px){
+  .char .num{flex-wrap:wrap;justify-content:center;gap:10px}
+  .char .num input{order:-1;flex:1 0 100%;font-size:40px}
+  .fcard .num button{width:26px}
+}
+@media(max-width:560px){
+  .wrap{padding:12px 12px 90px}
+  .wiz-in{padding:0 12px 90px}
+  .top{padding:14px 16px;gap:10px}
+  .brand{flex-basis:100%}
+  .brand h1{font-size:30px}
+  #heroSel{flex:1;min-width:0!important}
+  .top .respite-cta{flex:1;text-align:center;padding:12px 8px}
+  .tabs{flex-wrap:wrap;overflow:visible;gap:0}
+  .tab{padding:10px 10px;font-size:10.5px;letter-spacing:.14em}
+  .card{padding:16px}
+  .banner{gap:14px}
+  .banner h2{font-size:30px}
+  .gems{margin-left:0;width:100%}
+  .gems .gem{flex:1;min-width:0;padding:10px 6px}
+  .gem b{font-size:26px}
+  .lead{font-size:25px;margin:14px 0}
+  .wbar{position:static;gap:10px;padding:12px 16px;border-radius:0 0 6px 6px}
+  .wbar h2{font-size:24px;margin-right:auto}
+  .wbar h2 .who{display:none}
+  .wbar .phases{margin-left:0;order:3;flex-basis:100%;justify-content:flex-start}
+  .wbar .phases .ph{display:none}
+  .orn{margin:26px 0 12px;gap:10px}
+  .orn h3{letter-spacing:.2em;max-width:80%}
+  .tiles{grid-template-columns:1fr 1fr;gap:8px}
+  .tile{padding:12px 10px;gap:10px}
+  .tile .ic{width:30px;height:30px;font-size:13px}
+  .tile b{font-size:16px}
+  .tile span.d{display:none}
+  .contcard{padding:14px}
+  .contcard .spread:last-child{flex-direction:column;align-items:stretch}
+  .quick{flex-wrap:wrap}
+  .quick .btn{flex:1}
+  .res{flex-wrap:wrap;row-gap:4px}
+  .res .rn{width:auto;flex-basis:100%}
+  .res .why{flex:1 0 100%;order:9}
+  .rollzone{gap:12px}
+  .bigtotal{font-size:56px}
+  .actions .btn.lg{padding:14px 20px;letter-spacing:.14em}
+  .btn.lg{padding:14px 22px}
+  .pick{padding:10px 12px;gap:10px}
+  .pick .nm{font-size:19px}
+  .seg{display:flex}
+  .seg button{flex:1 1 auto;padding:8px 10px}
+  .fcard .row[style*="nowrap"]{flex-wrap:wrap!important}
+  .fcard [data-fnew]{flex:1 0 100%}
+  .fcard select[data-fassign]{flex:1 0 100%!important}
+  .celebrate{padding:22px 14px 18px}
+  .celebrate h3{font-size:30px}
+  td:nth-child(2),th:nth-child(2){display:none}
+  td,th{padding:9px 5px}
+  .stepper button{width:38px;height:38px}
+  .list{max-height:none}
+  .dlgbox{padding:18px}
+  .toast{max-width:92vw;text-align:center}
+}
+.celebrate .orn h3{font-family:var(--sans);font-size:11.5px;font-style:normal;margin:0;color:#ecd9aa}
+.chip{border-radius:14px}
+.btn{white-space:nowrap}
+.actions .btn,.dlgbox .btn{white-space:normal}
+@media(max-width:780px){
+  .char{padding:12px 4px}
+  .char .num{gap:6px}
+  .char .num button{width:30px;height:30px}
+}
+@media(max-width:560px){
+  #heroSel{flex:1 1 55%}
+  .top .respite-cta{flex:1 1 40%}
+}
+
+
+/* ============ Vanadium skin for Respite ============ */
+:root{
+  --mat:#F7F7F5; --acc:#D9622B; --cta:#D9622B; --tint:#FCEDE4; --focus:#D9622B;
+  --ink:#1A1A1A; --paper:#FFFFFF; --edge:#E4E2DC;
+  --text:#1A1A1A; --soft:#55534E; --muted:#6E6B64; --dim:#8A877F;
+  --line:#E4E2DC; --line2:#D3D0C7;
+  --gold:#D9622B; --gold2:#A8461A; --ember:#B54A2A; --moss:#3F7D4E; --sky:#4A6378; --violet:#6B4FA8;
+  --display:Inter,system-ui,sans-serif; --sans:Inter,system-ui,sans-serif; --serif:'Source Serif 4',Georgia,serif;
+  --lift:none; --sub:#F1F0EC; --field:#FFFFFF; --sh1:0 1px 2px rgba(0,0,0,.05),0 4px 12px rgba(0,0,0,.04);
+  --vig:transparent; --sheen:transparent; --noise:none; --leather:none; --cherry:none;
+  color-scheme:light;
+}
+html[data-theme=dark]{
+  --mat:#111214; --acc:#E07038; --cta:#E07038; --tint:#3A2318; --focus:#E07038;
+  --ink:#ECEBE8; --paper:#18191C; --edge:#2A2B30;
+  --text:#ECEBE8; --soft:#C9C7C1; --muted:#A9A7A1; --dim:#77756F;
+  --line:#2A2B30; --line2:#3A3B41;
+  --gold:#E07038; --gold2:#F2A27A; --ember:#F08A55; --moss:#6DB07E; --sky:#8FA8BD; --violet:#B9A2E8;
+  --sub:#1F2024; --field:#111214; --sh1:0 1px 2px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.25);
+  color-scheme:dark;
+}
+.night{--mat:var(--mat)}
+.card,.tile,.pick,.contcard,.res,.callout,.celebrate,.chip,.btn.gold,.seg button,.stepper{
+  --text:var(--ink);--soft:inherit;--line:var(--edge);--line2:var(--line2);--gold:var(--acc);--gold2:var(--gold2);--focus:var(--acc)}
+html,body{font-size:14.5px;letter-spacing:-.003em}
+.matbg,body{background:var(--mat)!important}
+h1,h2,h3{font-family:var(--display);letter-spacing:-.02em;font-weight:700}
+input,select,textarea{background:var(--field);color:var(--ink);border:1px solid var(--edge);border-radius:6px;height:36px;padding:0 11px}
+textarea{height:auto;padding:9px 11px}
+input::placeholder,textarea::placeholder{color:var(--dim)}
+input:focus,select:focus,textarea:focus,button:focus-visible,.tip:focus-visible{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--tint)}
+input:disabled{background:var(--sub);color:var(--muted)}
+label.l{font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0;text-transform:none}
+.wrap{max-width:1080px;padding:28px 24px 100px}
+/* header */
+.top{margin-bottom:18px;gap:10px}
+.moon{width:38px;height:38px;background:var(--tint)}
+.moon::after{background:var(--acc);width:60%;height:60%;left:20%;top:20%;border-radius:50%;-webkit-mask:radial-gradient(circle at 70% 30%,transparent 42%,#000 44%);mask:radial-gradient(circle at 70% 30%,transparent 42%,#000 44%)}
+.brand h1{font-size:28px;font-weight:700;font-style:normal;color:var(--ink)}
+.brand small{font-size:13.5px;color:var(--muted);letter-spacing:0;text-transform:none}
+/* buttons */
+.btn{background:var(--paper);color:var(--ink);border:1px solid var(--edge);border-radius:6px;font-weight:600;font-size:14px;height:36px;padding:0 14px;box-shadow:none;letter-spacing:0;text-transform:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background .15s,border-color .15s}
+.btn:hover{background:var(--sub);border-color:var(--line2)}
+.btn:active{transform:none}
+.btn.gold,.respite-cta{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.gold:hover,.respite-cta:hover{background:#C2531F;border-color:#C2531F}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted);font-weight:500}
+.btn.ghost:hover{background:var(--sub);color:var(--ink);text-decoration:none}
+.btn.danger{color:#C0392B}
+.btn.sm{height:30px;font-size:13px;padding:0 10px}
+.btn.lg{height:44px;padding:0 22px;font-size:15px;letter-spacing:0}
+.respite-cta{font-size:14px;height:36px;padding:0 16px}
+/* tabs */
+.tabs{border-bottom:1px solid var(--edge);gap:4px;margin-bottom:24px}
+.tab{color:var(--muted);font-weight:500;font-size:14px;padding:10px 4px;margin-right:14px;letter-spacing:0;text-transform:none;border-bottom-width:2px}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);font-weight:600;border-bottom-color:var(--acc)}
+.tab .n{background:var(--tint);color:#A8461A;font-weight:600;font-size:11px}
+html[data-theme=dark] .tab .n{color:var(--gold2)}
+/* surfaces */
+.card,.tile,.pick,.contcard,.res,.celebrate,.stepper{background:var(--paper);border:1px solid var(--edge);border-radius:10px;box-shadow:none;color:var(--ink)}
+.card{padding:20px}
+.card.glow{border-top:1px solid var(--edge);box-shadow:inset 0 3px 0 var(--acc)}
+.card h3[style]{font-size:16px!important;color:var(--ink)!important}
+.tile:hover,.pick:hover,.night .tile:hover,.night .pick:hover{box-shadow:var(--sh1);border-color:var(--line2)}
+.contcard{border-left:1px solid var(--edge);box-shadow:inset 3px 0 0 var(--acc)}
+.orn{margin:32px 0 12px}
+.orn h3{font-family:var(--sans);font-size:15px;font-weight:600;letter-spacing:-.01em;text-transform:none;color:var(--ink);font-style:normal}
+.orn::before{display:none}
+.orn::after{background:var(--edge)}
+/* hero banner */
+.sigil{width:56px;height:56px;background:var(--sub);color:var(--ink);font-family:var(--sans);font-size:22px;font-weight:600;border:0;box-shadow:none}
+.banner h2{font-size:24px;font-weight:700;font-style:normal}
+.banner .sub{font-size:13.5px;letter-spacing:0;text-transform:none}
+.gem{background:var(--sub);border:0;border-radius:8px;min-width:96px;padding:10px 12px}
+.gem b{font-family:var(--sans);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)!important}
+.gem span{font-size:12px;letter-spacing:0;text-transform:none}
+.gem .mini button,.counter button{background:var(--paper);border:1px solid var(--edge);border-radius:6px;color:var(--muted)}
+.gem .mini button:hover,.counter button:hover{background:var(--tint);color:var(--acc)}
+/* numbers & characteristics */
+.char{padding:14px 10px}
+.char label{font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted)}
+.char .num input{font-family:var(--sans);font-size:28px;font-weight:600;color:var(--ink)}
+.char .num button{border:1px solid var(--edge);background:var(--paper);color:var(--muted)}
+.num{background:var(--field);border:1px solid var(--edge);border-radius:6px;color:var(--ink)}
+.num button{background:var(--sub);color:var(--muted)}
+.num button:hover{background:var(--tint);color:var(--acc)}
+.num input{height:auto;font-weight:600;color:var(--ink);background:transparent!important;border:0;box-shadow:none!important;font-variant-numeric:tabular-nums}
+.num:focus-within{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--tint)}
+/* chips, segments, bars */
+.chip{background:var(--paper);border:1px solid var(--edge);color:var(--ink);font-size:13px;letter-spacing:0;text-transform:none}
+.chip.gold{background:var(--tint);color:#A8461A;border-color:transparent}
+html[data-theme=dark] .chip.gold{color:var(--gold2)}
+.seg button{background:var(--paper);border:1px solid var(--edge);border-radius:6px;color:var(--ink);letter-spacing:0;text-transform:none}
+.seg button.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.seg button b,.counter span,.stepper b,.pts,.res .tot,.bigtotal,.kv b,.pick .nm,.proj-t,.serif,.tile b,.lead,.d10 b{font-family:var(--sans)!important;font-style:normal!important;letter-spacing:-.01em}
+.pick .nm,.proj-t,.serif{font-size:16px;font-weight:600}
+.tile b{font-size:15px;font-weight:600}
+.lead{font-size:20px;font-weight:600}
+.pts{color:#A8461A;font-weight:600}
+.bar{height:6px;border-radius:999px;background:var(--sub)}
+.bar>i{background:var(--acc);border-radius:999px}
+.bar.done>i{background:var(--moss)}
+.tag{background:var(--sub);color:var(--muted);border-radius:999px;padding:1px 8px}
+.tile .ic,.fav-ic{background:var(--sub);filter:grayscale(1);border-radius:999px}
+.callout{background:var(--sub);border-left:3px solid var(--acc);color:var(--ink)}
+.callout.warn{background:#FBF1DC;border-color:#B8862B}
+.callout.good{background:#E6F2E8;border-color:#3F7D4E}
+html[data-theme=dark] .callout.warn{background:#33291A}
+html[data-theme=dark] .callout.good{background:#1B2B20}
+.badge.bt{background:#FBE7E4;color:#C0392B}.badge.ev{background:#EEE8F8;color:#6B4FA8}.badge.ok{background:#E6F2E8;color:#3F7D4E}
+.empty{border:1px dashed var(--line2);color:var(--muted);border-radius:10px}
+.star.on{color:var(--acc)}
+th{color:var(--muted);font-weight:500;font-size:12px;letter-spacing:0;text-transform:none}
+td,th{border-bottom:1px solid var(--edge)}
+/* wizard overlay (respite / days pass) */
+.wiz,.wiz.night{background:var(--mat)!important}
+.wbar{background:var(--mat);border-bottom:1px solid var(--edge)}
+.wbar h2{font-size:20px;font-style:normal}
+.ph{border-color:var(--line2)}.ph.done{background:var(--acc);border-color:var(--acc)}.ph.cur{background:linear-gradient(90deg,var(--acc) 50%,transparent 50%);border-color:var(--acc)}
+.stepper{border-radius:6px}
+.stepper button:hover{background:var(--sub)}
+.d10::before{background:var(--acc)}
+.d10::after{background:var(--paper)}
+.d10 b{color:var(--acc)}
+.bigtotal{color:var(--ink);font-weight:700}
+.celebrate{border-top:1px solid var(--edge);box-shadow:inset 0 3px 0 var(--acc)}
+.celebrate h3{font-size:22px;font-style:normal}
+.celebrate .orn h3{color:var(--muted);font-family:var(--sans)}
+.sparkle{color:var(--acc)}
+.card .res,.celebrate .res{background:var(--sub)}
+.toast,#tipbox{background:#1A1A1A;color:#fff;border-radius:999px;box-shadow:0 12px 32px rgba(0,0,0,.15)}
+#tipbox{border-radius:10px}
+.tip:hover,.tip:focus,.night .tip:hover,.night .tip:focus,.night .card .tip:hover,.night .card .tip:focus{background:var(--acc);color:#fff;border-color:var(--acc)}
+.dlg{position:fixed;inset:0;z-index:300;background:rgba(17,18,20,.45);display:grid;place-items:center;padding:20px}
+.dlgbox{max-width:420px;width:100%;border-radius:14px!important;box-shadow:0 12px 32px rgba(0,0,0,.18)}
+.dlgbox p{margin:0 0 12px;font-size:15px}
+.linkbtn{color:var(--muted)}
+details>summary{color:var(--muted)}
+#daysBtn{font-size:14px!important}
+@media(max-width:560px){
+  .wrap{padding:14px 14px 90px}
+  .top{padding:4px 0 8px}
+  .brand h1{font-size:24px}
+  .tab{font-size:13px;letter-spacing:0;padding:10px 4px;margin-right:12px}
+  .tabs{flex-wrap:nowrap;overflow-x:auto}
+  .banner h2{font-size:22px}
+  .gem b{font-size:20px}
+  .lead{font-size:19px}
+  .orn h3{letter-spacing:-.01em}
+  .btn.lg{letter-spacing:0}
+  .wbar h2{font-size:19px}
+  .celebrate h3{font-size:22px}
+}
+</style>
+<script>(function(){function ap(){try{var t=JSON.parse(localStorage.getItem('st_theme2')||'"light"');document.documentElement.dataset.theme=t;}catch(e){}}ap();window.addEventListener('storage',ap);window.__stTheme=ap;})();</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><div class="moon"></div><div><h1>Respite</h1><small>a Draw Steel downtime companion</small></div></div>
+    <select id="heroSel" style="width:auto;min-width:150px"></select>
+    <button class="btn sm" id="newHero">+ Hero</button>
+    <button class="btn respite-cta" id="daysBtn" style="font-size:15px">Days pass</button>
+    <button class="btn gold respite-cta" id="respiteBtn">Respite</button>
+  </header>
+  <nav class="tabs" id="tabs"></nav>
+  <main id="main"></main>
+</div>
+<div class="wiz matbg" id="wiz"><div class="wiz-in" id="wizIn"></div></div>
+<div class="wiz matbg" id="setup"><div class="wiz-in" id="setupIn"></div></div>
+<div class="wiz matbg" id="days"><div class="wiz-in" id="daysIn"></div></div>
+<div class="toast" id="toast"></div>
+<div id="tipbox" role="tooltip"></div>
+
+<script>
+const TREASURES = [{"name": "Black Ash Dart", "cat": "Consumable (1st echelon)", "kw": "Magic", "pre": "Three vials of black ash from the College of Black Ash", "src": "Texts or lore in Szetch", "ch": "Agility or Intuition", "goalText": "45 (yields 1d3 darts, or three darts if crafted by a shadow)", "goal": 45}, {"name": "Blood Essence Vial", "cat": "Consumable (1st echelon)", "kw": "Potion, Psionic", "pre": "A ruby purloined from a vampire", "src": "Texts or lore in Proto-Ctholl", "ch": "Agility or Reason", "goalText": "45", "goal": 45}, {"name": "Buzz Balm", "cat": "Consumable (1st echelon)", "kw": "Magic, Oil", "pre": "An ounce of demon honey", "src": "Texts or lore in Kalliak", "ch": "Reason or Intuition", "goalText": "45", "goal": 45}, {"name": "Catapult Dust", "cat": "Consumable (1st echelon)", "kw": "Magic", "pre": "An ounce of witherite crystal", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "45", "goal": 45}, {"name": "Giant’s-Blood Flame", "cat": "Consumable (1st echelon)", "kw": "Magic, Oil", "pre": "One vial of fire giant blood", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "45", "goal": 45}, {"name": "Growth Potion", "cat": "Consumable (1st echelon)", "kw": "Magic, Potion", "pre": "A half-pound of seagrass", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "45", "goal": 45}, {"name": "Healing Potion", "cat": "Consumable (1st echelon)", "kw": "Magic, Potion", "pre": "An ounce of costmary leaves", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "45", "goal": 45}, {"name": "Imp’s Tongue", "cat": "Consumable (1st echelon)", "kw": "Magic", "pre": "One imp’s tongue", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "45", "goal": 45}, {"name": "Lachomp Tooth", "cat": "Consumable (1st echelon)", "kw": "Psionic", "pre": "A leftover carcass of a lachomp meal", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "45 (yields 1d3 teeth)", "goal": 45}, {"name": "Mirror Token", "cat": "Consumable (1st echelon)", "kw": "Psionic", "pre": "Three sheets of glass, sunbaked gold dust", "src": "Texts or lore in Variac", "ch": "Reason or Intuition", "goalText": "45", "goal": 45}, {"name": "Pocket Homunculus", "cat": "Consumable (1st echelon)", "kw": "Psionic", "pre": "A strip of starmetal coated in the blood of the item’s crafter", "src": "Texts or lore in Zaliac", "ch": "Reason", "goalText": "45", "goal": 45}, {"name": "Portable Cloud", "cat": "Consumable (1st echelon)", "kw": "Magic", "pre": "A cup of rainwater from a sacred fey grove, plus an optional prerequisite (see below)", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "30 or 45 (see below)", "goal": 30}, {"name": "Professor Veratismo’s Quaff ’n Huff Snuff", "cat": "Consumable (1st echelon)", "kw": "Potion, Psionic", "pre": "The roots of a just-budded nightshade", "src": "Texts or lore in Caelian", "ch": "Reason", "goalText": "45", "goal": 45}, {"name": "Snapdragon", "cat": "Consumable (1st echelon)", "kw": "Magic", "pre": "Fifty snapdragon seeds", "src": "Texts or lore in Yllyric", "ch": "Reason or Intuition", "goalText": "45 (yields 1d6 + 1 snapdragons)", "goal": 45}, {"name": "Breath of Dawn", "cat": "Consumable (2nd echelon)", "kw": "Psionic", "pre": "The breath of a mystic sage captured at sunrise", "src": "Texts or lore in Hyrallic", "ch": "Intuition or Presence", "goalText": "90", "goal": 90}, {"name": "Bull Shot", "cat": "Consumable (2nd echelon)", "kw": "Magic, Potion", "pre": "One vial of pure bovine essence", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "90", "goal": 90}, {"name": "Chocolate of Immovability", "cat": "Consumable (2nd echelon)", "kw": "Magic", "pre": "A chocolate made by a gnome confectioner", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "90", "goal": 90}, {"name": "Concealment Potion", "cat": "Consumable (2nd echelon)", "kw": "Potion, Psionic", "pre": "An ounce of sap from a tree damaged by psionic fire", "src": "Texts or lore in Yllyric", "ch": "Agility or Intuition", "goalText": "90", "goal": 90}, {"name": "Float Powder", "cat": "Consumable (2nd echelon)", "kw": "Magic", "pre": "Several strands of hag hair", "src": "Texts or lore in Khelt", "ch": "Intuition or Presence", "goalText": "90 (yields 1d3 vials)", "goal": 90}, {"name": "Purified Jelly", "cat": "Consumable (2nd echelon)", "kw": "Potion, Psionic", "pre": "A cup of algae from glacial water", "src": "Texts or lore in Yllyric", "ch": "Reason or Intuition", "goalText": "90 (yields 1d3 doses)", "goal": 90}, {"name": "Scroll of Resurrection", "cat": "Consumable (2nd echelon)", "kw": "Magic, Scroll", "pre": "A sheet of paper infused with the dust of a painite", "src": "Texts or lore in the First Language", "ch": "Intuition or Presence", "goalText": "90", "goal": 90}, {"name": "Telemagnet", "cat": "Consumable (2nd echelon)", "kw": "Psionic", "pre": "A shard of prismacore, an ounce of ferrous metal", "src": "Texts or lore in Zaliac", "ch": "Reason or Intuition", "goalText": "90", "goal": 90}, {"name": "Vial of Ethereal Attack", "cat": "Consumable (2nd echelon)", "kw": "Psionic", "pre": "A signed agreement with a ghost, a large obsidian disk", "src": "Texts or lore in Anjali", "ch": "Reason or Intuition", "goalText": "90", "goal": 90}, {"name": "Anamorphic Larva", "cat": "Consumable (3rd echelon)", "kw": "Psionic", "pre": "A grub steeped in voiceless talker bile", "src": "Texts or lore in Variac", "ch": "Might or Intuition", "goalText": "180", "goal": 180}, {"name": "Bottled Paradox", "cat": "Consumable (3rd echelon)", "kw": "Magic, Potion", "pre": "A month’s lifespan from the creator or another willing creature, ground sapphire", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "180", "goal": 180}, {"name": "G’Allios Visiting Card", "cat": "Consumable (3rd echelon)", "kw": "Magic", "pre": "One vial of archdevil’s blood, an expired contract", "src": "Texts or lore in Anjali", "ch": "Reason or Intuition", "goalText": "180", "goal": 180}, {"name": "Personal Effigy", "cat": "Consumable (3rd echelon)", "kw": "Magic", "pre": "A brief period of contact with the creature the effigy is tied to", "src": "Texts or lore in Khemharic", "ch": "Reason or Intuition", "goalText": "120", "goal": 120}, {"name": "Stygian Liquor", "cat": "Consumable (3rd echelon)", "kw": "Magic, Potion", "pre": "An ounce of scrapings from a coven’s used cauldron", "src": "Texts in Anjali", "ch": "Reason or Intuition", "goalText": "180", "goal": 180}, {"name": "Timesplitter", "cat": "Consumable (3rd echelon)", "kw": "Psionic", "pre": "A time crystal", "src": "Texts or lore in Voll", "ch": "Reason or Intuition", "goalText": "180", "goal": 180}, {"name": "Ward Token", "cat": "Consumable (3rd echelon)", "kw": "Psionic", "pre": "A small quartz", "src": "Texts or lore in Zaliac", "ch": "Might or Intuition", "goalText": "180", "goal": 180}, {"name": "Wellness Tonic", "cat": "Consumable (3rd echelon)", "kw": "Potion, Psionic", "pre": "An ounce of troll’s blood, raw honey", "src": "Texts or lore in Variac", "ch": "Might or Intuition", "goalText": "180", "goal": 180}, {"name": "Breath of Creation", "cat": "Consumable (4th echelon)", "kw": "Psionic", "pre": "The captured breath of a god, an ounce of condensed dreams", "src": "Texts or lore in the First Language", "ch": "Intuition or Presence", "goalText": "360", "goal": 360}, {"name": "Elixir of Saint Elspeth", "cat": "Consumable (4th echelon)", "kw": "Magic, Potion", "pre": "An ounce of the blood of Saint Elspeth", "src": "Texts or lore in Caelian", "ch": "Presence", "goalText": "360", "goal": 360}, {"name": "Page From the Infinite Library: Solaris", "cat": "Consumable (4th echelon)", "kw": "Magic", "pre": "One vial of sacred ink, blessed parchment", "src": "Reference materials in the First Language from the Infinite Library detailing incomplete instructions for building a sun", "ch": "Reason or Intuition", "goalText": "360", "goal": 360}, {"name": "Restorative of the Bright Court", "cat": "Consumable (4th echelon)", "kw": "Magic", "pre": "A year’s lifespan from the creator or another willing creature, the laughter of a young hero", "src": "Texts or lore in Khelt", "ch": "Reason or Presence", "goalText": "360", "goal": 360}, {"name": "Color Cloak (Blue)", "cat": "Trinket (1st echelon)", "kw": "Magic, Neck", "pre": "A pint of blue ichor, soul chalk", "src": "Licensing agreements in Anjali", "ch": "Reason or Intuition", "goalText": "150", "goal": 150}, {"name": "Color Cloak (Red)", "cat": "Trinket (1st echelon)", "kw": "Magic, Neck", "pre": "A pint of red ichor, soul chalk", "src": "Licensing agreements in Anjali", "ch": "Reason or Intuition", "goalText": "150", "goal": 150}, {"name": "Color Cloak (Yellow)", "cat": "Trinket (1st echelon)", "kw": "Magic, Neck", "pre": "A pint of yellow ichor, soul chalk", "src": "Licensing agreements in Anjali", "ch": "Reason or Intuition", "goalText": "150", "goal": 150}, {"name": "Deadweight", "cat": "Trinket (1st echelon)", "kw": "Magic", "pre": "One humanoid femur, one bar of lead laced with starmetal", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "150", "goal": 150}, {"name": "Displacing Replacement Bracer", "cat": "Trinket (1st echelon)", "kw": "Arms, Psionic", "pre": "Petrified wood from a tree that has not been observed since falling", "src": "Texts or lore in Zaliac", "ch": "Reason", "goalText": "150", "goal": 150}, {"name": "Divine Vine", "cat": "Trinket (1st echelon)", "kw": "Magic", "pre": "Three withered mundane vines, a tree’s blessing", "src": "Songs in Yllyric", "ch": "Reason or Presence", "goalText": "150", "goal": 150}, {"name": "Flameshade Gloves", "cat": "Trinket (1st echelon)", "kw": "Hands, Psionic", "pre": "A humanoid’s shadow disconnected from its source", "src": "Texts or lore in Khelt", "ch": "Reason", "goalText": "150", "goal": 150}, {"name": "Gecko Gloves", "cat": "Trinket (1st echelon)", "kw": "Hands, Magic", "pre": "Ten gecko tails", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "150", "goal": 150}, {"name": "Hellcharger Helm", "cat": "Trinket (1st echelon)", "kw": "Head, Magic", "pre": "One broken contract, one ingot of steel", "src": "Texts or lore in Anjali and Caelian", "ch": "Might or Reason", "goalText": "150", "goal": 150}, {"name": "Mask of the Many", "cat": "Trinket (1st echelon)", "kw": "Head, Magic", "pre": "One used death shroud", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "150", "goal": 150}, {"name": "Quantum Satchel", "cat": "Trinket (1st echelon)", "kw": "Magic", "pre": "One uncut opal", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "150", "goal": 150}, {"name": "Unbinder Boots", "cat": "Trinket (1st echelon)", "kw": "Feet, Magic", "pre": "One battered gold chain of at least fifty links", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "150", "goal": 150}, {"name": "Bastion Belt", "cat": "Trinket (2nd echelon)", "kw": "Magic, Waist", "pre": "A giant’s tooth", "src": "Texts or lore in High Kuric", "ch": "Might or Intuition", "goalText": "300", "goal": 300}, {"name": "Evilest Eye", "cat": "Trinket (2nd echelon)", "kw": "Neck, Psionic", "pre": "An eyeball from a pirate captain who drowned at sea", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "300", "goal": 300}, {"name": "Insightful Crown", "cat": "Trinket (2nd echelon)", "kw": "Head, Psionic", "pre": "One measure of pure crystal, a jarred memory of true joy", "src": "Texts or lore in Variac", "ch": "Reason or Intuition", "goalText": "300", "goal": 300}, {"name": "Key of Inquiry", "cat": "Trinket (2nd echelon)", "kw": "Psionic", "pre": "The finger bone of a creature with telepathy, three black opals", "src": "Texts or lore in Ullorvic", "ch": "Reason or Intuition", "goalText": "300", "goal": 300}, {"name": "Mediator’s Charm", "cat": "Trinket (2nd echelon)", "kw": "Head, Psionic", "pre": "The gold nib of a fountain pen used to sign a major treaty or compact, a ruby once worn by a devil", "src": "Texts or lore in Hyrallic", "ch": "Reason or Presence", "goalText": "300", "goal": 300}, {"name": "Necklace of the Bayou", "cat": "Trinket (2nd echelon)", "kw": "Magic, Neck", "pre": "A gallon of swamp water, the limbs of four different newts", "src": "Texts or lore in Yllyric", "ch": "Reason or Intuition", "goalText": "300", "goal": 300}, {"name": "Scannerstone", "cat": "Trinket (2nd echelon)", "kw": "Psionic", "pre": "A piece of polished obsidian, seven flawless pea-sized diamonds", "src": "Texts or lore in Variac", "ch": "Reason or Intuition", "goalText": "300", "goal": 300}, {"name": "Stop-’n-Go Coin", "cat": "Trinket (2nd echelon)", "kw": "Magic", "pre": "A coin minted during an earthquake", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "300", "goal": 300}, {"name": "Bracers of Strife", "cat": "Trinket (3rd echelon)", "kw": "Arms, Magic", "pre": "The severed hand of a giant", "src": "Texts or lore in Yllyric", "ch": "Reason or Intuition", "goalText": "450", "goal": 450}, {"name": "Mask of Oversight", "cat": "Trinket (3rd echelon)", "kw": "Head, Magic", "pre": "An overmind egg, the skin of any shapeshifter", "src": "Texts or lore in the First Language", "ch": "Reason or Intuition", "goalText": "450", "goal": 450}, {"name": "Mirage Band", "cat": "Trinket (3rd echelon)", "kw": "Head, Psionic", "pre": "A spool of mindspider silk, an ingot of white gold", "src": "Texts or lore in Higaran", "ch": "Reason or Intuition", "goalText": "450", "goal": 450}, {"name": "Nullfield Resonator Ring", "cat": "Trinket (3rd echelon)", "kw": "Psionic, Ring", "pre": "A wafer of gallium arsenide", "src": "Texts or lore in Mindspeech", "ch": "Reason or Intuition", "goalText": "450", "goal": 450}, {"name": "Shifting Ring", "cat": "Trinket (3rd echelon)", "kw": "Psionic, Ring", "pre": "One-third of a pound of diamond dust, one nugget of pure silver", "src": "Texts or lore in Khelt", "ch": "Agility or Intuition", "goalText": "450", "goal": 450}, {"name": "Gravekeeper’s Lantern", "cat": "Trinket (4th echelon)", "kw": "Magic", "pre": "The powdered jawbone of a powerful spellcaster, wood from a tree marking multiple graves", "src": "Texts or lore in Hyrallic", "ch": "Reason or Intuition", "goalText": "600", "goal": 600}, {"name": "Psi Blade", "cat": "Trinket (4th echelon)", "kw": "Arms, Psionic", "pre": "Steel alloy, one fine-cut topaz", "src": "Texts or lore in Mindspeech", "ch": "Agility or Presence", "goalText": "600", "goal": 600}, {"name": "Adaptive Second Skin of Toxins", "cat": "Leveled armor", "kw": "Light Armor, Magic", "pre": "Five rabid honey badger pelts, the quills of a hedgehog", "src": "Texts or lore in Yllyric", "ch": "Agility or Intuition", "goalText": "450", "goal": 450}, {"name": "Chain of the Sea and Sky", "cat": "Leveled armor", "kw": "Heavy Armor, Magic", "pre": "A set of wings from a flying carp, a set of chain mail rusted by seawater", "src": "Texts or lore in Zaliac", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Grand Scarab", "cat": "Leveled armor", "kw": "Magic, Medium Armor", "pre": "A giant scarab beetle carapace", "src": "Texts or lore in Phaedran", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "King’s Roar", "cat": "Leveled armor", "kw": "Magic, Shield", "pre": "A ballad of heroism, two ingots of sunmetal", "src": "Songs in High Rhyvian", "ch": "Reason, Intuition, or Presence", "goalText": "450", "goal": 450}, {"name": "Kuran’zoi Prismscale", "cat": "Leveled armor", "kw": "Medium Armor, Psionic", "pre": "The eyes of a time raider who died valiantly in battle", "src": "Texts or lore in Voll", "ch": "Intuition or Presence", "goalText": "450", "goal": 450}, {"name": "Paper Trappings", "cat": "Leveled armor", "kw": "Light Armor, Magic", "pre": "Ten pages from each of a hundred different books", "src": "Texts or lore in Anjali", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Shrouded Memory", "cat": "Leveled armor", "kw": "Light Armor, Psionic", "pre": "The will of a deceased person with no heirs", "src": "Texts or lore in Khelt", "ch": "Agility or Presence", "goalText": "450", "goal": 450}, {"name": "Spiny Turtle", "cat": "Leveled armor", "kw": "Heavy Armor, Magic", "pre": "Ten steel gears from an ancient construct", "src": "Texts or lore in Variac", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Star-Hunter", "cat": "Leveled armor", "kw": "Heavy Armor, Psionic", "pre": "A large vessel of astral ice, a pint of supercooled mercury", "src": "Texts or lore in Voll", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Telekinetic Bulwark", "cat": "Leveled armor", "kw": "Psionic, Shield", "pre": "Three ingots of steel, six crystals that resonate with psionic power", "src": "Texts or lore in Variac", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Abjurer’s Bastion", "cat": "Leveled implement", "kw": "Implement, Magic", "pre": "A diamond ring", "src": "Texts or lore in Caelian", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Brittlebreaker", "cat": "Leveled implement", "kw": "Psionic, Wand", "pre": "A handful of shattered quartz", "src": "Texts or lore in Caelian", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Chaldorb", "cat": "Leveled implement", "kw": "Implement, Magic", "pre": "An ounce of primordial ice, an ounce of mam- moth-ivory shards", "src": "Texts or lore in Zaliac", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Ether-Fueled Vessel", "cat": "Leveled implement", "kw": "Implement, Psionic", "pre": "Incense distilled from the essence of ether", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "450", "goal": 450}, {"name": "Foesense Lenses", "cat": "Leveled implement", "kw": "Implement, Psionic", "pre": "Two clear lenses carved from volcanic glass", "src": "Texts or lore in Caelian", "ch": "Reason or Intuition", "goalText": "450", "goal": 450}, {"name": "Words Become Wonders at Next Breath", "cat": "Leveled implement", "kw": "Implement, Magic", "pre": "Written permission from a high elf magistrate", "src": "Texts or lore in Hyrallic", "ch": "Reason or Intuition", "goalText": "450", "goal": 450}, {"name": "Authority’s End", "cat": "Leveled weapon", "kw": "Psionic, Whip", "pre": "A lash used to punish a mutineer", "src": "Texts or lore in Khelt", "ch": "Reason, Intuition, or Presence", "goalText": "450", "goal": 450}, {"name": "Blade of Quintessence", "cat": "Leveled weapon", "kw": "Magic, Medium Weapon", "pre": "A ruby hardened in the fires of the City of Brass, a sapphire that has been struck by lightning", "src": "Texts or lore in Zaliac", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Blade of the Luxurious Fop", "cat": "Leveled weapon", "kw": "Light Weapon, Magic", "pre": "A personal blessing from the greatest duelist in the land, six fake and extremely shiny gemstones", "src": "Texts or lore in Caelian", "ch": "Agility, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Displacer", "cat": "Leveled weapon", "kw": "Medium Weapon, Psionic", "pre": "An ancient bronze gear covered in indeci- pherable runes", "src": "Texts in Zaliac", "ch": "Might or Intuition", "goalText": "450", "goal": 450}, {"name": "Executioner’s Blade", "cat": "Leveled weapon", "kw": "Heavy Weapon, Psionic", "pre": "The skull of a convicted criminal", "src": "Texts or lore in Caelian", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Icemaker Maul", "cat": "Leveled weapon", "kw": "Heavy Weapon, Magic", "pre": "Eight iron bars cooled in a glacier, the branch of an ancient evergreen", "src": "Texts in Zaliac", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Knife of Nine", "cat": "Leveled weapon", "kw": "Light Weapon, Psionic", "pre": "Eighteen daggers—nine taken from personal enemies and nine gifted by friends", "src": "Texts or lore in Variac", "ch": "Reason or Intuition", "goalText": "450", "goal": 450}, {"name": "Lance of the Sundered Star", "cat": "Leveled weapon", "kw": "Magic, Polearm", "pre": "Night-blooming flower petals, a starmetal meteorite", "src": "Texts or lore in Hyrallic", "ch": "Agility or Presence", "goalText": "450", "goal": 450}, {"name": "Molten Constrictor", "cat": "Leveled weapon", "kw": "Magic, Net", "pre": "Four iron bars coated in magma slag", "src": "Texts or lore in Caelian", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Onerous Bow", "cat": "Leveled weapon", "kw": "Bow, Magic", "pre": "A venom sac from a giant spider, one valok gyroscope", "src": "Texts or lore in Caelian and Variac", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Steeltongue", "cat": "Leveled weapon", "kw": "Magic, Whip", "pre": "One hundred steel arrowheads stained with blood", "src": "Texts or lore in Caelian and Kalliak", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Third Eye Seeker", "cat": "Leveled weapon", "kw": "Bow, Psionic", "pre": "Heart strings of a tapir, a pound of tiger’s eye gemstones", "src": "Texts or lore in Variac", "ch": "Reason or Intuition", "goalText": "450", "goal": 450}, {"name": "Thunderhead Bident", "cat": "Leveled weapon", "kw": "Magic, Medium Weapon", "pre": "A jar of captured thunder, two ingots of moon metal", "src": "Texts or lore in Zaliac", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Wetwork", "cat": "Leveled weapon", "kw": "Polearm, Psionic", "pre": "A folded metal blade infused with blood", "src": "Texts or lore in Higaran", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Bloodbound Band", "cat": "Other leveled", "kw": "Magic, Ring", "pre": "A pair of obituaries that each mention the subject of the other", "src": "Texts or lore in Caelian", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Bloody Hand Wraps", "cat": "Other leveled", "kw": "Hands, Psionic", "pre": "One cotton bolt soaked in the blood of six adventurers", "src": "Texts or lore in Caelian", "ch": "Might, Agility, or Intuition", "goalText": "450", "goal": 450}, {"name": "Lightning Treads", "cat": "Other leveled", "kw": "Feet, Magic", "pre": "One jar of lightning", "src": "Texts or lore in Yllyric", "ch": "Agility, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Revenger’s Wrap", "cat": "Other leveled", "kw": "Neck, Magic", "pre": "A cloak worn by a murdered monarch", "src": "Texts or lore in Caelian", "ch": "Might, Reason, or Intuition", "goalText": "450", "goal": 450}, {"name": "Thief of Joy", "cat": "Other leveled", "kw": "Neck, Psionic", "pre": "A pound of feathers, a pound of bricks from the Seven Cities of Hell", "src": "Texts or lore in Anjali", "ch": "Might, Reason, or Presence", "goalText": "450", "goal": 450}];
+const CHARS = ['Might','Agility','Reason','Intuition','Presence'];
+const SKILLS = {
+  Crafting:['Alchemy','Architecture','Blacksmithing','Carpentry','Cooking','Fletching','Forgery','Jewelry','Mechanics','Tailoring'],
+  Exploration:['Climb','Drive','Endurance','Gymnastics','Heal','Jump','Lift','Navigate','Ride','Swim'],
+  Interpersonal:['Brag','Empathize','Flirt','Gamble','Handle Animals','Interrogate','Intimidate','Lead','Lie','Music','Perform','Persuade','Read Person'],
+  Intrigue:['Alertness','Conceal Object','Disguise','Eavesdrop','Escape Artist','Hide','Pick Lock','Pick Pocket','Sabotage','Search','Sneak','Track'],
+  Lore:['Criminal Underworld','Culture','History','Magic','Monsters','Nature','Psionics','Religion','Rumors','Society','Strategy','Timescape']
+};
+const SKILL_GROUP = {}; Object.entries(SKILLS).forEach(([g,l])=>l.forEach(s=>SKILL_GROUP[s]=g));
+const LANGS = ['Caelian','Anjali','Axiomatic','Filliaric','The First Language','Higaran','High Kuric','High Rhyvian','Hyrallic','Kalliak','Kethaic','Khamish','Khelt','Khemharic','Khoursirian','Low Kuric','Low Rhyvian','Mindspeech','Oaxuatl','Phaedran','Proto-Ctholl','Rallarian','Szetch','Ullorvic','Variac','Vastariax','Vhoric','Voll','Yllyric','Zaliac'];
+
+// Imbue enhancements: [name, item prerequisite, source language, short summary]
+const ENH = {
+ armor:{chars:['Might','Reason','Intuition'], bonus:['+6 Stamina','+12 Stamina','+21 Stamina'], page:297,
+  1:[['Awe','A lock of hair from a fey (bargained for Charming, taken by force for Threatening)','Khelt','Pick Charming or Threatening: edge on Presence tests to charm or to intimidate.'],
+     ['Damage Immunity I','Elemental sand left when an elemental enters Orden from Quintessence','Zaliac','Immunity 5 to three damage types you choose.'],
+     ['Disguise','The blood of a lycanthrope','Khelt','Maneuver: the armor takes the look of any clothing you have been near.'],
+     ['Iridescent','Fur from a lightbender','Hyrallic','When you are the sole target, reveal an afterimage; the power roll counts as 11. Recharges with Victories.'],
+     ['Magic Resistance I','A scale from a dragon','The First Language','Characteristics count +1 (max 2) to resist magic potencies.'],
+     ['Nettlebloom','A rose from the magical hedge of a hag','Khelt','A creature grabbing you is weakened.'],
+     ['Phasing I','Ichor from a destroyed wraith','Szetch','Once per turn, move through 1 square of solid matter.'],
+     ['Psionic Resistance I','Psionically resonant crystals from a site of psionic experimentation','Voll','Characteristics count +1 (max 2) to resist psionic potencies.'],
+     ['Swift','The feather of a falcon slain as it was diving','Yllyric','+1 speed.'],
+     ['Tempest I','A strip of starmetal struck by lightning','Ullorvic','Maneuver: the next adjacent creature to damage you takes lightning damage and is pushed.']],
+  5:[['Absorption','A mirror blessed by a priest of a god of magic','The First Language','Absorb a single-target magic/psionic ability and use it later yourself.'],
+     ['Damage Immunity II','The essence of an elemental who is still alive','Zaliac','Your damage immunity rises to 10.'],
+     ['Dragon Soul','A scale from a dead dragon','Vastariax','When a creature winds you or drops you to dying, hurl a dragon soul at them.'],
+     ['Levitating','A palm-sized crystal grown in an overmind’s subterranean lair','Zaliac','Treat up to 5 squares of movement per turn as flying.'],
+     ['Magic Resistance II','A scale from a mature dragon','The First Language','Characteristics count +2 (max 3) vs magic potencies.'],
+     ['Phasing II','The remnants of a slain ooze','Szetch','Phase through up to 3 squares per turn.'],
+     ['Psionic Resistance II','A fresh crystalline scale from a gemstone dragon','Voll','Characteristics count +2 (max 3) vs psionic potencies.'],
+     ['Reactive','Hand-engineered brass gears inscribed with runes in silver dust','Zaliac','After you take damage, gain damage immunity 2 until the end of your next turn.'],
+     ['Second Wind','The sweat of a troll','Kalliak','When you become winded, spend a Recovery as a free triggered action.'],
+     ['Shattering','A pound of volcanic obsidian formed as a single piece','Zaliac','Enemies who crit you take 10 sonic damage.'],
+     ['Tempest II','Lay the armor under a clear sky as a comet passes over','Ullorvic','Tempest now deals 8 lightning and pushes up to 3.']],
+  9:[['Devil’s Bargain','The wing of an archdevil','Anjali','You can fly; avoid going prone in the air by losing Stamina.'],
+     ['Dragon Soul II','Gems, coins and art stolen from a dragon’s hoard, burned in ritual fire','Vastariax','While winded you gain a dragon’s-fire breath ability.'],
+     ['Invulnerable','Repurposed metal plates from a servok war engine','Rallarian','Ignore the damage and effects of tier 1 results against you.'],
+     ['Leyline Walker','A cutting from an ethereal tree that appears once a year','Yllyric','Once per turn, teleport instead of moving.'],
+     ['Life','The tear of a saint','High Kuric','When you would die, spend a Recovery to regain Stamina instead.'],
+     ['Magic Resistance III','A scale from an ancient dragon','The First Language','Magic Resistance II also covers allies within 3 squares.'],
+     ['Phasing III','Perfectly clear glass from a house that vanished into the Ethereal Plane','Szetch','No opportunity attacks; move through enemies’ spaces.'],
+     ['Psionic Resistance III','The skull of a voiceless talker at least a century old','Voll','Psionic Resistance II also covers allies within 3 squares.'],
+     ['Temporal Flux','An experimental kuran’zoi temporal capacitor','Voll','Leave an imprint you can teleport back to; dodge abilities into tier 1.'],
+     ['Unbending','A weapon fragment ossified in a stone giant’s body for a year or more','High Kuric','You can’t be force moved unless you choose to be.']]},
+ implement:{chars:['Agility','Reason','Intuition'], bonus:['+1 magic/psionic damage','+2 magic/psionic damage','+3 magic/psionic damage'], page:299,
+  1:[['Berserking','The tusk of a feral boar','Kalliak','Tier 3 hits make the target attack their nearest ally.'],
+     ['Displacing I','Slime from an ooze','Khelt','Tier 3 hits let you teleport the target up to 2 squares.'],
+     ['Elemental','Ashes or leavings from a natural disaster','The First Language','Attune to an element; edge on power rolls with that keyword.'],
+     ['Forceful I','A lead slingstone that killed a giant','High Kuric','Your magic/psionic pushes and pulls go 2 squares further.'],
+     ['Rat Form','One hundred rat pelts','Khamish','Maneuver: turn into a rat.'],
+     ['Rejuvenating I','A singing quartz crystal','The First Language','After spending Heroic Resource, roll d10; on 9+ regain 1.'],
+     ['Seeking','An inch-long needle carved from a diamond','Caelian','+2 ranged distance; the implement points toward a named target.'],
+     ['Thought Sending','The brain of a psionic creature','Variac','+2 ranged distance; telepathy with willing creatures whose name you know.'],
+     ['Warding I','Three skulls from the same chimera','Zaliac','+6 Stamina.']],
+  5:[['Celerity','A dire falcon’s beak','Khelt','After a main-action magic/psionic ability, shift 3 or escape a grab.'],
+     ['Celestine','A still-warm piece of a meteorite','Ullorvic','Conjure up to three exploding stars (10 fire + slide).'],
+     ['Displacing II','The wing of a pixie','Voll','Displacing teleports up to 4 and gives the target a bane.'],
+     ['Erupting I','Obsidian from an active volcano','Vastariax','Single-target tier 3 hits deal 3 fire to enemies within 2.'],
+     ['Forceful II','A marble stone giant’s fingernail','High Kuric','Pushes and pulls go 3 squares further.'],
+     ['Hallucinatory','A night hag’s hairpin','Variac','Maneuver: a 2 aura of difficult terrain for enemies.'],
+     ['Lingering I','Slow-acting poison refined from rare fungi','Szetch','Tier 3 hits deal 8 damage at the start of your next turn.'],
+     ['Rejuvenating II','A still-growing bonsai tree at least 30 years old','The First Language','On 8+ regain 1 Heroic Resource and spend a Recovery.'],
+     ['Warding II','A metallic dragon’s horn','Zaliac','Warding becomes +12 Stamina; +1 to resist potencies.']],
+  9:[['Anathema','An olothec tentacle','Variac','Tier 3 hits weaken (save ends); free strike when it ends.'],
+     ['Displacing III','The keystone of a gate between worlds','Voll','Displacing teleports up to 5 and gives a bane.'],
+     ['Erupting II','A sealed geode containing explosive gas','Vastariax','Erupting deals 6 fire.'],
+     ['Forceful III','A scale from the kraken','High Kuric','Pushes and pulls +3 and can be vertical.'],
+     ['Lingering II','A venom gland from a mature dragon','Szetch','Lingering deals 15 damage.'],
+     ['Piercing','Black iron from a slain blood elemental','Anjali','Your magic and psionic abilities ignore damage immunities.'],
+     ['Psionic Siphon','The frontal lobe of an overmind','Variac','Tier 3: gain Stamina and deal an extra 5 damage.'],
+     ['Rejuvenating III','A live flower that blooms once a decade','The First Language','On 7+ regain 1 resource and you or an ally within 3 spends a Recovery.'],
+     ['Warding III','Heartwood from a two-century-old tree','Zaliac','Warding becomes +18 Stamina; allies within 3 also resist potencies better.']]},
+ weapon:{chars:['Might','Reason','Intuition'], bonus:['+1 weapon damage','+2 weapon damage','+3 weapon damage'], page:301,
+  1:[['Blood Bargain','The blood of a devil','Anjali','Maneuver: take 1d6 damage so an ally within 5 can spend a Recovery.'],
+     ['Chilling I','A piece of never-melting ice from Quintessence','Yllyric','Tier 3 hits deal +3 cold.'],
+     ['Disrupting I','A vial of blood from a living saint','Anjali','Undead you leave at 15 Stamina or less drop to 0.'],
+     ['Hurling','A magnet made from rare metals','Variac','Throw it as ranged 3; it flies back.'],
+     ['Merciful','A sprig of dockwart','Yllyric','Knock creatures out instead of killing them.'],
+     ['Terrifying I','The preserved amygdala of a mindkiller','Variac','Tier 3 hits deal +2 psychic.'],
+     ['Thundering I','The heart of a lion, bear or other large predator','Low Kuric','Push 1 whenever you deal rolled damage.'],
+     ['Vengeance I','The crown of a usurper','Kalliak','+2 damage against whoever hurt you since your last turn.'],
+     ['Wingbane','The pinfeather of a giant hawk','Yllyric','Flying creatures you hit bleed for every square they fly.']],
+  5:[['Chargebreaker','An adamantine spearhead','Zaliac','Free triggered: 5 damage to an enemy who moves adjacent to you.'],
+     ['Chilling II','Frozen bones from a white dragon’s lair','Yllyric','Tier 3: 6 cold and slowed.'],
+     ['Devastating','A slaughter demon’s horn','High Kuric','Crit range improves by 1.'],
+     ['Disrupting II','A cutting from a century-old tree in a graveyard','Anjali','Undead at 30 Stamina or less drop to 0.'],
+     ['Metamorphic','Oil from an olothec’s liver','Variac','Reshape it: concealed, large, or vicious.'],
+     ['Silencing','An executioner’s hood worn while executing a mage','The First Language','Tier 3: target can’t use magic until end of their next turn.'],
+     ['Terrifying II','Riverbed silt from the Abyssal Wasteland','Variac','Tier 3: 4 psychic and frightened.'],
+     ['Thundering II','An iron rod charged by a dying essence of storms','Low Kuric','Push up to 3; prone on tier 3.'],
+     ['Vengeance II','The remains of a sworn foe of the imbuer','Kalliak','Vengeance bonus becomes +4.']],
+  9:[['Chilling III','Dip the weapon in the Glacial Forge in Hell’s coldest depths','Yllyric','Tier 3: 9 cold and slowed.'],
+     ['Disrupting III','Wrappings from a mummy buried at least a century','Anjali','Undead at 50 or less drop to 0; at 100 or less are frightened.'],
+     ['Draining','The still-thinking brain of a voiceless talker','Voll','Tier 3 weakens; you gain a surge.'],
+     ['Imprisoning','A chain once used to restrain an angel','Anjali','Tier 3 restrains and blocks magic/psionics.'],
+     ['Nova','A piece of metal touched by a sun','Ullorvic','Hits burn adjacent enemies; a nova blast while winded.'],
+     ['Terrifying III','The central eye of an overmind','Variac','Tier 3: 6 psychic and frightened.'],
+     ['Thundering III','An oracle of storms blesses it with lightning while wielded','Low Kuric','Vertical push 5 and prone; extra thunder damage.'],
+     ['Vengeance III','The true name of a devil who hunts devils','Kalliak','Vengeance bonus becomes +6.'],
+     ['Windcutting','A feather from a bird at the eye of an endless tornado','Yllyric','Take a bane to hit every enemy in a cube 3 with a signature strike.']]}
+};
+
+const XP_STEP = {normal:16, double:8, half:32};
+
+
+
+/* ================= STATE ================= */
+const KEY='drawsteel-respite-v1';
+let S=load();
+function blankHero(name){return{id:uid(),name:name||'New Hero',ancestry:'',klass:'',career:'',careerSkills:2,kit:'',culture:'',level:1,xp:0,victories:0,staminaMax:20,stamina:20,recoveriesMax:8,recoveries:8,chars:{Might:0,Agility:0,Reason:0,Intuition:0,Presence:0},skills:[],languages:['Caelian'],items:[],projects:[],favs:[],log:[],respites:0,notes:'',titles:[],renown:0,followerBonus:0,stronghold:'',followers:[]};}
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.heroes&&s.heroes.length){s.settings=Object.assign({events:'none',abilitySwap:false,xpSpeed:'normal'},s.settings);return s;}}catch(e){}const h=blankHero('My Hero');return{heroes:[h],active:h.id,settings:{events:'none',abilitySwap:false,xpSpeed:'normal'},tab:'hero'};}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Could not save in this browser');}}
+function fix(h){if(!h)return h;h.followers=h.followers||[];h.renown=h.renown||0;h.followerBonus=h.followerBonus||0;h.stronghold=h.stronghold||'';h.titles=h.titles||[];return h;}
+function H(){return fix(S.heroes.find(h=>h.id===S.active)||S.heroes[0]);}
+function heroById(id){return S.heroes.find(h=>h.id===id);}
+function uid(){return Math.random().toString(36).slice(2,10);}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2300);}
+const tip=t=>`<span class="tip" tabindex="0" role="button" aria-label="More info" data-tip="${esc(t)}">?</span>`;
+function showTip(el){const TB=document.getElementById('tipbox');TB.innerHTML=el.dataset.tip;TB.style.display='block';const r=el.getBoundingClientRect(),w=TB.offsetWidth,hh=TB.offsetHeight;let y=r.bottom+8;if(y+hh>innerHeight-8)y=r.top-hh-8;TB.style.left=Math.min(innerWidth-w-8,Math.max(8,r.left+r.width/2-w/2))+'px';TB.style.top=Math.max(8,y)+'px';}
+function hideTip(){document.getElementById('tipbox').style.display='none';}
+document.addEventListener('mouseover',e=>{const t=e.target.closest&&e.target.closest('.tip');if(t)showTip(t);});
+document.addEventListener('mouseout',e=>{if(e.target.closest&&e.target.closest('.tip'))hideTip();});
+document.addEventListener('focusin',e=>{const t=e.target.closest&&e.target.closest('.tip');if(t)showTip(t);});
+document.addEventListener('focusout',hideTip);
+document.addEventListener('click',e=>{const t=e.target.closest('.tip');if(t){e.stopPropagation();e.preventDefault();showTip(t);}else hideTip();},true);
+document.addEventListener('scroll',hideTip,true);
+function ask(msg,o={}){return new Promise(res=>{const el=document.createElement('div');el.className='dlg';
+  el.innerHTML=`<div class="card glow dlgbox"><p>${esc(msg)}</p>${o.input!=null?`<input id="dlgIn" type="number" value="${esc(o.input)}">`:''}<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn" data-x="0">Cancel</button><button class="btn gold" data-x="1">${esc(o.ok||'OK')}</button></div></div>`;
+  document.body.appendChild(el);const inp=el.querySelector('#dlgIn');(inp||el.querySelector('[data-x="1"]')).focus();if(inp)inp.select();
+  const done=y=>{el.remove();res(y?(inp?inp.value:true):(inp?null:false));};
+  el.addEventListener('click',e=>{e.stopPropagation();const b=e.target.closest('[data-x]');if(b)done(b.dataset.x==='1');else if(e.target===el)done(false);});
+  el.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter')done(true);if(e.key==='Escape')done(false);});});}
+function d10(){return 1+Math.floor(Math.random()*10);}
+function today(){return new Date().toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});}
+function sign(n){return n>=0?'+'+n:''+n;}
+function step(){return XP_STEP[S.settings.xpSpeed||'normal'];}
+function levelFromXp(xp){return Math.min(10,Math.floor(xp/step())+1);}
+function parseChars(str){return CHARS.filter(c=>new RegExp(c,'i').test(str||''));}
+function langFromSrc(src){return LANGS.find(x=>new RegExp(x.replace('The ',''),'i').test(src||''))||'';}
+function knows(h,lang){return !lang||h.languages.some(l=>l.toLowerCase()===lang.toLowerCase());}
+function milestones(goal){if(goal<=30)return[];if(goal<=200)return[1/2];if(goal<1000)return[1/3,2/3];return[1/4,1/2,3/4];}
+function isCL(s){return['Crafting','Lore'].includes(SKILL_GROUP[s]);}
+function ord(n){return n+(n===1?'st':n===2?'nd':n===3?'rd':'th');}
+function pct(p){return Math.min(100,100*p.points/p.goal);}
+function bar(p,cls=''){return `<div class="bar ${cls} ${p.status==='done'?'done':''}"><i style="width:${pct(p)}%"></i></div>`;}
+function isFav(k){return H().favs.some(f=>f.key===k);}
+function toggleFav(f){const h=H();const i=h.favs.findIndex(x=>x.key===f.key);if(i>=0)h.favs.splice(i,1);else h.favs.push(f);save();return i<0;}
+
+/* ================= MAIN VIEWS ================= */
+const TABS=[['hero','Hero'],['projects','Projects'],['followers','Followers'],['items','Items'],['favs','Favourites'],['log','Chronicle'],['settings','Settings']];
+function render(){
+  document.getElementById('heroSel').innerHTML=S.heroes.map(h=>`<option value="${h.id}" ${h.id===S.active?'selected':''}>${esc(h.name||'New hero')}</option>`).join('');
+  const n=H().projects.filter(p=>p.status==='active').length;
+  document.getElementById('tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab ${S.tab===k?'on':''}" data-tab="${k}">${l}${k==='projects'&&n?`<span class="n">${n}</span>`:''}</button>`).join('');
+  document.getElementById('main').innerHTML=({hero:vHero,projects:vProjects,followers:vFollowers,items:vItems,favs:vFavs,log:vLog,settings:vSettings}[S.tab]||vHero)();
+}
+const F=(label,key,type='text',extra='')=>`<div><label class="l">${label}</label><input type="${type}" value="${esc(H()[key])}" data-hf="${key}" ${extra}></div>`;
+const NUM=(label,spec,val,min,max)=>`<div>${label?`<label class="l">${label}</label>`:''}<div class="num"><button data-inc="${spec}" data-d="-1" aria-label="minus">−</button><input type="number" data-num="${spec}" value="${val}" ${min!=null?`data-min="${min}"`:''} ${max!=null?`data-max="${max}"`:''}><button data-inc="${spec}" data-d="1" aria-label="plus">+</button></div></div>`;
+const LIMITS={level:[1,10],xp:[0],victories:[0],careerSkills:[2,3],staminaMax:[1],recoveries:[0],recoveriesMax:[0],renown:[0],followerBonus:[0],char:[-5,6]};
+function numRef(spec){const p=spec.split(':');
+  if(p[0]==='hf')return{get:()=>H()[p[1]],set:v=>H()[p[1]]=v,lim:LIMITS[p[1]]};
+  if(p[0]==='char')return{get:()=>H().chars[p[1]],set:v=>H().chars[p[1]]=v,lim:LIMITS.char};
+  if(p[0]==='fol'){const f=H().followers.find(x=>x.id===p[1]);return{get:()=>f.chars[p[2]],set:v=>f.chars[p[2]]=v,lim:LIMITS.char};}}
+function setNum(spec,v){const r=numRef(spec);if(!r)return;v=Math.round(+v||0);const l=r.lim||[];if(l[0]!=null)v=Math.max(l[0],v);if(l[1]!=null)v=Math.min(l[1],v);r.set(v);save();}
+function vHero(){
+  const h=H();const st=step();const lvl=levelFromXp(h.xp);
+  const into=h.xp-(h.level-1)*st;const xpPct=h.level>=10?100:Math.max(0,Math.min(100,100*into/st));
+  const sub=[h.ancestry,h.klass].filter(Boolean).join(' ')||'Hero';
+  const mini=k=>`<div class="mini"><button data-inc="hf:${k}" data-d="-1">−</button><button data-inc="hf:${k}" data-d="1">+</button></div>`;
+  return `<div class="card glow banner">
+    <div class="sigil">${esc((h.name||'?').trim()[0]||'?').toUpperCase()}</div>
+    <div style="flex:1;min-width:200px"><h2>${esc(h.name)}</h2><div class="sub">Level ${h.level} ${esc(sub)}${h.career?' · '+esc(h.career):''}</div>
+      <div class="xp"><div class="spread tiny muted" style="margin-bottom:4px"><span>${h.xp} XP</span><span>${h.level>=10?'max level':`level ${h.level+1} at ${h.level*st}`}</span></div><div class="bar thin"><i style="width:${xpPct}%"></i></div></div></div>
+    <div class="gems"><div class="gem st"><b>${h.stamina}<small class="muted" style="font-size:13px">/${h.staminaMax}</small></b><span>Stamina</span>${mini('stamina')}</div><div class="gem rc"><b>${h.recoveries}<small class="muted" style="font-size:13px">/${h.recoveriesMax}</small></b><span>Recoveries</span>${mini('recoveries')}</div><div class="gem vi"><b>${h.victories}</b><span>Victories</span>${mini('victories')}</div></div>
+  </div>
+  <div class="row" style="margin-top:12px"><button class="btn ${!h.klass&&CHARS.every(c=>!h.chars[c])?'gold':''}" data-act="setup">Import your hero</button>${tip('Walks you through your character sheet in six short steps: who you are, characteristics, level and vitals, skills, languages and gear. You can run it again any time to update things.')}</div>
+  ${lvl>h.level?`<div class="callout good">You have enough XP for level ${lvl}. <button class="btn sm" data-act="levelup">Set level ${lvl}</button></div>`:''}
+  <div class="orn"><span class="d">◆</span><h3>Characteristics</h3><span class="d">◆</span></div>
+  <div class="grid g5">${CHARS.map(c=>`<div class="card char"><label>${c}</label>${NUM('','char:'+c,h.chars[c],-5,6)}</div>`).join('')}</div>
+  <div class="orn"><span class="d">◆</span><h3>Vitals</h3><span class="d">◆</span></div>
+  <div class="grid g4">${NUM('Level','hf:level',h.level)}${NUM('Experience','hf:xp',h.xp)}${NUM('Victories'+tip('Victories turn into XP when you finish a respite.'),'hf:victories',h.victories)}${NUM('Renown'+tip('Renown 3 / 6 / 9 / 12 lets you keep 1 / 2 / 3 / 4 followers.'),'hf:renown',h.renown)}
+    ${NUM('Stamina','hf:stamina',h.stamina)}${NUM('Stamina max','hf:staminaMax',h.staminaMax)}${NUM('Recoveries','hf:recoveries',h.recoveries)}${NUM('Recoveries max','hf:recoveriesMax',h.recoveriesMax)}
+    ${NUM('Career skills'+tip('How many skills your career granted: 2 or 3. This sets the goal for Hone career skills (240 or 360).'),'hf:careerSkills',h.careerSkills)}</div>
+  <div class="orn"><span class="d">◆</span><h3>Identity</h3><span class="d">◆</span></div>
+  <div class="grid g3">${F('Name','name')}${F('Ancestry','ancestry')}${F('Class','klass')}${F('Career','career')}${F('Culture','culture')}${F('Kit','kit')}</div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><div class="spread"><h3 style="font-size:15px;color:var(--gold2)">Skills</h3>${tip('Crafting and lore skills are highlighted. They are the ones that usually add +2 to project rolls.')}</div>
+      <div class="chips" style="margin:12px 0">${h.skills.map(s=>`<span class="chip ${isCL(s)?'gold':''}">${esc(s)}<button data-rmskill="${esc(s)}">×</button></span>`).join('')||'<span class="dim small">None yet</span>'}</div>
+      <select id="addSkillSel"><option value="">Add a skill…</option>${Object.entries(SKILLS).map(([g,l])=>`<optgroup label="${g}">${l.filter(s=>!h.skills.includes(s)).map(s=>`<option>${s}</option>`).join('')}</optgroup>`).join('')}</select></div>
+    <div class="card"><div class="spread"><h3 style="font-size:15px;color:var(--gold2)">Languages</h3></div>
+      <div class="chips" style="margin:12px 0">${h.languages.map(s=>`<span class="chip">${esc(s)}<button data-rmlang="${esc(s)}">×</button></span>`).join('')||'<span class="dim small">None</span>'}</div>
+      <div class="row"><input id="addLangIn" list="langList" placeholder="Add a language…" style="flex:1"><button class="btn sm" data-act="addlang">Add</button></div></div>
+  </div>
+  <datalist id="langList">${LANGS.map(l=>`<option>${l}</option>`).join('')}</datalist>
+  ${(h.titles||[]).length?`<div style="margin-top:14px" class="chips">${h.titles.map(t=>`<span class="chip gold">Title: ${esc(t)}</span>`).join('')}</div>`:''}
+  <div style="margin-top:14px"><label class="l">Notes</label><textarea rows="3" data-hf="notes">${esc(h.notes)}</textarea></div>
+  <div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn danger sm" data-act="delhero">Delete hero</button></div>`;
+}
+
+/* ================= FOLLOWERS ================= */
+const FTYPES={artisan:{ic:'⚒',label:'Artisan',group:'Crafting',desc:'Crafting expert. One project roll per day.'},sage:{ic:'📜',label:'Sage',group:'Lore',desc:'Research expert. One project roll per day.'},retainer:{ic:'⚔',label:'Retainer',group:null,desc:'Adventures with you; combat stats in Draw Steel: Monsters.'}};
+function maxFollowers(h){return Math.min(4,Math.floor((h.renown||0)/3))+(h.followerBonus||0);}
+let FF=null;function ffReset(){FF={name:'',ancestry:'',type:'artisan',mc:'Might',skills:[],lang1:'',lang2:'',project:''};}ffReset();
+function ffForm(){
+  const h=H();const T=FTYPES[FF.type];const act=h.projects.filter(p=>p.status==='active');
+  return `<div class="grid g2"><div><label class="l">Name</label><input data-ffin="name" value="${esc(FF.name)}" placeholder="e.g. Bram Ironhand"></div><div><label class="l">Ancestry</label><input data-ffin="ancestry" value="${esc(FF.ancestry)}" placeholder="e.g. dwarf"></div></div>
+  <div style="margin-top:12px"><label class="l">Role ${tip('<b>Artisan</b>: crafting expert, one project roll per day.<br><b>Sage</b>: research expert, one project roll per day.<br><b>Retainer</b>: adventures with you and makes no project rolls. Stats are in Draw Steel: Monsters.')}</label><div class="seg">${Object.entries(FTYPES).map(([k,t])=>`<button class="${FF.type===k?'on':''}" data-fft="${k}">${t.ic} ${t.label}</button>`).join('')}</div></div>
+  ${FF.type==='artisan'?`<div style="margin-top:12px"><label class="l">Characteristics</label><div class="seg"><button class="${FF.mc==='Might'?'on':''}" data-ffmc="Might">Might 1</button><button class="${FF.mc==='Agility'?'on':''}" data-ffmc="Agility">Agility 1</button></div>${tip('An artisan has Might or Agility 1 (your choice), Reason 1, and 0 in everything else.')}</div>`:''}
+  ${FF.type==='sage'?`<div class="row small" style="margin-top:12px">Reason 1, Intuition 1 ${tip('A sage has Reason 1 and Intuition 1, and 0 in everything else.')}</div>`:''}
+  ${T.group?`<div style="margin-top:12px"><label class="l">Four ${T.group.toLowerCase()} skills · ${FF.skills.length}/4</label><div class="pill-row">${SKILLS[T.group].map(sk=>`<button class="chip ${FF.skills.includes(sk)?'gold':''}" data-ffsk="${sk}">${FF.skills.includes(sk)?'✓ ':''}${sk}</button>`).join('')}</div></div>
+  <div class="grid g3" style="margin-top:12px"><div><label class="l">Languages</label><input value="Caelian" disabled></div><div><label class="l">&nbsp;</label><input data-ffin="lang1" list="ffll" value="${esc(FF.lang1)}" placeholder="2nd language"></div><div><label class="l">&nbsp;</label><input data-ffin="lang2" list="ffll" value="${esc(FF.lang2)}" placeholder="3rd language"></div></div>
+  <div style="margin-top:12px"><label class="l">Assign to project</label><select data-ffin="project"><option value="">Not assigned yet</option>${act.map(p=>`<option value="${p.id}" ${FF.project===p.id?'selected':''}>${esc(p.title)} (${p.points}/${p.goal})</option>`).join('')}</select></div>`:''}
+  <datalist id="ffll">${LANGS.map(l=>`<option>${l}</option>`).join('')}</datalist>`;
+}
+function ffBuild(){
+  if(!FF.name.trim()){toast('Give your follower a name');return null;}
+  const chars={Might:0,Agility:0,Reason:0,Intuition:0,Presence:0};
+  if(FF.type==='artisan'){chars[FF.mc]=1;chars.Reason=1;}if(FF.type==='sage'){chars.Reason=1;chars.Intuition=1;}
+  const f={id:uid(),name:FF.name.trim(),ancestry:FF.ancestry.trim(),type:FF.type,chars,skills:FF.skills.slice(),languages:FF.type==='retainer'?[]:['Caelian',FF.lang1,FF.lang2].map(x=>x.trim()).filter(Boolean),project:FF.project,present:true,skillApplies:true,langMode:'auto',contrib:0,since:today()};
+  ffReset();return f;
+}
+function folCard(h,f){
+  const T=FTYPES[f.type];const act=h.projects.filter(p=>p.status==='active');const p=h.projects.find(x=>x.id===f.project&&x.status==='active');
+  const knowsL=p&&(!p.sourceLang||f.languages.some(l=>l.toLowerCase()===p.sourceLang.toLowerCase()));
+  return `<div class="card fcard"><div class="fhead"><div class="fav-ic">${T.ic}</div><div style="flex:1;min-width:0"><div class="proj-t">${esc(f.name)}</div><div class="tiny muted">${T.label}${f.ancestry?' · '+esc(f.ancestry):''}${f.contrib?` · ${f.contrib} points contributed`:''}</div></div><button class="btn sm ghost" data-delfol="${f.id}" title="Let go">×</button></div>
+  ${f.type!=='retainer'?`<div class="grid g5" style="margin-top:12px;gap:6px">${CHARS.map(c=>`<div style="text-align:center"><div class="tiny muted" style="letter-spacing:.08em">${c.slice(0,3).toUpperCase()}</div>${NUM('','fol:'+f.id+':'+c,f.chars[c],-5,6)}</div>`).join('')}</div>
+  <div class="chips" style="margin-top:10px">${f.skills.map(s=>`<span class="chip gold">${esc(s)}</span>`).join('')}${f.languages.map(l=>`<span class="chip">${esc(l)}</span>`).join('')}</div>
+  <div style="margin-top:12px"><label class="l">Working on ${tip('Pick one of your projects, or start a brand new one for this follower. They make one project roll for it per day.')}</label><div class="row" style="flex-wrap:nowrap"><select data-fassign="${f.id}" style="flex:1;min-width:0"><option value="">Idle</option><option value="__new">＋ Start a new project…</option>${act.map(x=>`<option value="${x.id}" ${f.project===x.id?'selected':''}>${esc(x.title)} (${x.points}/${x.goal})</option>`).join('')}</select><button class="btn sm gold" data-fnew="${f.id}" style="white-space:nowrap">＋ New project</button></div>${p?`<div style="margin-top:8px">${bar(p,'thin')}</div>`:''}</div>
+  <div class="row" style="margin-top:10px;gap:16px">
+    <label class="row small soft" style="gap:6px;flex-wrap:nowrap"><input type="checkbox" data-fpresent="${f.id}" ${f.present!==false?'checked':''}> On site ${tip('Followers must stay at your stronghold or the project site, with the materials to hand. Untick this while they are away and they do no work.')}</label>
+    <label class="row small soft" style="gap:6px;flex-wrap:nowrap"><input type="checkbox" data-fskill="${f.id}" ${f.skillApplies!==false?'checked':''}> Skill applies ${tip('Adds +2 when one of this follower’s skills directly relates to the project.')}</label></div>
+  ${p&&p.sourceLang?`<div class="row small soft" style="margin-top:8px">Source in ${esc(p.sourceLang)}: <select data-flang="${f.id}" style="width:auto;padding:5px 8px"><option value="auto" ${f.langMode==='auto'?'selected':''}>${knowsL?'Known (auto)':'Unknown −4 (auto)'}</option><option value="known" ${f.langMode==='known'?'selected':''}>Known</option><option value="related" ${f.langMode==='related'?'selected':''}>Related −2</option><option value="unknown" ${f.langMode==='unknown'?'selected':''}>Unknown −4</option></select></div>`:''}`
+  :`<p class="small muted" style="margin:10px 0 0">Retainers fight alongside you and don’t make project rolls.</p>`}
+  </div>`;
+}
+function vFollowers(){
+  const h=H();const mx=maxFollowers(h);const n=h.followers.length;
+  return `<div class="card glow"><div class="row" style="gap:20px;align-items:flex-end">
+    <div style="width:150px">${NUM('Renown'+tip('Renown 3 / 6 / 9 / 12 lets you keep 1 / 2 / 3 / 4 followers.'),'hf:renown',h.renown)}</div><div style="width:150px">${NUM('Bonus slots'+tip('Extra follower slots from titles and the like, for example Royal Retinue (+2).'),'hf:followerBonus',h.followerBonus)}</div>
+    <div style="flex:1;min-width:180px"><label class="l">Stronghold</label><input data-hf="stronghold" value="${esc(h.stronghold)}" placeholder="e.g. rooms above the Gilded Goose"></div>
+    <div class="gem" style="min-width:110px"><b style="${n>mx?'color:var(--ember)':''}">${n}/${mx}</b><span>Followers ${tip('Artisans and sages each make <b>one project roll per day</b> for the project you assign, whether you are resting or adventuring. Respites count their days automatically; use <b>Days pass</b> for any other in-game time. (p. 350)')}</span></div></div>
+    </div>
+  ${n?`<div class="grid g2" style="margin-top:14px">${h.followers.map(f=>folCard(h,f)).join('')}</div>`:'<div class="empty" style="margin-top:14px">No followers yet.</div>'}
+  <div class="orn"><span class="d">◆</span><h3>Add a follower</h3><span class="d">◆</span></div>
+  <div class="card">${ffForm()}<div class="row" style="justify-content:space-between;margin-top:14px">${tip('Recruiting normally takes a respite activity (it is in the respite menu). Use this form for followers you already have.')}<button class="btn gold" data-ffadd="1">Add follower</button></div></div>`;
+}
+function folRoller(f){return{id:f.id,name:f.name,chars:f.chars};}
+function folCfg(f,p){const chars=(p.chars.length?p.chars:CHARS);const ch=chars.slice().sort((a,b)=>(f.chars[b]||0)-(f.chars[a]||0))[0];
+  const known=!p.sourceLang||f.languages.some(l=>l.toLowerCase()===p.sourceLang.toLowerCase());
+  const lang={known:0,related:1,unknown:2}[f.langMode]??(known?0:2);
+  return{char:ch,skill:f.skillApplies!==false?'skill':'',lang,E:0,B:0,mod:0};}
+function followerWork(h,days){
+  fix(h);const out=[];
+  h.followers.forEach(f=>{
+    if(f.type==='retainer'||!f.project)return;
+    const p=h.projects.find(x=>x.id===f.project);
+    if(!p||p.status!=='active'){f.project='';return;}
+    if(f.present===false){out.push({f,p,idle:'away from the stronghold or project site'});return;}
+    const before=p.points,cfg=folCfg(f,p),rolls=[];let done=false,bts=0,ev=false;
+    for(let d=0;d<days&&p.status==='active';d++){let r,c=[];do{r=rollOnce(h,p,folRoller(f),cfg);c.push(r.total);if(r.bt)bts++;if(r.ms)ev=true;}while(r.bt&&!r.done);rolls.push(c);if(r.done)done=true;}
+    const gained=p.points-before;f.contrib=(f.contrib||0)+gained;if(done)f.project='';
+    out.push({f,p,rolls,gained,done,bts,ev});
+  });
+  save();return out;
+}
+function workLines(res){return res.map(r=>r.idle?`${r.f.name} did no work (${r.idle})`:`${r.f.name} → ${r.p.title}: +${r.gained} over ${r.rolls.length} day${r.rolls.length>1?'s':''}, now ${Math.min(r.p.points,r.p.goal)} of ${r.p.goal}${r.done?' ✓ complete':''}`);}
+function workHtml(res){return res.map(r=>r.idle?`<div class="res"><span class="rn">${esc(r.f.name)}</span><span class="why">${esc(r.idle)}</span></div>`:
+  `<div class="res" style="flex-wrap:wrap"><span style="font-size:18px">${FTYPES[r.f.type].ic}</span><span style="min-width:120px"><b class="serif" style="font-size:16px">${esc(r.f.name)}</b><div class="tiny muted">${esc(r.p.title)}</div></span>
+  <span class="why">${r.rolls.map((c,i)=>`<span title="day ${i+1}">${c.join('✦+')}</span>`).join(' · ')}</span><span class="tot">+${r.gained}</span>
+  <span class="pts" style="font-size:13px">${Math.min(r.p.points,r.p.goal)}/${r.p.goal}</span>${r.bts?'<span class="badge bt">✦ '+r.bts+'</span>':''}${r.ev?'<span class="badge ev">⚑ Milestone</span>':''}${r.done?'<span class="badge ok">✓ Done</span>':''}</div>
+  ${r.done&&r.p.rewardMsg?`<div class="callout good small" style="margin:4px 0 6px">${r.p.rewardMsg}</div>`:''}`).join('');}
+
+/* ================= DAYS PASS ================= */
+const D={el:document.getElementById('days'),inner:document.getElementById('daysIn'),st:null,
+  open(){this.st={days:1,all:S.heroes.length>1,res:null};this.el.classList.add('open');document.body.style.overflow='hidden';this.draw();},
+  close(){this.el.classList.remove('open');document.body.style.overflow='';render();},
+  heroes(){return this.st.all?S.heroes.map(fix):[H()];},
+  draw(){
+    const st=this.st;let h=`<div class="wbar"><h2>Time passes</h2><button class="btn sm" data-d="close" style="margin-left:auto">${st.res?'Done':'Close'}</button></div>`;
+    if(!st.res){
+      h+=`<p class="lead">How many days pass in the world? ${tip('Use this for travel, adventuring or any other in-game time. Each artisan and sage makes one project roll per day. Respites already count their own days, so leave those out.')}</p>
+      <div class="row" style="gap:16px"><div class="stepper" style="transform:scale(1.25);transform-origin:left"><button data-d="m">−</button><b>${st.days}</b><button data-d="p">+</button></div>
+      <div class="pill-row" style="margin-left:24px">${[1,3,7,14,30].map(n=>`<button class="chip ${st.days===n?'gold':''}" data-d="set" data-n="${n}">${n===7?'a week':n===14?'two weeks':n===30?'a month':n+' day'+(n>1?'s':'')}</button>`).join('')}</div></div>
+      ${S.heroes.length>1?`<label class="row small soft" style="margin-top:16px;flex-wrap:nowrap"><input type="checkbox" data-d="all" ${st.all?'checked':''}> All heroes on this device</label>`:''}
+      `;
+      const rows=this.heroes().flatMap(hero=>hero.followers.filter(f=>f.type!=='retainer').map(f=>({hero,f})));
+      h+=`<div class="orn"><span class="d">◆</span><h3>Your followers</h3><span class="d">◆</span></div>`;
+      h+=rows.length?`<div class="results">${rows.map(({hero,f})=>{const act=hero.projects.filter(p=>p.status==='active');return `<div class="res" style="flex-wrap:wrap"><span style="font-size:18px">${FTYPES[f.type].ic}</span><span style="min-width:130px"><b class="serif" style="font-size:16px">${esc(f.name)}</b>${this.st.all?`<div class="tiny muted">${esc(hero.name)}</div>`:''}</span>
+        <select data-fassign="${f.id}" style="flex:1;min-width:180px;width:auto;padding:6px 10px"><option value="">Idle</option><option value="__new">＋ Start a new project…</option>${act.map(p=>`<option value="${p.id}" ${f.project===p.id?'selected':''}>${esc(p.title)} (${p.points}/${p.goal})</option>`).join('')}</select>
+        <label class="row tiny muted" style="gap:5px;flex-wrap:nowrap"><input type="checkbox" data-fpresent="${f.id}" ${f.present!==false?'checked':''}> on site</label></div>`;}).join('')}</div>`:'<div class="empty" style="font-size:15px">No artisans or sages yet. Add them in the Followers tab.</div>';
+      h+=`<div class="actions"><button class="btn gold lg" data-d="go">Let ${st.days} day${st.days>1?'s':''} pass</button></div>`;
+    } else {
+      h+=`<p class="lead">${st.days} day${st.days>1?'s':''} later…</p>`;
+      st.res.forEach(({hero,res})=>{h+=`${st.all?`<div class="orn"><span class="d">◆</span><h3>${esc(hero.name)}</h3><span class="d">◆</span></div>`:''}<div class="results">${res.length?workHtml(res):'<div class="dim small">No follower work.</div>'}</div>`;});
+      if(st.res.some(x=>x.res.some(r=>r.ev)))h+=`<div class="callout small" style="border-color:var(--violet)">⚑ An event milestone was reached. Tell your Director.</div>`;
+      h+=`<div class="actions"><button class="btn gold" data-d="close">Done</button></div>`;
+    }
+    this.inner.innerHTML=h;
+  },
+  go(){const st=this.st;st.res=this.heroes().map(hero=>{const res=followerWork(hero,st.days);hero.log.push({title:`${st.days} day${st.days>1?'s':''} passed`,date:today(),lines:res.length?workLines(res):['Time passed; no follower work.']});return{hero,res};});save();this.draw();}
+};
+D.inner.addEventListener('click',e=>{const t=e.target.closest('[data-d]');if(!t)return;const st=D.st;
+  switch(t.dataset.d){case 'close':D.close();break;case 'm':st.days=Math.max(1,st.days-1);D.draw();break;case 'p':st.days=Math.min(365,st.days+1);D.draw();break;
+  case 'set':st.days=+t.dataset.n;D.draw();break;case 'go':D.go();break;}});
+D.inner.addEventListener('change',e=>{if(e.target.dataset.d==='all'){D.st.all=e.target.checked;D.draw();}});
+document.getElementById('daysBtn').onclick=()=>D.open();
+function openAssign(id){const[h,f]=findFol(id);if(!f)return;if(S.active!==h.id){S.active=h.id;save();}W.open(id);}
+function findFol(id){for(const h of S.heroes){const f=fix(h).followers.find(x=>x.id===id);if(f)return[h,f];}return[];}
+function refreshAll(){if(W.el.classList.contains('open'))W.draw();if(D.el.classList.contains('open'))D.draw();else render();}
+// follower controls shared by every view
+document.addEventListener('change',e=>{const t=e.target,d=t.dataset;
+  if(d.fassign!=null){if(t.value==='__new'){t.value='';openAssign(d.fassign);return;}const[,f]=findFol(d.fassign);if(f){f.project=t.value;save();refreshAll();}}
+  if(d.fpresent!=null){const[,f]=findFol(d.fpresent);if(f){f.present=t.checked;save();}}
+  if(d.fskill!=null){const[,f]=findFol(d.fskill);if(f){f.skillApplies=t.checked;save();}}
+  if(d.flang!=null){const[,f]=findFol(d.flang);if(f){f.langMode=t.value;save();}}
+});
+document.addEventListener('input',e=>{const k=e.target.dataset.ffin;if(k)FF[k]=e.target.value;});
+document.addEventListener('click',e=>{const t=e.target.closest('[data-fft],[data-ffmc],[data-ffsk],[data-ffadd],[data-delfol],[data-fnew]');if(!t)return;const d=t.dataset;
+  if(d.fnew){e.stopPropagation();openAssign(d.fnew);return;}
+  if(d.fft){if(FF.type!==d.fft)FF.skills=[];FF.type=d.fft;}
+  else if(d.ffmc)FF.mc=d.ffmc;
+  else if(d.ffsk){const i=FF.skills.indexOf(d.ffsk);if(i>=0)FF.skills.splice(i,1);else if(FF.skills.length<4)FF.skills.push(d.ffsk);else toast('Four skills max');}
+  else if(d.ffadd){const f=ffBuild();if(!f)return;H().followers.push(f);save();toast(f.name+' joins you');}
+  else if(d.delfol){const[h,f]=findFol(d.delfol);e.stopPropagation();if(f)ask(`Let ${f.name} go?`,{ok:'Let go'}).then(y=>{if(!y)return;h.followers=h.followers.filter(x=>x!==f);save();refreshAll();});return;}
+  e.stopPropagation();refreshAll();
+},true);
+
+function projCard(p){
+  return `<div class="card"><div class="spread"><span class="tag">${esc(p.kindLabel)}</span><span class="pts">${Math.min(p.points,p.goal)} <small>of ${p.goal}</small></span></div>
+  <div class="proj-t" style="margin:8px 0 10px">${esc(p.title)}</div>${bar(p)}
+  <div class="tiny muted" style="margin-top:8px">${esc(p.chars.join(' / '))}${p.sourceLang?' · '+esc(p.sourceLang):''}${p.prereq?' · needs '+esc(p.prereq):''}</div>
+  <div class="row" style="margin-top:10px">${p.status==='active'?`<button class="btn sm" data-editpts="${p.id}">Adjust</button>`:'<span class="badge ok">✓ Complete</span>'}
+  <button class="btn sm ghost" data-hist="${p.id}">History</button><button class="btn sm ghost" data-delproj="${p.id}" style="margin-left:auto">Delete</button></div>
+  <div id="hist-${p.id}" style="display:none;margin-top:8px" class="tiny muted">${p.log.map(l=>`<div>· ${esc(l.date)} — ${esc(l.text)}</div>`).join('')||'No entries'}</div></div>`;
+}
+function vProjects(){
+  const h=H();const a=h.projects.filter(p=>p.status==='active'),d=h.projects.filter(p=>p.status==='done');
+  return `${a.length?`<div class="grid g2">${a.map(projCard).join('')}</div>`:'<div class="empty">No projects in progress. Take a respite to begin one.</div>'}
+  ${d.length?`<div class="orn"><span class="d">◆</span><h3>Completed</h3><span class="d">◆</span></div><div class="grid g2">${d.map(projCard).join('')}</div>`:''}`;
+}
+function vItems(){
+  const h=H();
+  return `<div class="card"><div class="grid g4" style="align-items:end"><div style="grid-column:span 2"><label class="l">Item</label><input id="itName" placeholder="e.g. Grandmother’s longsword"></div>
+  <div><label class="l">Type</label><select id="itType"><option value="weapon">Weapon</option><option value="armor">Armor</option><option value="implement">Implement</option><option value="consumable">Consumable</option><option value="trinket">Trinket</option><option value="leveled">Leveled treasure</option><option value="other">Other</option></select></div>
+  <button class="btn" data-act="additem">Add item</button></div></div>
+  <div class="orn"><span class="d">◆</span><h3>Inventory</h3><span class="d">◆</span></div>
+  ${h.items.length?`<div class="card" style="padding:6px 14px"><table><tr><th>Item</th><th>Type</th><th>Enhancements</th><th></th></tr>${h.items.map(it=>`<tr><td><span class="serif" style="font-size:17px;font-weight:600">${esc(it.name)}</span>${it.qty>1?` <span class="muted">×${it.qty}</span>`:''}${it.notes?`<div class="tiny dim">${esc(it.notes)}</div>`:''}</td><td class="muted">${esc(it.type)}</td><td>${(it.enh||[]).map(e=>`<span class="chip gold">${ord(e.level)}: ${esc(e.name)}</span>`).join(' ')||'<span class="dim">—</span>'}</td><td style="text-align:right;white-space:nowrap">${it.type==='consumable'?`<button class="btn sm" data-useitem="${it.id}">Use</button> `:''}<button class="btn sm ghost" data-delitem="${it.id}">×</button></td></tr>`).join('')}</table></div>`:'<div class="empty">Your pack is empty.</div>'}`;
+}
+function vFavs(){const h=H();return h.favs.length?`<div class="grid g2">${h.favs.map(f=>`<div class="card spread"><div><span class="tag">${esc(f.kindLabel)}</span><div class="proj-t" style="margin-top:6px">${esc(f.label)}</div></div><button class="star on" data-unfav="${esc(f.key)}">★</button></div>`).join('')}</div>`:'<div class="empty">Star treasures, enhancements and projects during a respite and they’ll wait for you here.</div>';}
+function vLog(){const h=H();return h.log.length?h.log.slice().reverse().map(l=>`<div class="card" style="margin-bottom:10px"><div class="spread"><h3 style="font-size:15px;color:var(--gold2)">${esc(l.title)}</h3><span class="tiny dim">${esc(l.date)}</span></div><div class="summary-list" style="font-size:15.5px;margin-top:6px">${l.lines.map(x=>`<div>${esc(x)}</div>`).join('')}</div></div>`).join(''):'<div class="empty">Your respites will be chronicled here.</div>';}
+function vSettings(){const s=S.settings;return `<div class="grid g2">
+  <div class="card"><h3 style="font-size:15px;color:var(--gold2);margin-bottom:10px">Project events ${tip('Optional. The app tells you when an event happens; the Director rolls the event itself on the tables in Chapter 12 (p. 304–305).')}</h3><select data-set="events"><option value="none" ${s.events==='none'?'selected':''}>No events</option><option value="d6" ${s.events==='d6'?'selected':''}>Roll a d6 each respite (event on a 6)</option><option value="milestones" ${s.events==='milestones'?'selected':''}>Event milestones</option></select></div>
+  <div class="card"><h3 style="font-size:15px;color:var(--gold2);margin-bottom:10px">Optional rules</h3><label class="row small soft" style="margin-bottom:12px;flex-wrap:nowrap;align-items:flex-start"><input type="checkbox" data-setb="abilitySwap" ${s.abilitySwap?'checked':''}> Respite Ability Changes (swap signature & heroic abilities)</label><label class="l">XP speed</label><select data-set="xpSpeed"><option value="normal" ${s.xpSpeed==='normal'?'selected':''}>Standard · 16 XP per level</option><option value="double" ${s.xpSpeed==='double'?'selected':''}>Double · 8 XP per level</option><option value="half" ${s.xpSpeed==='half'?'selected':''}>Half · 32 XP per level</option></select></div>
+  <div class="card"><h3 style="font-size:15px;color:var(--gold2);margin-bottom:10px">Backup ${tip('Everything is saved in this browser only. Export a file to move your heroes to another device or keep a backup.')}</h3><div class="row"><button class="btn" data-act="export">Export</button><label class="btn" style="margin:0">Import<input type="file" accept=".json" id="importFile" style="display:none"></label></div></div></div>`;}
+
+document.getElementById('tabs').onclick=e=>{const b=e.target.closest('[data-tab]');if(b){S.tab=b.dataset.tab;save();render();}};
+document.getElementById('heroSel').onchange=e=>{S.active=e.target.value;save();render();};
+document.getElementById('newHero').onclick=()=>{const h=blankHero('');h.name='';S.heroes.push(h);S.active=h.id;S.tab='hero';save();render();G.open(true);};
+document.getElementById('respiteBtn').onclick=()=>W.open();
+const M=document.getElementById('main');
+M.addEventListener('change',e=>{const t=e.target,h=H();
+  if(t.dataset.num){setNum(t.dataset.num,t.value);render();return;}
+  if(t.dataset.hf){const k=t.dataset.hf;h[k]=t.type==='number'?(+t.value||0):t.value;save();if(k!=='notes')render();}
+  if(t.dataset.char){h.chars[t.dataset.char]=+t.value||0;save();}
+  if(t.id==='addSkillSel'&&t.value){h.skills.push(t.value);save();render();}
+  if(t.dataset.set){S.settings[t.dataset.set]=t.value;save();}
+  if(t.dataset.setb){S.settings[t.dataset.setb]=t.checked;save();}
+  if(t.id==='importFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.heroes)throw 0;ask('Replace all heroes on this device with the imported file?',{ok:'Replace'}).then(y=>{if(!y)return;S=d;S.settings=Object.assign({events:'none',abilitySwap:false,xpSpeed:'normal'},S.settings);save();render();toast('Imported');});}catch(err){toast('That file isn’t a Respite export.');}};r.readAsText(t.files[0]);}
+});
+M.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;const h=H(),d=t.dataset;
+  if(d.inc){const r=numRef(d.inc);setNum(d.inc,(+r.get()||0)+(+d.d));render();return;}
+  if(d.rmskill){h.skills=h.skills.filter(s=>s!==d.rmskill);save();render();}
+  if(d.rmlang){h.languages=h.languages.filter(s=>s!==d.rmlang);save();render();}
+  if(d.act==='addlang'){const v=document.getElementById('addLangIn').value.trim();if(v&&!h.languages.includes(v)){h.languages.push(v);save();render();}}
+  if(d.act==='setup'){G.open();return;}
+  if(d.act==='levelup'){h.level=levelFromXp(h.xp);save();render();toast('Level '+h.level+'! Update your class features.');}
+  if(d.act==='delhero'){if(S.heroes.length===1)return toast('You need at least one hero.');ask('Delete '+h.name+' and everything they have?',{ok:'Delete'}).then(y=>{if(!y)return;S.heroes=S.heroes.filter(x=>x.id!==h.id);S.active=S.heroes[0].id;save();render();});}
+  if(d.act==='additem'){const n=document.getElementById('itName').value.trim();if(!n)return;h.items.push({id:uid(),name:n,type:document.getElementById('itType').value,enh:[],qty:1});save();render();}
+  if(d.delitem)ask('Remove this item?',{ok:'Remove'}).then(y=>{if(!y)return;h.items=h.items.filter(i=>i.id!==d.delitem);save();render();});
+  if(d.useitem){const it=h.items.find(i=>i.id===d.useitem);it.qty=(it.qty||1)-1;if(it.qty<=0)h.items=h.items.filter(i=>i!==it);save();render();}
+  if(d.delproj)ask('Delete this project and its progress?',{ok:'Delete'}).then(y=>{if(!y)return;h.projects=h.projects.filter(p=>p.id!==d.delproj);H().followers.forEach(f=>{if(f.project===d.delproj)f.project='';});save();render();});
+  if(d.hist){const el=document.getElementById('hist-'+d.hist);el.style.display=el.style.display==='none'?'block':'none';}
+  if(d.editpts){const p=h.projects.find(x=>x.id===d.editpts);ask(`Points for “${p.title}” (goal ${p.goal})`,{input:p.points,ok:'Set'}).then(v=>{if(v===null)return;const n=Math.max(0,parseInt(v)||0);p.log.push({date:today(),text:`Points set ${p.points} → ${n}`});p.points=n;if(p.points>=p.goal){completeProject(h,p);toast('Project complete!');}save();render();});}
+  if(d.unfav){h.favs=h.favs.filter(f=>f.key!==d.unfav);save();render();}
+  if(d.act==='export'){const b=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});let host=null;try{host=window.parent!==window&&window.parent.__stSave;}catch(e){}if(host){host('respite-heroes.json',b);}else{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='respite-heroes.json';a.click();}}
+});
+
+/* ================= IMPORT YOUR HERO ================= */
+const ANC=['Devil','Dragon Knight','Dwarf','Wode Elf','High Elf','Hakaan','Human','Memonek','Orc','Polder','Revenant','Time Raider'];
+const CLS=['Censor','Conduit','Elementalist','Fury','Null','Shadow','Tactician','Talent','Troubadour'];
+const CAR=['Agent','Aristocrat','Artisan','Beggar','Criminal','Disciple','Explorer','Farmer','Gladiator','Laborer','Mage’s Apprentice','Performer','Politician','Sage','Sailor','Soldier','Warden','Watch Officer'];
+const G={el:document.getElementById('setup'),inner:document.getElementById('setupIn'),st:null,
+  STEPS:['Who is your hero?','What are their characteristics?','Level and vitals','Which skills do they have?','Which languages do they know?','What gear do they carry?'],
+  open(fresh){const h0=H();this.st={step:0,fullS:h0.stamina>=h0.staminaMax,fullR:h0.recoveries>=h0.recoveriesMax};this.el.classList.add('open');document.body.style.overflow='hidden';this.draw();},
+  close(){this.el.classList.remove('open');document.body.style.overflow='';render();},
+  leave(){const h=H();if(this.st.step===2){h.stamina=this.st.fullS?h.staminaMax:Math.min(h.stamina,h.staminaMax);h.recoveries=this.st.fullR?h.recoveriesMax:Math.min(h.recoveries,h.recoveriesMax);save();}},
+  draw(){
+    const h=H(),st=this.st,n=this.STEPS.length,i=st.step;
+    const TI=(label,k,ph,list)=>`<div><label class="l">${label}</label><input data-g="${k}" value="${esc(h[k])}" placeholder="${ph||''}" ${list?`list="${list}"`:''}></div>`;
+    const DL=(id,a)=>`<datalist id="${id}">${a.map(x=>`<option>${x}</option>`).join('')}</datalist>`;
+    let b='';
+    if(i===0)b=`<div class="card"><div class="grid g2">${TI('Name','name','')}${TI('Ancestry','ancestry','e.g. Human','gAnc')}${TI('Class','klass','e.g. Fury','gCls')}${TI('Kit','kit','e.g. Panther')}${TI('Career','career','e.g. Soldier','gCar')}${TI('Culture','culture','optional')}</div>
+      <div style="margin-top:14px"><label class="l">Skills your career gave you ${tip('Most careers grant two skills, some grant three. This only sets the goal of the Hone career skills project (240 or 360).')}</label><div class="seg"><button class="${h.careerSkills<3?'on':''}" data-gcs="2">Two</button><button class="${h.careerSkills>=3?'on':''}" data-gcs="3">Three</button></div></div></div>${DL('gAnc',ANC)}${DL('gCls',CLS)}${DL('gCar',CAR)}`;
+    if(i===1)b=`<div class="grid g5">${CHARS.map(c=>`<div class="card char"><label>${c}</label>${NUM('','char:'+c,h.chars[c],-5,6)}</div>`).join('')}</div>
+      <p class="small muted" style="margin-top:12px">Project rolls add one of these, so they matter most for downtime.</p>`;
+    if(i===2)b=`<div class="card"><div class="grid g3">${NUM('Level','hf:level',h.level)}${NUM('Experience'+tip('Your total XP. At standard speed you gain a level every 16 XP.'),'hf:xp',h.xp)}${NUM('Victories'+tip('Victories you are holding right now. They turn into XP when you finish a respite.'),'hf:victories',h.victories)}
+      ${NUM('Stamina max','hf:staminaMax',h.staminaMax)}${NUM('Recoveries max','hf:recoveriesMax',h.recoveriesMax)}${NUM('Renown'+tip('Renown 3 / 6 / 9 / 12 lets you keep 1 / 2 / 3 / 4 followers. Leave it at 0 if you are not sure.'),'hf:renown',h.renown)}</div></div>`;
+    if(i===3)b=`<p class="small muted" style="margin:-6px 0 4px">${h.skills.length} selected. Tap to add or remove.</p>${Object.entries(SKILLS).map(([g,l])=>`<div class="orn" style="margin:16px 0 8px"><h3>${g}</h3></div><div class="pill-row">${l.map(k=>`<button class="chip ${h.skills.includes(k)?'gold':''}" data-gsk="${k}">${h.skills.includes(k)?'✓ ':''}${k}</button>`).join('')}</div>`).join('')}`;
+    if(i===4){const extra=h.languages.filter(l=>!LANGS.includes(l));b=`<p class="small muted" style="margin:-6px 0 12px">${h.languages.length} selected. Project sources are written in specific languages, so this decides which rolls take a bane.</p>
+      <div class="pill-row">${LANGS.concat(extra).map(k=>`<button class="chip ${h.languages.includes(k)?'gold':''}" data-glang="${esc(k)}">${h.languages.includes(k)?'✓ ':''}${esc(k)}</button>`).join('')}</div>
+      <div class="row" style="margin-top:14px;max-width:420px;flex-wrap:nowrap"><input id="gLang" placeholder="Another language"><button class="btn" data-ga="addlang">Add</button></div>`;}
+    if(i===5)b=`<div class="card"><div class="row" style="align-items:flex-end;flex-wrap:nowrap"><div style="flex:1;min-width:0"><label class="l">Item ${tip('Add the armor, weapons and implements you might imbue, plus any treasures you want to keep track of. You can skip this and add items later in the Items tab.')}</label><input id="gItem" placeholder="e.g. Grandmother’s longsword"></div>
+      <div><label class="l">Type</label><select id="gType" style="width:auto"><option value="weapon">Weapon</option><option value="armor">Armor</option><option value="implement">Implement</option><option value="consumable">Consumable</option><option value="trinket">Trinket</option><option value="leveled">Leveled treasure</option><option value="other">Other</option></select></div><button class="btn" data-ga="additem">Add</button></div>
+      <div class="chips" style="margin-top:14px">${h.items.map(it=>`<span class="chip">${esc(it.name)} <span class="muted">${esc(it.type)}</span><button data-ga="rmitem" data-id="${it.id}">×</button></span>`).join('')||'<span class="muted small">Nothing added yet.</span>'}</div></div>`;
+    this.inner.innerHTML=`<div class="wbar"><h2>Import your hero <span class="who">step ${i+1} of ${n}</span></h2><div class="phases">${this.STEPS.map((_,k)=>`<span class="ph ${k<i?'done':k===i?'cur':''}"></span>`).join('')}</div><button class="btn sm" data-ga="close">Save and close</button></div>
+      <p class="lead">${this.STEPS[i]}</p>${b}
+      <div class="row" style="justify-content:space-between;margin-top:22px">${i?'<button class="btn" data-ga="back">Back</button>':'<span></span>'}<button class="btn gold lg" data-ga="${i===n-1?'finish':'next'}">${i===n-1?'Finish':'Next'}</button></div>`;
+  }
+};
+G.inner.addEventListener('input',e=>{const k=e.target.dataset.g;if(k){H()[k]=e.target.value;save();}});
+G.inner.addEventListener('change',e=>{const t=e.target;if(t.dataset.num){setNum(t.dataset.num,t.value);G.draw();}});
+G.inner.addEventListener('keydown',e=>{if(e.key!=='Enter')return;if(e.target.id==='gItem')G.inner.querySelector('[data-ga=additem]').click();else if(e.target.id==='gLang')G.inner.querySelector('[data-ga=addlang]').click();});
+G.inner.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;const d=t.dataset,h=H(),st=G.st;
+  if(d.inc){const r=numRef(d.inc);setNum(d.inc,(+r.get()||0)+(+d.d));}
+  else if(d.gcs){h.careerSkills=+d.gcs;save();}
+  else if(d.gsk){const i=h.skills.indexOf(d.gsk);if(i>=0)h.skills.splice(i,1);else h.skills.push(d.gsk);save();}
+  else if(d.glang){const i=h.languages.indexOf(d.glang);if(i>=0)h.languages.splice(i,1);else h.languages.push(d.glang);save();}
+  else if(d.ga==='addlang'){const v=document.getElementById('gLang').value.trim();if(v&&!h.languages.includes(v)){h.languages.push(v);save();}}
+  else if(d.ga==='additem'){const v=document.getElementById('gItem').value.trim();if(!v)return toast('Type the item’s name first');h.items.push({id:uid(),name:v,type:document.getElementById('gType').value,enh:[],qty:1});save();G.draw();document.getElementById('gItem').focus();return;}
+  else if(d.ga==='rmitem'){h.items=h.items.filter(x=>x.id!==d.id);save();}
+  else if(d.ga==='next'){G.leave();st.step++;G.el.scrollTop=0;}
+  else if(d.ga==='back'){G.leave();st.step--;G.el.scrollTop=0;}
+  else if(d.ga==='close'||d.ga==='finish'){G.leave();if(!h.name.trim())h.name='My Hero';save();S.tab='hero';G.close();if(d.ga==='finish')toast(h.name+' is ready. Press Respite when you rest.');return;}
+  else return;
+  G.draw();
+});
+
+/* ================= PROJECT LOGIC ================= */
+function makeProject(o){return Object.assign({id:uid(),points:0,status:'active',log:[],bonus:0,sourceLang:'',prereq:'',source:'',created:today(),hitMilestones:[],cfg:null},o);}
+function completeProject(h,p){
+  if(p.status==='done')return p.rewardMsg||'';
+  p.status='done';p.completed=today();const r=p.reward||{};let msg='';
+  if(r.type==='skill'){if(!h.skills.includes(r.value))h.skills.push(r.value);msg=`You learned <b>${esc(r.value)}</b>. It’s on your sheet.`;}
+  else if(r.type==='language'){if(!h.languages.includes(r.value))h.languages.push(r.value);msg=`You now speak <b>${esc(r.value)}</b>. It’s on your sheet.`;}
+  else if(r.type==='item'){const t=r.itemType||'other';const ex=t==='consumable'&&h.items.find(i=>i.name===r.value);if(ex)ex.qty=(ex.qty||1)+1;else h.items.push({id:uid(),name:r.value,type:t,enh:[],qty:1,notes:r.notes||''});msg=`<b>${esc(r.value)}</b> is in your pack.${r.notes?' '+esc(r.notes):''}`;}
+  else if(r.type==='enh'){let it=h.items.find(i=>i.id===r.itemId);if(!it){it={id:r.itemId,name:r.itemName,type:r.itemType,enh:[],qty:1};h.items.push(it);}(it.enh=it.enh||[]).push({level:r.level,name:r.value});msg=`<b>${esc(it.name)}</b> now holds <b>${esc(r.value)}</b> and grants ${esc(ENH[r.itemType].bonus[[1,5,9].indexOf(r.level)])}.`;}
+  else if(r.text)msg=r.text;
+  p.rewardMsg=msg;p.log.push({date:today(),text:'Project complete!'});return msg;
+}
+function defaultCfg(p,roller){
+  const ch=(p.chars.length?p.chars:CHARS).slice().sort((a,b)=>roller.chars[b]-roller.chars[a])[0];
+  const sk=roller.skills.find(isCL)&&p.kind==='craft'?(roller.skills.filter(isCL).find(s=>SKILL_GROUP[s]==='Crafting')||''):(p.kind==='lore'?(roller.skills.find(s=>SKILL_GROUP[s]==='Lore')||''):'');
+  return {char:ch,skill:sk,lang:knows(roller,p.sourceLang)?0:2,E:0,B:0,mod:p.bonus||0};
+}
+function rollOnce(owner,p,roller,cfg,dice){
+  const [a,b]=dice||[d10(),d10()];const nat=a+b;
+  const cv=roller.chars[cfg.char]||0, sk=cfg.skill?2:0;
+  const E=cfg.E, B=cfg.B+cfg.lang;let eb=0,ebT='';
+  if(E&&B){if(E>=2&&B===1){eb=2;ebT='edge';}else if(B>=2&&E===1){eb=-2;ebT='bane';}else ebT='edges & banes cancel';}
+  else if(E){eb=E>=2?4:2;ebT=E>=2?'double edge':'edge';}else if(B){eb=B>=2?-4:-2;ebT=B>=2?'double bane':'bane';}
+  const total=Math.max(1,nat+cv+sk+eb+(cfg.mod||0));
+  const why=[`${cfg.char} ${sign(cv)}`];if(sk)why.push(`${cfg.skill} +2`);if(ebT)why.push(`${ebT}${eb?' '+sign(eb):''}`);if(cfg.mod)why.push(`bonus ${sign(cfg.mod)}`);
+  const before=p.points;p.points+=total;const bt=nat>=19;
+  p.log.push({date:today(),text:`Rolled ${total}${bt?' (breakthrough)':''}${roller.id!==owner.id?' by '+roller.name:''}: ${before} → ${p.points}`});
+  let ms=null;
+  if(S.settings.events==='milestones')milestones(p.goal).forEach(f=>{const t=Math.ceil(p.goal*f);if(before<t&&p.points>=t&&p.points<p.goal&&!p.hitMilestones.includes(f)){p.hitMilestones.push(f);ms=f;}});
+  const done=p.points>=p.goal&&p.status!=='done';if(done)completeProject(owner,p);
+  return {a,b,nat,total,bt,why:why.join(' · '),ms,done};
+}
+
+/* ================= RESPITE ================= */
+const W={
+  el:document.getElementById('wiz'),inner:document.getElementById('wizIn'),st:null,
+  open(assign){const h=H();this.st={total:1,done:0,entries:[],cur:null,screen:'home',startVictories:h.victories,event:{},assign:assign||null};this.el.classList.toggle('night',!assign);this.el.classList.add('open');document.body.style.overflow='hidden';this.go('home');},
+  close(){this.el.classList.remove('open');if(D.el.classList.contains('open'))D.draw();else document.body.style.overflow='';render();},
+  get rem(){return this.st.total-this.st.done;},
+  go(screen,arg){this.st.screen=screen;this.st.arg=arg;this.draw();this.el.scrollTop=0;},
+  draw(){
+    const st=this.st,h=H();
+    const phases=Array.from({length:st.total},(_,i)=>`<span class="ph ${i<st.done?'done':i===st.done&&st.screen!=='end'?'cur':''}"></span>`).join('');
+    const fol=st.assign&&findFol(st.assign)[1];
+    const head=fol?`<div class="wbar"><h2>New project <span class="who">for ${esc(fol.name)}</span></h2><button class="btn sm" data-w="close" style="margin-left:auto">Cancel</button></div>`:st.screen==='end'?`<div class="wbar"><h2>Dawn <span class="who">${esc(h.name)}</span></h2></div>`:
+    `<div class="wbar"><h2>Respite <span class="who">${esc(h.name)}</span></h2>
+      <div class="phases">${st.total<=14?phases:''}<span class="tiny muted" style="margin:0 4px 0 6px">${st.done}/${st.total}</span>
+      <div class="stepper" title="How many respites"><button data-w="cnt-" aria-label="fewer">−</button><b>${st.total}</b><button data-w="cnt+" aria-label="more">+</button></div></div>
+      <button class="btn sm" data-w="${st.done?'end':'close'}">${st.done?'End respite':'Close'}</button></div>`;
+    this.inner.innerHTML=head+this[st.screen](st.arg);
+    this.after&&this.after();this.after=null;
+  },
+  /* -------- home: choose activity -------- */
+  home(){
+    const h=H(),st=this.st;
+    if(st.assign)return this.pick();
+    if(this.rem<=0)return this.allUsed();
+    const act=h.projects.filter(p=>p.status==='active');
+    const T=(ic,t,d,w)=>`<button class="tile" data-w="${w}"><span class="ic">${ic}</span><span><b>${t}</b><span class="d">${d}</span></span></button>`;
+    let html='';
+    if(st.done===0){
+      html+=`<div class="card glow restcard" style="margin-bottom:18px"><div style="flex:1;min-width:220px"><div class="serif" style="font-size:20px">${st.total===1?'One full day':st.total+' full days'} of rest ${tip('Each respite is 24 uninterrupted hours somewhere safe, with one respite activity. Use − / + at the top to take several in a row. Stamina, Recoveries and XP are applied when you finish.')}</div></div>
+        <div class="gems"><div class="gem st"><b>${h.staminaMax}</b><span>Stamina</span></div><div class="gem rc"><b>${h.recoveriesMax}</b><span>Recoveries</span></div><div class="gem vi"><b>+${h.victories}</b><span>XP</span></div></div></div>`;
+    }
+    html+=`<p class="lead">${st.total>1?`<em>Respite ${st.done+1} of ${st.total}.</em> `:''}What will you do?</p>`;
+    if(act.length){
+      html+=`<div class="orn"><span class="d">◆</span><h3>Continue a project</h3><span class="d">◆</span></div><div class="grid g2">${act.map(p=>`<div class="contcard">
+        <div class="spread"><span class="tag">${esc(p.kindLabel)}</span><span class="pts">${p.points} <small>of ${p.goal}</small></span></div>
+        <div class="proj-t">${esc(p.title)}</div>${bar(p,'thin')}
+        <div class="spread" style="margin-top:2px"><span class="tiny muted">${p.cfg?cfgText(p.cfg,h):esc(p.chars.join(' / '))}</span>
+        <span class="quick"><button class="btn sm" data-w="open-proj" data-id="${p.id}">Options</button><button class="btn sm gold" data-w="quick" data-id="${p.id}">Roll${this.rem>1?' ×1':''}</button>${this.rem>1?`<button class="btn sm gold" data-w="quick-all" data-id="${p.id}">×${this.rem}</button>`:''}</span></div></div>`).join('')}</div>`;
+    }
+    if(h.favs.length){
+      html+=`<div class="orn"><span class="d">◆</span><h3>Your favourites</h3><span class="d">◆</span></div><div class="pill-row">${h.favs.map(f=>`<button class="chip gold" data-w="fav" data-key="${esc(f.key)}" style="padding:7px 14px;font-size:14px">★ ${esc(f.label)}</button>`).join('')}</div>`;
+    }
+    html+=`<div class="orn"><span class="d">◆</span><h3>Start something new</h3><span class="d">◆</span></div><div class="tiles">
+      ${T('⚒','Create an item','Potions, trinkets, leveled gear','craft')}
+      ${T('✦','Imbue an item','Enhance armor, weapon, implement','imbue')}
+      ${T('📖','Learn a skill','Goal 120','f:skill')}
+      ${T('🗣','Learn a language','Goal 120','f:lang')}
+      ${T('🔍','Research lore','Common to forbidden','f:lore')}
+      ${T('🎓','Train with a master','Hone, control, acquire','f:master')}
+      ${T('🧭','Hone career skills','Edge on career skills','f:career')}
+      ${T('⚗','Find a cure','50 × creature level','f:cure')}
+      ${T('🍲','Perfect a recipe','Party buffs. Goal 100','f:recipe')}
+      ${T('🎭','Go undercover','Spy on an organization','f:undercover')}
+      ${T('🤝','Community service','Goal 75','f:community')}
+      ${T('🏡','See loved ones','Goal 60','f:loved')}
+      ${T('🎣','Go fishing','Reel until one escapes','fishing')}
+      ${T('🏗','Build something big','Airship, road, platform','f:build')}
+      ${T('✍','Custom project','Anything else','f:custom')}
+    </div>
+    <div class="orn"><span class="d">◆</span><h3>Or instead</h3><span class="d">◆</span></div>
+    <div class="pill-row">
+      <button class="chip" data-w="help">Help another hero</button><button class="chip" data-w="guide">Study a guide</button>
+      <button class="chip" data-w="t:search">Find a project source</button><button class="chip" data-w="t:besource">Be someone’s source</button>
+      <button class="chip" data-w="t:kit">Change kit</button>${S.settings.abilitySwap?'<button class="chip" data-w="t:abilities">Change abilities</button>':''}
+      <button class="chip" data-w="recruit">Recruit a follower</button><button class="chip" data-w="t:other">Something else</button><button class="chip" data-w="rest">Just rest${this.rem>1?` (all ${this.rem})`:''}</button>
+    </div>
+    <div style="margin-top:26px;text-align:center"><button class="linkbtn" data-w="interrupt">The respite was interrupted</button></div>`;
+    return html;
+  },
+  allUsed(){
+    return `<div class="celebrate"><div class="sparkle">◆ ◆ ◆</div><h3>All ${this.st.total} respite${this.st.total>1?'s':''} spent</h3><p class="muted">Take another (+ at the top) or greet the dawn.</p>
+    <div class="actions"><button class="btn" data-w="cnt+">+ One more respite</button><button class="btn gold lg" data-w="end">Finish ☀</button></div></div>`;
+  },
+  consume(text){this.st.done++;this.st.entries.push((this.st.total>1?`Respite ${this.st.done}: `:'')+text);save();},
+
+  /* -------- craft list -------- */
+  craft(q){
+    q=q||{f:'',c:'all'};const h=H();const cats=[...new Set(TREASURES.map(t=>t.cat))];
+    const list=TREASURES.filter(t=>(q.c==='all'||t.cat===q.c)&&(!q.f||(t.name+' '+t.pre+' '+t.kw).toLowerCase().includes(q.f.toLowerCase())));
+    this.after=()=>{const s=document.getElementById('crS');s.focus();s.setSelectionRange(q.f.length,q.f.length);s.oninput=()=>this.go('craft',{f:s.value,c:document.getElementById('crC').value});document.getElementById('crC').onchange=e=>this.go('craft',{f:s.value,c:e.target.value});};
+    return `<p class="lead">What are you making?</p>
+    <div class="grid g2" style="margin-bottom:12px;grid-template-columns:2fr 1fr"><input id="crS" placeholder="Search 97 treasures…" value="${esc(q.f)}"><select id="crC"><option value="all">All categories</option>${cats.map(c=>`<option ${c===q.c?'selected':''}>${c}</option>`).join('')}</select></div>
+    <div class="list">${list.map(t=>{const key='craft:'+t.name,l=langFromSrc(t.src);return `<div class="pick" data-w="craft-pick" data-name="${esc(t.name)}">
+      <button class="star ${isFav(key)?'on':''}" data-w="star" data-key="${esc(key)}" data-label="${esc(t.name)}" data-kl="Create an item">${isFav(key)?'★':'☆'}</button>
+      <div style="flex:1;min-width:0"><div class="spread"><span class="nm">${esc(t.name)}</span><span class="pts">${t.goal}</span></div>
+      <div class="meta">${esc(t.cat)} · ${esc(t.ch)} · ${esc(l||t.src)}${l&&!knows(h,l)?' <span style="color:var(--ember)">●</span>':''}</div></div></div>`;}).join('')||'<div class="empty">Nothing matches.</div>'}</div>
+    <div class="row" style="margin-top:14px"><button class="btn ghost" data-w="home">← Back</button></div>`;
+  },
+  craftPick(name){
+    const t=TREASURES.find(x=>x.name===name);
+    const type=/Consumable/.test(t.cat)?'consumable':/Trinket/.test(t.cat)?'trinket':/armor/.test(t.cat)?'armor':/implement/.test(t.cat)?'implement':/weapon/.test(t.cat)?'weapon':'leveled';
+    const y=/yields/.test(t.goalText)?t.goalText.replace(/^\d+\s*/,''):'';
+    this.newProject({kind:'craft',kindLabel:'Create an item',title:t.name,goal:t.goal,chars:parseChars(t.ch),sourceLang:langFromSrc(t.src),prereq:t.pre,source:t.src,reward:{type:'item',value:t.name,itemType:type,notes:y},note:`${t.cat} · ${t.kw}${y?' · '+y:''}`,favKey:'craft:'+t.name});
+  },
+  /* -------- imbue: one screen -------- */
+  imbue(sel){
+    const h=H();const items=h.items.filter(i=>['armor','weapon','implement'].includes(i.type)&&(i.enh||[]).length<3);
+    const it=sel&&h.items.find(i=>i.id===sel);
+    let list='';
+    if(it){
+      const n=(it.enh||[]).length,lvl=[1,5,9][n],E=ENH[it.type],has=(it.enh||[]).map(e=>e.name);
+      const ok=nm=>{if(has.includes(nm))return false;const m=nm.match(/^(.*) (II|III)$/);if(!m)return true;return (m[2]==='II'?[m[1]+' I',m[1]]:[m[1]+' II']).some(x=>has.includes(x));};
+      list=`<div class="callout small">${ord(lvl)}-level enhancement · grants <b>${E.bonus[[1,5,9].indexOf(lvl)]}</b> · ${E.chars.join(', ')} · goal 150 <span class="pageref">p. ${E.page}</span></div>
+      <div class="list">${E[lvl].map(([nm,pre,lang,sum])=>{const k=`imbue:${it.type}:${nm}`;const o=ok(nm);return `<div class="pick ${o?'':'off'}" ${o?`data-w="imbue-pick" data-name="${esc(nm)}" data-item="${it.id}"`:''}>
+        <button class="star ${isFav(k)?'on':''}" data-w="star" data-key="${esc(k)}" data-label="${esc(nm)}" data-kl="Imbue (${it.type})">${isFav(k)?'★':'☆'}</button>
+        <div style="flex:1;min-width:0"><div class="spread"><span class="nm">${esc(nm)}</span><span class="tag">${esc(lang)}${knows(h,lang)?'':' ●'}</span></div>
+        <div class="eff">${esc(sum)}</div><div class="meta">Needs ${esc(pre.charAt(0).toLowerCase()+pre.slice(1))}${o?'':' · <span style="color:var(--ember)">needs the earlier version first</span>'}</div></div></div>`;}).join('')}</div>`;
+    }
+    return `<p class="lead">Which item will you imbue?</p>
+    <div class="pill-row" style="margin-bottom:10px">${items.map(i=>`<button class="chip ${it&&it.id===i.id?'gold':''}" style="padding:7px 14px;font-size:14px" data-w="imbue-sel" data-id="${i.id}">${i.type==='armor'?'🛡':i.type==='weapon'?'⚔':'🔮'} ${esc(i.name)} <span class="dim">· ${(i.enh||[]).length}/3</span></button>`).join('')}</div>
+    <div class="row" style="margin-bottom:14px"><input id="imN" placeholder="…or a new mundane item" style="flex:1;min-width:160px"><select id="imT" style="width:auto"><option value="weapon">Weapon</option><option value="armor">Armor</option><option value="implement">Implement</option></select><button class="btn" data-w="imbue-new">Add</button></div>
+    ${list||'<div class="empty" style="font-size:15px">Pick an item to see its next enhancements. Each item takes three: 1st, 5th and 9th level.</div>'}
+    <div class="row" style="margin-top:14px"><button class="btn ghost" data-w="home">← Back</button></div>`;
+  },
+  imbuePick(itemId,nm){
+    const it=H().items.find(i=>i.id===itemId);const n=(it.enh||[]).length,lvl=[1,5,9][n],E=ENH[it.type],e=E[lvl].find(x=>x[0]===nm);
+    this.newProject({kind:'imbue',kindLabel:'Imbue an item',title:`${it.name}: ${nm}`,goal:150,chars:E.chars.slice(),sourceLang:e[2],prereq:(lvl>1?`the ${ord(lvl===5?1:5)}-level enhancement, and `:'')+e[1].charAt(0).toLowerCase()+e[1].slice(1),source:`Texts or lore in ${e[2]}`,reward:{type:'enh',value:nm,level:lvl,itemId:it.id,itemName:it.name,itemType:it.type},note:e[3]});
+  },
+
+  /* -------- quick forms -------- */
+  form(kind){
+    const h=H();const DL=`<datalist id="ll">${LANGS.map(l=>`<option>${l}</option>`).join('')}</datalist>`;
+    const back=`<div class="row" style="margin-top:16px;justify-content:space-between"><button class="btn ghost" data-w="home">← Back</button>${kind==='skill'||kind==='build'?'':`<button class="btn gold" data-w="form-go" data-kind="${kind}">Begin</button>`}</div>`;
+    const srcLang=(id='f9')=>`<div><label class="l">Language of your source</label><input id="${id}" list="ll" value="${esc(h.languages[0]||'Caelian')}"></div>`;
+    let b='';
+    if(kind==='skill')b=`<p class="lead">Which skill will you learn? <span class="small muted">Reason or Intuition · 120</span></p>${Object.entries(SKILLS).map(([g,l])=>`<div class="orn" style="margin:14px 0 8px"><h3 style="font-size:11px">${g}</h3></div><div class="pill-row">${l.filter(s=>!h.skills.includes(s)).map(s=>`<button class="chip" data-w="skill-go" data-s="${s}">${s}</button>`).join('')}</div>`).join('')}`;
+    if(kind==='lang')b=`<p class="lead">Which language? <span class="small muted">Reason or Intuition · 120</span></p><div class="grid g2"><div><label class="l">Language to learn</label><input id="f1" list="ll" placeholder="e.g. Khelt"></div>${srcLang()}</div>`;
+    if(kind==='lore')b=`<p class="lead">What do you want to know? <span class="small muted">Reason</span></p><textarea id="f1" rows="2" placeholder="Where was the Crown of Ash lost?"></textarea>
+      <div class="grid g2" style="margin-top:12px"><div><label class="l">How esoteric? (ask your Director)</label><div class="seg" data-seg="f2"><button data-v="15" class="on">Common <b>15</b></button><button data-v="45">Obscure <b>45</b></button><button data-v="120">Lost <b>120</b></button><button data-v="240">Forbidden <b>240</b></button></div></div>${srcLang()}</div>`;
+    if(kind==='master')b=`<p class="lead">What will the master teach you? <span class="small muted">your highest characteristic</span> ${tip('<b>Hone</b>: +1 damage per tier or +2 ranged distance on one ability.<br><b>Control</b>: one heroic ability costs 1 less.<br><b>Acquire</b>: a signature ability from the master’s class.<br>You need a higher-level NPC or records of their teachings.')}</p>
+      <div class="seg" data-seg="f1" style="margin-bottom:12px"><button class="on" data-v="120|Hone ability">Hone ability <b>120</b></button><button data-v="500|Improve control">Improve control <b>500</b></button><button data-v="1000|Acquire ability">Acquire ability <b>1000</b></button></div>
+      <div class="grid g2"><div><label class="l">Ability / master</label><input id="f2" placeholder="e.g. Sir Vell, a 7th-level fury"></div>${srcLang()}</div>
+      `;
+    if(kind==='career')b=`<p class="lead">You revisit your old life${h.career?' as a <em>'+esc(h.career)+'</em>':''}. <span class="small muted">Intuition · ${h.careerSkills>=3?360:240}</span> ${tip('When complete you gain an edge on tests with your career skills. The goal is 240 if your career gave two skills and 360 if it gave three (set on your hero sheet).')}</p>`;
+    if(kind==='cure')b=`<p class="lead">What are you curing? <span class="small muted">Reason or Intuition</span></p><div class="grid g2"><div><label class="l">Affliction</label><input id="f1" placeholder="werewolf’s bite…"></div><div><label class="l">Level of the creature</label><input id="f2" type="number" min="1" value="1"></div><div><label class="l">Custom goal (optional)</label><input id="f3" type="number" placeholder="default 50 × level"></div><div><label class="l">Item prerequisite</label><input id="f4"></div></div>`;
+    if(kind==='recipe')b=`<p class="lead">What dish will you perfect? <span class="small muted">Reason or Intuition · 100</span></p><div class="grid g2"><div><label class="l">Dish</label><input id="f1" placeholder="Grandma’s kindleseed stew"></div>${srcLang()}</div>
+      <div style="margin-top:12px"><label class="l">Kind</label><div class="seg" data-seg="f2"><button class="on" data-v="Modern|common ingredients|Hearty: +1 Recovery at the end of the respite">Modern · Hearty</button><button data-v="Vintage|key ingredients|Comforting: turn one failed saving throw into a success">Vintage · Comforting</button><button data-v="Ancient|rare or extinct ingredients|Supernatural: +1 to one characteristic (max 6)">Ancient · Supernatural</button></div></div>
+      <label class="row small soft" style="margin-top:12px;flex-wrap:nowrap"><input type="checkbox" id="f4"> From my own culture (+3 to rolls)</label>`;
+    if(kind==='undercover')b=`<p class="lead">Which organization? <span class="small muted">Intuition or Presence · 15 (+30 each repeat)</span> ${tip('When complete you learn what you were after, but there is a chance you are caught: 25% the first time, rising by 25% each time you repeat this for the same group.')}</p><div class="grid g2"><div><label class="l">Organization</label><input id="f1"></div><div><label class="l">What you want to learn</label><input id="f2"></div></div>`;
+    if(kind==='community')b=`<p class="lead">Where are you helping? <span class="small muted">Director picks the characteristic · 75</span></p><div class="grid g2"><div><label class="l">Settlement</label><input id="f1"></div><div><label class="l">What you do</label><input id="f2" placeholder="odd jobs, tutoring…"></div></div>`;
+    if(kind==='loved')b=`<p class="lead">Who do you spend time with? <span class="small muted">Presence · 60</span> ${tip('Reward: Stamina maximum +'+(12+h.level)+' until the end of your next respite. You can start this once a month, and you need to be able to talk to them.')}</p><input id="f1" placeholder="my sister in Capital">`;
+    if(kind==='custom')b=`<p class="lead">Describe your project.</p><div class="grid g2"><div><label class="l">Name</label><input id="f1"></div><div><label class="l">Goal</label><input id="f2" type="number" value="45"></div><div><label class="l">Item prerequisite</label><input id="f5"></div>${srcLang('f4')}</div>
+      <div style="margin-top:12px"><label class="l">Characteristics allowed</label><div class="seg" data-seg="f3" data-multi="1">${CHARS.map(c=>`<button class="on" data-v="${c}">${c}</button>`).join('')}</div></div>`;
+    if(kind==='build')b=`<p class="lead">What will you build?</p><div class="tiles">
+      <button class="tile" data-w="build" data-b="airship"><span class="ic">⛵</span><span><b>Airship</b><span class="d">3,000 · Low Rhyvian</span></span></button>
+      <button class="tile" data-w="build" data-b="platform"><span class="ic">🌀</span><span><b>Teleport platform</b><span class="d">1,500 · Voll</span></span></button></div>
+      <div class="card" style="margin-top:12px"><div class="grid g3" style="align-items:end"><div><label class="l">🛤 Road length (miles)</label><input id="f1" type="number" value="20"></div><label class="row small soft" style="flex-wrap:nowrap"><input type="checkbox" id="f2"> Repairing (half goal)</label><button class="btn gold" data-w="build" data-b="road">Build road</button></div></div>`;
+    return b+back+DL;
+  },
+  formGo(kind){
+    const h=H();const v=id=>{const e=document.getElementById(id);return e?(e.type==='checkbox'?e.checked:e.value.trim()):'';};
+    const seg=id=>{const s=document.querySelector(`[data-seg="${id}"]`);return s?[...s.querySelectorAll('button.on')].map(b=>b.dataset.v):[];};
+    let p;
+    if(kind==='lang'){const s=v('f1');if(!s)return toast('Name the language');p={kindLabel:'Learn a language',title:'Learn '+s,goal:120,chars:['Reason','Intuition'],sourceLang:v('f9'),source:'Texts or instruction teaching '+s,reward:{type:'language',value:s}};}
+    if(kind==='lore'){const q=v('f1')||'Research';const g=+seg('f2')[0];p={kindLabel:'Discover lore',title:q,goal:g,chars:['Reason'],sourceLang:v('f9'),source:'Texts or knowledge about the subject',reward:{text:`Ask your Director for the answers to “${esc(q)}”.`}};}
+    if(kind==='master'){const [g,l]=seg('f1')[0].split('|');const best=CHARS.slice().sort((a,b)=>h.chars[b]-h.chars[a])[0];p={kindLabel:'Learn from a master',title:l+(v('f2')?': '+v('f2'):''),goal:+g,chars:[best],sourceLang:v('f9'),source:'A higher-level NPC or their records',reward:{text:`Training complete: <b>${esc(l)}</b>. Update your sheet.`}};}
+    if(kind==='career')p={kindLabel:'Hone career skills',title:'Hone career skills'+(h.career?' ('+h.career+')':''),goal:h.careerSkills>=3?360:240,chars:['Intuition'],reward:{text:'You gain an <b>edge on tests with your career skills</b>.'}};
+    if(kind==='cure'){const a=v('f1')||'an affliction';const g=+v('f3')||50*(+v('f2')||1);p={kindLabel:'Find a cure',title:'Cure for '+a,goal:g,chars:['Reason','Intuition'],prereq:v('f4'),reward:{type:'item',value:'Cure: '+a,itemType:'consumable',notes:'Further doses: '+Math.ceil(g/2)+' points each.'}};}
+    if(kind==='recipe'){const [t,ing,ben]=seg('f2')[0].split('|');const d=v('f1')||t+' recipe';p={kindLabel:'Perfect a recipe',title:d,goal:100,chars:['Reason','Intuition'],sourceLang:v('f9'),prereq:ing,bonus:v('f4')?3:0,source:'A recipe or a tutor',reward:{text:`<b>${esc(d)}</b> perfected. Cook 5 servings as a respite activity. ${esc(ben)}.`}};}
+    if(kind==='undercover'){const org=v('f1');if(!org)return toast('Name the organization');const n=h.projects.filter(p=>p.kind==='undercover'&&p.org===org&&p.status==='done').length;p={kindLabel:'Go undercover',title:'Undercover: '+org,org,goal:15+30*n,chars:['Intuition','Presence'],prereq:'perhaps a disguise or token',reward:{text:`You learn what you sought. <b>${25*(n+1)}% chance you were caught</b>: your Director rolls.`}};}
+    if(kind==='community'){const c=v('f1')||'the community';p={kindLabel:'Community service',title:'Service in '+c,goal:75,chars:CHARS.slice(),reward:{text:'The community rewards you with a <b>random consumable treasure</b>.'}};}
+    if(kind==='loved')p={kindLabel:'Loved ones',title:'Time with '+(v('f1')||'loved ones'),goal:60,chars:['Presence'],reward:{text:`Stamina maximum <b>+${12+h.level}</b> until the end of your next respite.`}};
+    if(kind==='custom'){const ch=seg('f3');p={kindLabel:'Custom project',title:v('f1')||'Custom project',goal:+v('f2')||45,chars:ch.length?ch:CHARS.slice(),sourceLang:v('f4'),prereq:v('f5'),reward:{text:'Check with your Director for the outcome.'}};}
+    p.kind=kind;p.favKey='tpl:'+kind;this.newProject(p);
+  },
+  build(b){
+    if(b==='airship')this.newProject({kind:'build',kindLabel:'Build',title:'Airship',goal:3000,chars:['Might','Reason','Presence'],sourceLang:'Low Rhyvian',prereq:'a Wind Crystal of Quintessence',source:'Texts or lore in Low Rhyvian',reward:{type:'item',value:'Airship',itemType:'other',notes:'130 miles/day.'}});
+    if(b==='platform')this.newProject({kind:'build',kindLabel:'Build',title:'Teleportation platform',goal:1500,chars:['Reason'],sourceLang:'Voll',prereq:'one spatial navigator',source:'Texts or lore in Voll',reward:{type:'item',value:'Teleportation platform',itemType:'other'}});
+    if(b==='road'){const mi=+document.getElementById('f1').value||1,half=document.getElementById('f2').checked;const g=half?Math.ceil(5*mi):10*mi;this.newProject({kind:'build',kindLabel:'Build',title:`${half?'Repair':'Build'} a ${mi}-mile road`,goal:g,chars:['Might','Reason','Presence'],sourceLang:'Caelian',prereq:'writs from the engineers’, masons’ and guards’ guilds',source:'Texts or lore in Caelian',reward:{text:`Road complete: <b>${mi<=50?1:mi<=100?2:3} Renown</b>, double-speed travel along it.`}});}
+  },
+  newProject(o){const p=makeProject(o);if(this.st.assign){this.st.cur={p};return this.go('assign');}this.st.cur={p,owner:H().id,roller:H().id,isNew:true,results:[],pendingBt:false};p.cfg=defaultCfg(p,H());this.go('roll');},
+  openProj(id,ownerId,rollerId){const owner=heroById(ownerId||H().id);const p=owner.projects.find(x=>x.id===id);const roller=heroById(rollerId||owner.id);
+    this.st.cur={p,owner:owner.id,roller:roller.id,isNew:false,results:[],pendingBt:false,cfg:(roller.id===owner.id&&p.cfg)?Object.assign({},p.cfg):defaultCfg(p,roller)};
+    if(roller.id===owner.id&&!p.cfg)p.cfg=this.st.cur.cfg;},
+
+  /* -------- the roll screen -------- */
+  roll(){
+    const c=this.st.cur,p=c.p,owner=heroById(c.owner),roller=heroById(c.roller);const cfg=c.cfg||p.cfg;c.cfg=cfg;
+    const rem=this.rem;const chars=p.chars.length?p.chars:CHARS;
+    const editOpen=c.isNew||c.edit;
+    const lang=p.sourceLang?`<div><label class="l">Source in ${esc(p.sourceLang)} ${tip('You need to understand the project source. A related language is a bane (−2); an unknown one is a double bane (−4).')}</label><div class="seg" data-cfg="lang"><button data-v="0" class="${cfg.lang===0?'on':''}">Known</button><button data-v="1" class="${cfg.lang===1?'on':''}">Related −2</button><button data-v="2" class="${cfg.lang===2?'on':''}">Unknown −4</button></div></div>`:'';
+    const cfgHtml=`<div class="grid" style="gap:14px">
+      <div><label class="l">Characteristic</label><div class="seg" data-cfg="char">${chars.map(ch=>`<button data-v="${ch}" class="${cfg.char===ch?'on':''}">${ch}<b>${sign(roller.chars[ch])}</b></button>`).join('')}</div></div>
+      <div class="grid g2"><div><label class="l">Skill that relates ${tip('Adds +2 when one of your skills directly relates to the project. Crafting and lore skills usually qualify; others need your Director’s OK.')}</label><select data-cfgsel="skill"><option value="">None</option>${roller.skills.slice().sort((a,b)=>isCL(b)-isCL(a)).map(s=>`<option ${cfg.skill===s?'selected':''} value="${esc(s)}">${esc(s)}${isCL(s)?'':' (ask Director)'}</option>`).join('')}</select></div>${lang}</div>
+      <div class="row" style="gap:22px"><div><label class="l">Edges ${tip('One edge is +2, two or more is a double edge (+4). Edges and banes cancel each other.')}</label><div class="counter"><button data-w="cfgn" data-k="E" data-d="-1">−</button><span>${cfg.E}</span><button data-w="cfgn" data-k="E" data-d="1">+</button></div></div>
+      <div><label class="l">Banes</label><div class="counter"><button data-w="cfgn" data-k="B" data-d="-1">−</button><span>${cfg.B}</span><button data-w="cfgn" data-k="B" data-d="1">+</button></div></div>
+      <div style="width:110px"><label class="l">Bonus ${tip('Any flat bonus, for example +3 for a recipe from your own culture.')}</label><input type="number" data-cfgsel="mod" value="${cfg.mod||0}"></div></div></div>`;
+    const done=p.status==='done';
+    const fk=p.favKey;
+    let h=`<div class="card glow"><div class="spread"><span class="tag">${esc(p.kindLabel)}${roller.id!==owner.id?' · helping '+esc(owner.name):''}</span>
+      <span class="row" style="gap:8px">${fk&&c.isNew?`<button class="star ${isFav(fk)?'on':''}" data-w="star" data-key="${esc(fk)}" data-label="${esc(p.kind==='craft'?p.title:p.kindLabel)}" data-kl="${esc(p.kindLabel)}">${isFav(fk)?'★':'☆'}</button>`:''}<span class="pts" style="font-size:19px">${Math.min(p.points,p.goal)} <small>of ${p.goal}</small></span></span></div>
+      <div class="proj-t" style="font-size:24px;margin:8px 0 12px">${esc(p.title)}</div>${bar(p)}
+      ${p.note?`<div class="small soft" style="margin-top:10px">${esc(p.note)}</div>`:''}
+      ${c.isNew&&(p.prereq||p.source)?`<div class="checks" style="margin-top:12px">${p.prereq?`<label><input type="checkbox" checked> <span><b>Item prerequisite:</b> ${esc(p.prereq)}</span></label>`:''}${p.source?`<label><input type="checkbox" checked> <span><b>Project source:</b> ${esc(p.source)} ${tip('You need access to the source every time you roll. Another hero can act as your source with their respite activity.')}</span></label>`:''}</div>`:''}
+      
+    </div>`;
+    h+=`<div class="card" style="margin-top:12px">${editOpen?cfgHtml:`<div class="spread"><div class="cfgsum">${cfgText(cfg,roller,true)}</div><button class="linkbtn" data-w="edit">change</button></div>`}</div>`;
+    // results
+    if(c.results.length){
+      const last=c.results[c.results.length-1];
+      h+=`<div class="card" style="margin-top:12px"><div class="rollzone"><div class="d10 spin"><b>${last.a}</b></div><div class="d10 spin" style="animation-delay:.05s"><b>${last.b}</b></div><div class="bigtotal">${last.total}</div></div>
+        <div class="results">${c.results.map(r=>`<div class="res"><span class="rn">${r.label}</span><span class="d10 sm"><b>${r.a}</b></span><span class="d10 sm"><b>${r.b}</b></span><span class="tot">${r.total}</span><span class="why">${esc(r.why)}</span>
+        ${r.bt?'<span class="badge bt">✦ Breakthrough</span>':''}${r.ev?'<span class="badge ev">⚑ Event</span>':''}${r.ms?`<span class="badge ev">⚑ Milestone</span>`:''}${r.done?'<span class="badge ok">✓ Done</span>':''}</div>`).join('')}</div>
+        ${c.results.some(r=>r.ev||r.ms)?'<div class="callout small" style="border-color:var(--violet)">⚑ An event triggers: tell your Director to roll on the project’s event table.</div>':''}</div>`;
+    }
+    if(done){
+      h+=`<div class="celebrate"><div class="sparkle">◆ ◆ ◆</div><h3>Project complete!</h3><p class="serif" style="font-size:18px">${p.rewardMsg||''}</p>
+      <div class="actions">${this.rem>0?`<button class="btn" data-w="home">Next activity (${this.rem} left)</button>`:''}<button class="btn gold" data-w="end">Finish ☀</button></div></div>`;
+    } else if(c.pendingBt){
+      h+=`<div class="actions"><button class="btn gold lg" data-w="roll1">✦ Breakthrough! Roll again</button></div>${this.manual()}`;
+    } else if(rem>0){
+      h+=`<div class="actions"><button class="btn gold lg" data-w="roll1">Roll${c.results.length?` · respite ${this.st.done+1}`:''}</button>${rem>1?`<button class="btn lg" data-w="rollall">Roll all ${rem} respites</button>`:''}</div>${this.manual()}
+      <div class="actions" style="margin-top:8px">${c.results.length?`<button class="linkbtn" data-w="home">Do something else with the next respite</button>`:`<button class="linkbtn" data-w="home">← Back</button>`}</div>`;
+    } else {
+      h+=`<div class="celebrate"><h3 style="font-size:20px">All respites spent</h3><div class="actions"><button class="btn" data-w="cnt+">+ One more respite</button><button class="btn gold" data-w="end">Finish ☀</button></div></div>`;
+    }
+    return h;
+  },
+  manual(){return `<details style="text-align:center;margin-top:10px"><summary>Using real dice?</summary><div class="row" style="justify-content:center;margin-top:8px"><input id="mA" type="number" min="1" max="10" placeholder="d10" style="width:76px"><input id="mB" type="number" min="1" max="10" placeholder="d10" style="width:76px"><button class="btn" data-w="rollm">Enter</button></div></details>`;},
+  doRoll(dice){
+    const c=this.st.cur,p=c.p,owner=heroById(c.owner),roller=heroById(c.roller);
+    if(c.isNew){owner.projects.push(p);p.log.push({date:today(),text:'Project started'});c.isNew=false;c.edit=false;}
+    if(roller.id===owner.id)p.cfg=Object.assign({},c.cfg);
+    const n=this.st.done+1;
+    const r=rollOnce(owner,p,roller,c.cfg,dice);
+    r.label=c.pendingBt?'Bonus':(this.st.total>1?'Respite '+n:'Roll');
+    if(S.settings.events==='d6'&&!c.pendingBt&&!this.st.event[n]){this.st.event[n]=1;if(1+Math.floor(Math.random()*6)===6)r.ev=true;}
+    c.results.push(r);
+    c.chain=(c.chain||[]);c.chain.push(r.total+(r.bt?'✦':''));
+    if(r.bt&&!r.done){c.pendingBt=true;}
+    else{c.pendingBt=false;this.consume(`${p.title}${roller.id!==owner.id?' (helping '+owner.name+')':''}: +${c.chain.join(' +')} → ${Math.min(p.points,p.goal)} of ${p.goal}${r.done?' ✓ complete':''}`);c.chain=[];}
+    save();
+  },
+  rollAll(){
+    const c=this.st.cur;let guard=0;
+    while(this.rem>0&&c.p.status!=='done'&&guard++<200){this.doRoll();}
+    this.draw();
+  },
+
+  /* -------- fishing -------- */
+  fishing(){
+    const h=H();const f=this.st.fish||(this.st.fish={points:0,rolls:[],over:false,spent:[]});
+    const chars=['Agility','Reason','Intuition'];f.char=f.char||chars.slice().sort((a,b)=>h.chars[b]-h.chars[a])[0];
+    const angler=(h.titles||[]).includes('Angler');
+    const T=[[50,'Hearty meal','+1 Recovery until the end of your next respite.'],[100,'Great meal','+1 Recovery and 10 temporary Stamina until your next respite ends.'],[120,'Better tackle','Title Angler: edge on Fishing rolls.'],[200,'Fishing event','Director rolls on the Fishing Events table.'],[300,'Legendary fisher','Title Goldenrod: reroll one Fishing roll each time.']];
+    this.tackleT=T;const left=f.points-f.spent.reduce((s,x)=>s+x[0],0);
+    return `<p class="lead">You cast a line into still water. ${tip('Keep rolling: each total is a fish worth that many points. It ends on a total of 11 or less (it got away) or on a breakthrough (the Director rolls a Fishing Event). Then spend your points; unspent points are lost. (p. 310)')}</p>
+    <div class="card"><div class="spread"><div class="seg" data-fish="char">${chars.map(c=>`<button data-v="${c}" class="${f.char===c?'on':''}">${c}<b>${sign(h.chars[c])}</b></button>`).join('')}</div>${angler?'<span class="chip gold">Angler: edge +2</span>':''}</div>
+    <div class="rollzone" style="margin-top:10px"><div class="bigtotal">${f.points}</div><span class="muted small">points caught</span></div>
+    <div class="results">${f.rolls.map(r=>`<div class="res"><span class="d10 sm"><b>${r.a}</b></span><span class="d10 sm"><b>${r.b}</b></span><span class="tot">${r.t}</span><span class="why">${r.txt}</span></div>`).join('')}</div>
+    ${!f.over?`<div class="actions"><button class="btn gold lg" data-w="cast">Cast</button><button class="btn lg" data-w="castall">Fish until it ends</button></div>`:''}</div>
+    ${f.over?`<div class="orn"><span class="d">◆</span><h3>Spend your catch · ${left} left</h3><span class="d">◆</span></div>
+      <div class="list">${T.map((t,i)=>`<div class="pick ${t[0]>left?'off':''}" ${t[0]<=left?`data-w="tackle" data-i="${i}"`:''}><div style="flex:1"><div class="spread"><span class="nm">${t[1]}</span><span class="pts">${t[0]}</span></div><div class="meta">${t[2]}</div></div></div>`).join('')}</div>
+      ${f.spent.length?`<p class="small soft">Bought: ${f.spent.map(x=>x[1]).join(', ')}</p>`:''}
+      <div class="actions"><button class="btn gold" data-w="fish-done">Done fishing</button></div>`:`<div class="actions"><button class="linkbtn" data-w="home">← Back</button></div>`}`;
+  },
+  cast(){
+    const h=H(),f=this.st.fish;if(f.over)return;const a=d10(),b=d10(),nat=a+b;
+    const t=Math.max(1,nat+h.chars[f.char]+((h.titles||[]).includes('Angler')?2:0));let txt;
+    if(nat>=19){txt='<b>✦ Breakthrough!</b> Director rolls a Fishing Event (d10).';f.over=true;}
+    else if(t<=11){txt='It got away…';f.over=true;}else{f.points+=t;txt=`A fish worth ${t}!`;}
+    f.rolls.push({a,b,t,txt});
+  },
+  fishDone(){const f=this.st.fish;this.consume(`Fishing: caught ${f.points}${f.spent.length?', bought '+f.spent.map(x=>x[1]).join(', '):''}`);this.st.fish=null;this.go('home');},
+
+  /* -------- other -------- */
+  help(){
+    const h=H();const projs=S.heroes.filter(x=>x.id!==h.id).flatMap(o=>o.projects.filter(p=>p.status==='active').map(p=>({o,p})));
+    return `<p class="lead">Whose project will you help with?</p>
+    ${projs.length?`<div class="list">${projs.map(({o,p})=>`<div class="pick" data-w="help-pick" data-o="${o.id}" data-p="${p.id}"><div style="flex:1"><div class="spread"><span class="nm">${esc(p.title)}</span><span class="pts">${p.points} <small>of ${p.goal}</small></span></div><div class="meta">${esc(o.name)} · ${esc(p.chars.join(' / '))}</div>${bar(p,'thin')}</div></div>`).join('')}</div>`:''}
+    <div class="orn"><span class="d">◆</span><h3>A hero on another device</h3><span class="d">◆</span></div>
+    <div class="card"><div class="seg" data-seg="hc">${CHARS.map((c,i)=>`<button data-v="${c}" class="${i===0?'on':''}">${c}<b>${sign(h.chars[c])}</b></button>`).join('')}</div>
+    <label class="row small soft" style="margin-top:10px;flex-wrap:nowrap"><input type="checkbox" id="hs"> A skill of mine applies (+2)</label>
+    <div class="actions"><button class="btn gold" data-w="help-free">Roll and tell them</button></div><div id="hr"></div></div>
+    <div class="row" style="margin-top:14px"><button class="btn ghost" data-w="home">← Back</button></div>`;
+  },
+  helpFree(){
+    const h=H();const c=document.querySelector('[data-seg="hc"] .on').dataset.v;let tot=0,parts=[],bt;
+    do{const a=d10(),b=d10();bt=a+b>=19;const t=Math.max(1,a+b+h.chars[c]+(document.getElementById('hs').checked?2:0));tot+=t;parts.push(t+(bt?'✦':''));}while(bt);
+    this.consume(`Helped another hero: ${tot} points (${parts.join(' + ')})`);
+    document.getElementById('hr').innerHTML=`<div class="rollzone"><div class="bigtotal">${tot}</div></div><p class="center small muted" style="text-align:center">Tell them to add ${tot} points${parts.length>1?' (breakthroughs included)':''}. Apply edges/banes yourselves.</p><div class="actions"><button class="btn gold" data-w="home">Continue</button></div>`;
+  },
+  guide(){
+    const h=H();const act=h.projects.filter(p=>p.status==='active');
+    if(!act.length)return `<div class="empty">Start a project first, then study a guide for it.</div><div class="row" style="margin-top:14px"><button class="btn ghost" data-w="home">← Back</button></div>`;
+    return `<p class="lead">You study a guide.</p><div class="grid g2"><div><label class="l">For project</label><select id="gP">${act.map(p=>`<option value="${p.id}">${esc(p.title)} (${p.points}/${p.goal})</option>`).join('')}</select></div>
+    <div><label class="l">Knowledge value</label><input id="gV" type="number" value="50"></div><div><label class="l">Guide name</label><input id="gN" placeholder="The Shipwright’s Folio"></div>
+    <div><label class="l">Language</label><div class="seg" data-seg="gl"><button class="on" data-v="1">Understood · full</button><button data-v=".5">Related · half</button></div></div></div>
+    <div class="row" style="margin-top:16px;justify-content:space-between"><button class="btn ghost" data-w="home">← Back</button><button class="btn gold" data-w="guide-go">Study it</button></div>`;
+  },
+  guideGo(){
+    const h=H();const p=h.projects.find(x=>x.id===document.getElementById('gP').value);
+    const v=Math.floor((+document.getElementById('gV').value||0)*(+document.querySelector('[data-seg="gl"] .on').dataset.v));const nm=document.getElementById('gN').value||'a guide';
+    p.points+=v;p.log.push({date:today(),text:`Studied ${nm}: +${v}`});let extra='';if(p.points>=p.goal){completeProject(h,p);extra=' ✓ complete';toast('Project complete!');}
+    this.consume(`Studied ${nm} for ${p.title}: +${v}${extra}`);this.go('home');
+  },
+  text(kind){
+    const h=H();const c={search:['Find a project source','If the source is common enough for a library, sages or guild artisans, and you’re somewhere with that access, you find it.','Which source?'],
+      besource:['Be a project source','You act as another hero’s source of knowledge for their roll.','Whose project?'],
+      kit:['Change your kit','You get used to new gear and a new fighting style.','New kit'],
+      abilities:['Change abilities','Swap any number of signature and heroic abilities from your class.','What did you swap?'],
+      other:['Something else','A class feature or anything your Director allows.','Describe it']}[kind];
+    return `<p class="lead">${c[0]} ${tip(c[1])}</p><label class="l">${c[2]}</label><input id="tA" value="${kind==='kit'?esc(h.kit):''}">
+    <div class="row" style="margin-top:16px;justify-content:space-between"><button class="btn ghost" data-w="home">← Back</button><button class="btn gold" data-w="text-go" data-kind="${kind}">Done</button></div>`;
+  },
+  textGo(kind){
+    const h=H(),v=document.getElementById('tA').value.trim();
+    const t={search:'Searched for a project source',besource:'Acted as a project source',abilities:'Changed abilities',other:'Something else'}[kind];
+    if(kind==='kit'){this.consume(`Changed kit: ${h.kit||'none'} → ${v||'?'}`);if(v)h.kit=v;}else this.consume(t+(v?': '+v:''));
+    save();this.go('home');
+  },
+
+  pick(){
+    const h=H(),f=findFol(this.st.assign)[1];
+    const T=(ic,t,d,w)=>`<button class="tile" data-w="${w}"><span class="ic">${ic}</span><span><b>${t}</b><span class="d">${d}</span></span></button>`;
+    return `<p class="lead">What should ${esc(f.name)} work on? ${tip('The project starts at 0 points with this follower assigned. They roll for it once per day, and you can still roll on it yourself during respites. Followers contribute to research and crafting projects.')}</p>
+    ${h.favs.length?`<div class="pill-row" style="margin-bottom:14px">${h.favs.map(x=>`<button class="chip gold" data-w="fav" data-key="${esc(x.key)}" style="padding:7px 14px;font-size:14px">★ ${esc(x.label)}</button>`).join('')}</div>`:''}
+    <div class="tiles">
+      ${T('⚒','Create an item','Potions, trinkets, leveled gear','craft')}
+      ${T('✦','Imbue an item','Enhance armor, weapon, implement','imbue')}
+      ${T('🔍','Research lore','Common to forbidden','f:lore')}
+      ${T('⚗','Find a cure','50 × creature level','f:cure')}
+      ${T('🍲','Perfect a recipe','Goal 100','f:recipe')}
+      ${T('🏗','Build something big','Airship, road, platform','f:build')}
+      ${T('✍','Custom project','Anything else','f:custom')}
+    </div>`;
+  },
+  assign(){
+    const p=this.st.cur.p,f=findFol(this.st.assign)[1],cfg=folCfg(f,p),fk=p.favKey;
+    const bonus=(f.chars[cfg.char]||0)+(cfg.skill?2:0)-[0,2,4][cfg.lang];const days=Math.ceil(p.goal/Math.max(1,11+bonus));
+    return `<div class="card glow"><div class="spread"><span class="tag">${esc(p.kindLabel)}</span><span class="row" style="gap:8px">${fk?`<button class="star ${isFav(fk)?'on':''}" data-w="star" data-key="${esc(fk)}" data-label="${esc(p.kind==='craft'?p.title:p.kindLabel)}" data-kl="${esc(p.kindLabel)}">${isFav(fk)?'★':'☆'}</button>`:''}<span class="pts" style="font-size:19px">0 <small>of ${p.goal}</small></span></span></div>
+      <div class="proj-t" style="font-size:24px;margin:8px 0 6px">${esc(p.title)}</div>
+      ${p.note?`<div class="small soft">${esc(p.note)}</div>`:''}
+      ${p.prereq||p.source?`<div class="checks" style="margin-top:12px">${p.prereq?`<label><input type="checkbox" checked> <span><b>Item prerequisite:</b> ${esc(p.prereq)}</span></label>`:''}${p.source?`<label><input type="checkbox" checked> <span><b>Project source:</b> ${esc(p.source)}</span></label>`:''}</div>`:''}
+      <div class="kv" style="margin-top:14px"><span>${esc(f.name)} rolls <b>2d10 ${sign(bonus)}</b> a day ${tip('Best allowed characteristic ('+cfg.char+' '+sign(f.chars[cfg.char]||0)+')'+(cfg.skill?', +2 for a skill':'')+(cfg.lang?', '+(cfg.lang===2?'−4 for an unknown source language':'−2 for a related language'):'')+'. Change the skill and language settings on the follower’s card.')}</span><span>roughly <b>${days}</b> day${days>1?'s':''} of work</span></div>
+      ${cfg.lang===2?`<div class="callout warn small">${esc(f.name)} doesn’t know ${esc(p.sourceLang)}, so every roll takes a double bane.</div>`:''}</div>
+    <div class="actions"><button class="btn ghost" data-w="home">← Back</button><button class="btn gold lg" data-w="assign-go">Start it and assign ${esc(f.name)}</button></div>`;
+  },
+  recruit(){
+    const h=H(),mx=maxFollowers(h),n=h.followers.length;
+    return `<p class="lead">You put out word that you’re looking for help.</p>
+    <div class="callout small ${n>=mx?'warn':''}">You have <b>${n}</b> of <b>${mx}</b> followers your Renown (${h.renown}) allows. ${tip('Recruiting takes a respite activity. You need to be somewhere you can recruit, or have a way to reach people. (p. 350)')}</div>
+    <div class="card">${ffForm()}</div>
+    <div class="row" style="margin-top:16px;justify-content:space-between"><button class="btn ghost" data-w="home">← Back</button><button class="btn gold" data-w="recruit-go">Recruit</button></div>`;
+  },
+  /* -------- end -------- */
+  end(){
+    const h=H(),st=this.st;if(st.endHtml)return st.endHtml;if(st.done<st.total){const r=st.total-st.done;st.entries.push(`${r} respite${r>1?'s':''} of simple rest`);st.done=st.total;}
+    const v=h.victories,oldLvl=h.level;h.xp+=v;h.victories=0;h.stamina=h.staminaMax;h.recoveries=h.recoveriesMax;h.respites+=st.total;
+    const fw=followerWork(h,st.total);st.fw=fw;
+    const lines=[...st.entries,...workLines(fw).map(l=>'Follower: '+l),`Victories ${v} → ${v} XP (now ${h.xp})`,'Stamina and Recoveries restored'];
+    h.log.push({title:st.total>1?`${st.total} respites`:'Respite',date:today(),lines});save();
+    const nl=levelFromXp(h.xp);
+    return st.endHtml=`<div class="celebrate" style="padding:26px"><div class="sparkle">◆ ◆ ◆</div><h3>You rise rested</h3>
+    <div class="gems" style="justify-content:center;margin:16px 0"><div class="gem st"><b>${h.stamina}</b><span>Stamina</span></div><div class="gem rc"><b>${h.recoveries}</b><span>Recoveries</span></div><div class="gem"><b>${h.xp}</b><span>XP (+${v})</span></div></div>
+    ${nl>h.level?`<div class="callout good" style="text-align:left"><b>Level up!</b> You have enough XP for level ${nl}. <button class="btn sm" data-w="lvl" data-l="${nl}">Set level ${nl}</button></div>`:''}
+    ${fw.length?`<div class="orn"><span class="d">◆</span><h3>Meanwhile, your followers</h3><span class="d">◆</span></div><div class="results" style="text-align:left">${workHtml(fw)}</div>`:''}
+    <div class="summary-list" style="text-align:left;margin:16px auto 10px;max-width:560px">${lines.filter(l=>!l.startsWith('Follower: ')).map(l=>`<div>${esc(l)}</div>`).join('')}</div>
+    <div class="actions"><button class="btn gold lg" data-w="close">Done</button></div></div>`;
+  },
+  interrupt(){ask('Was the respite interrupted? You won’t gain its benefits. Project progress already made stays.',{ok:'Interrupted'}).then(y=>{if(!y)return;const h=H();h.log.push({title:'Respite interrupted',date:today(),lines:this.st.entries.length?this.st.entries:['No benefits gained']});save();this.close();toast('Respite interrupted');});}
+};
+function cfgText(cfg,roller,chips){
+  const bits=[`${cfg.char} ${sign(roller.chars[cfg.char]||0)}`];if(cfg.skill)bits.push(cfg.skill+' +2');
+  if(cfg.lang)bits.push(cfg.lang===2?'unknown language':'related language');if(cfg.E)bits.push(cfg.E+' edge'+(cfg.E>1?'s':''));if(cfg.B)bits.push(cfg.B+' bane'+(cfg.B>1?'s':''));if(cfg.mod)bits.push('bonus '+sign(cfg.mod));
+  return chips?bits.map(b=>`<span class="chip">${esc(b)}</span>`).join(''):esc(bits.join(' · '));
+}
+
+/* -------- wizard events -------- */
+W.inner.addEventListener('click',e=>{
+  const segBtn=e.target.closest('.seg button');
+  if(segBtn){const seg=segBtn.parentElement;
+    if(seg.dataset.cfg){const c=W.st.cur.cfg;c[seg.dataset.cfg]=seg.dataset.cfg==='lang'?+segBtn.dataset.v:segBtn.dataset.v;W.draw();return;}
+    if(seg.dataset.fish){W.st.fish.char=segBtn.dataset.v;W.draw();return;}
+    if(seg.dataset.multi)segBtn.classList.toggle('on');else{seg.querySelectorAll('button').forEach(b=>b.classList.remove('on'));segBtn.classList.add('on');}return;}
+  const t=e.target.closest('[data-w]');if(!t)return;const w=t.dataset.w,h=H(),st=W.st;
+  if(w==='star'){e.stopPropagation();const on=toggleFav({key:t.dataset.key,label:t.dataset.label,kindLabel:t.dataset.kl});t.classList.toggle('on',on);t.textContent=on?'★':'☆';return;}
+  if(w.startsWith('f:'))return W.go('form',w.slice(2));
+  if(w.startsWith('t:'))return W.go('text',w.slice(2));
+  switch(w){
+    case 'close':W.close();break;
+    case 'end':W.go('end');break;
+    case 'cnt+':st.total=Math.min(30,st.total+1);W.draw();break;
+    case 'cnt-':st.total=Math.max(Math.max(1,st.done),st.total-1);W.draw();break;
+    case 'home':W.go('home');break;
+    case 'interrupt':W.interrupt();break;
+    case 'craft':W.go('craft');break;
+    case 'craft-pick':W.craftPick(t.dataset.name);break;
+    case 'imbue':W.go('imbue');break;
+    case 'imbue-sel':W.go('imbue',t.dataset.id);break;
+    case 'imbue-new':{const n=document.getElementById('imN').value.trim();if(!n)return toast('Name the item');const it={id:uid(),name:n,type:document.getElementById('imT').value,enh:[],qty:1};h.items.push(it);save();W.go('imbue',it.id);break;}
+    case 'imbue-pick':W.imbuePick(t.dataset.item,t.dataset.name);break;
+    case 'skill-go':{const s=t.dataset.s;W.newProject({kind:'skill',kindLabel:'Learn a skill',title:'Learn '+s,goal:120,chars:['Reason','Intuition'],sourceLang:'',source:'Texts or instruction that teach '+s,reward:{type:'skill',value:s},favKey:'tpl:skill'});break;}
+    case 'form-go':W.formGo(t.dataset.kind);break;
+    case 'build':W.build(t.dataset.b);break;
+    case 'fav':{const k=t.dataset.key;
+      if(k.startsWith('craft:'))W.craftPick(k.slice(6));
+      else if(k.startsWith('imbue:')){const [,type,nm]=k.split(':');const it=h.items.find(i=>i.type===type&&(i.enh||[]).length<3);W.go('imbue',it&&it.id);toast(`Choose the ${type} for ${nm}`);}
+      else if(k.startsWith('tpl:'))W.go('form',k.slice(4));break;}
+    case 'open-proj':W.openProj(t.dataset.id);W.st.cur.edit=true;W.go('roll');break;
+    case 'quick':W.openProj(t.dataset.id);W.doRoll();W.go('roll');break;
+    case 'quick-all':W.openProj(t.dataset.id);W.st.screen='roll';W.rollAll();break;
+    case 'edit':st.cur.edit=true;W.draw();break;
+    case 'cfgn':{const c=st.cur.cfg;c[t.dataset.k]=Math.max(0,c[t.dataset.k]+(+t.dataset.d));W.draw();break;}
+    case 'roll1':W.doRoll();st.cur.edit=false;W.draw();break;
+    case 'rollall':st.cur.edit=false;W.rollAll();break;
+    case 'rollm':{const a=+document.getElementById('mA').value,b=+document.getElementById('mB').value;if(!(a>=1&&a<=10&&b>=1&&b<=10))return toast('Two numbers from 1 to 10');W.doRoll([a,b]);st.cur.edit=false;W.draw();break;}
+    case 'fishing':st.fish=null;W.go('fishing');break;
+    case 'cast':W.cast();W.draw();break;
+    case 'castall':{let g=0;while(!st.fish.over&&g++<50)W.cast();W.draw();break;}
+    case 'tackle':{const T=W.tackleT[+t.dataset.i];st.fish.spent.push(T);h.titles=h.titles||[];
+      if(T[1]==='Better tackle'&&!h.titles.includes('Angler'))h.titles.push('Angler');if(T[1]==='Legendary fisher'&&!h.titles.includes('Goldenrod'))h.titles.push('Goldenrod');
+      if(/meal/.test(T[1]))h.items.push({id:uid(),name:T[1],type:'consumable',qty:1,enh:[],notes:T[2]});save();W.draw();break;}
+    case 'fish-done':W.fishDone();break;
+    case 'help':W.go('help');break;
+    case 'help-free':W.helpFree();break;
+    case 'help-pick':W.openProj(t.dataset.p,t.dataset.o,h.id);st.cur.edit=true;W.go('roll');break;
+    case 'guide':W.go('guide');break;
+    case 'guide-go':W.guideGo();break;
+    case 'text-go':W.textGo(t.dataset.kind);break;
+    case 'recruit':ffReset();W.go('recruit');break;
+    case 'recruit-go':{const f=ffBuild();if(!f)return;h.followers.push(f);save();W.consume(`Recruited ${f.name}, ${FTYPES[f.type].label.toLowerCase()}`);W.go('home');break;}
+    case 'assign-go':{const[fh,f]=findFol(st.assign);const p=st.cur.p;fh.projects.push(p);p.log.push({date:today(),text:'Project started, assigned to '+f.name});f.project=p.id;save();W.close();toast(f.name+' starts work on '+p.title);break;}
+    case 'rest':{const r=W.rem;W.consume(r>1?`Rested (${r} respites)`:'Rested');st.done=st.total;W.go('end');break;}
+    case 'lvl':h.level=+t.dataset.l;save();t.parentElement.innerHTML='<b>Level '+h.level+'!</b> Don’t forget your new class features.';break;
+  }
+});
+W.inner.addEventListener('change',e=>{const t=e.target;if(t.dataset.cfgsel&&W.st.cur){const c=W.st.cur.cfg;c[t.dataset.cfgsel]=t.dataset.cfgsel==='mod'?(+t.value||0):t.value;}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&W.el.classList.contains('open')&&!W.st.done)W.close();});
+/* Steeltools: open rulebook page references in the host site */
+document.addEventListener('click',e=>{const t=e.target.closest('.pageref');if(!t)return;const m=t.textContent.match(/\d+/);let host=null;try{host=window.parent!==window&&window.parent.__stGotoPage;}catch(err){}if(m&&host){e.preventDefault();host(m[0]);}});
+document.addEventListener('mouseover',e=>{const t=e.target.closest('.pageref');if(t)t.style.cursor='pointer';});
+render();
+</script>
+</body>
+</html>

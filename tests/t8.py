@@ -1,0 +1,50 @@
+import asyncio
+from playwright.async_api import async_playwright
+async def main():
+    async with async_playwright() as p:
+        b = await p.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--no-sandbox'])
+        ctx = await b.new_context(viewport={'width':1440,'height':900})
+        pg = await ctx.new_page(); errs=[]
+        pg.on('pageerror', lambda e: errs.append(str(e)))
+        await pg.goto('http://127.0.0.1:8765/index.html#negotiation'); await pg.wait_for_timeout(3500)
+        await pg.screenshot(path='shots/n1.png')
+        ids = await pg.evaluate("[...document.querySelectorAll('.negc[href]')].map(a=>a.getAttribute('href'))")
+        print(ids)
+        z = [i for i in ids if 'zola' in i][0]
+        await pg.evaluate(f"location.hash={z[1:]!r}"); await pg.wait_for_timeout(800)
+        await pg.select_option('#ng-lang','1'); await pg.click('#ng-begin'); await pg.wait_for_timeout(300)
+        await pg.screenshot(path='shots/n2.png')
+        await pg.click('[data-type=pit][data-target="Higher Authority"]'); await pg.wait_for_timeout(200)
+        await pg.click('#ng-apply'); await pg.wait_for_timeout(200)
+        await pg.screenshot(path='shots/n3.png')
+        await pg.click('#ng-next'); await pg.wait_for_timeout(200)
+        await pg.click('#ng-disc'); await pg.click('[data-tier="3"]'); await pg.wait_for_timeout(200)
+        await pg.click('[data-disc="Revelry"]'); await pg.click('#ng-dapply'); await pg.wait_for_timeout(200)
+        await pg.click('[data-type=mot][data-target="Protection"]'); await pg.click('[data-tier="2"]'); await pg.click('#ng-apply'); await pg.wait_for_timeout(200)
+        await pg.click('#ng-next'); await pg.click('[data-type=mot][data-target="Benevolence"]'); await pg.click('#ng-roll'); await pg.wait_for_timeout(200)
+        await pg.screenshot(path='shots/n4.png')
+        await pg.click('[data-tier="2"]'); await pg.click('#ng-apply'); await pg.wait_for_timeout(200)
+        st = await pg.evaluate("JSON.parse(localStorage.getItem('st_negsess'))")
+        k=list(st.keys())[0]; print('state', st[k]['interest'], st[k]['patience'], st[k]['ended'], [l['text'] for l in st[k]['log']])
+        await pg.screenshot(path='shots/n5.png')
+        await pg.click('#ng-table'); await pg.wait_for_timeout(300); await pg.screenshot(path='shots/n6.png')
+        await pg.click('.pv-x')
+        # Blackbottom book button
+        await pg.evaluate("location.hash='book--fall-of-blackbottom--chapter-1-firefall--tchdorit-negotiation-stats'"); await pg.wait_for_timeout(1200)
+        await pg.screenshot(path='shots/n7.png')
+        # archetype editor
+        await pg.evaluate("location.hash='negotiation'"); await pg.wait_for_timeout(500)
+        await pg.click('[data-arch="arch-bandit-chief"]'); await pg.wait_for_timeout(300); await pg.screenshot(path='shots/n8.png')
+        await pg.click('.nm[data-m="Greed"] [data-r=m]'); await pg.click('.nm[data-m="Power"] [data-r=m]'); await pg.click('.nm[data-m="Justice"] [data-r=p]')
+        await pg.fill('#ne-name','Red Mags'); await pg.click('#ne-save'); await pg.wait_for_timeout(500)
+        print('after save', await pg.evaluate('location.hash'))
+        # paste
+        await pg.evaluate("location.hash='negotiation'"); await pg.wait_for_timeout(500)
+        await pg.click('#negpaste'); await pg.fill('#np-t', 'Old Gretl Negotiation Stats\nInterest: 3 Patience: 4 Impression: 2\nNative Language: Low Kuric\nMotivations\nPeace: She wants her farm left alone.\nGreed: Coin talks.\nPitfall\nVengeance: She forgave long ago.\nInterest 5: She hands over the map and a horse.\nInterest 0: She sets the dogs on them.')
+        await pg.wait_for_timeout(200); print(await pg.inner_text('#np-prev'))
+        print('ERR', errs[:5])
+        m = await b.new_context(viewport={'width':390,'height':844}, device_scale_factor=2, is_mobile=True, has_touch=True)
+        mp = await m.new_page(); await mp.goto('http://127.0.0.1:8765/index.html#negotiation--'+z.split('--')[1]); await mp.wait_for_timeout(3500)
+        await mp.screenshot(path='shots/n9.png')
+        await b.close()
+asyncio.run(main())
