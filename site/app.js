@@ -771,7 +771,7 @@ function confirmSheet(msg, okLabel) {
 window.__stSave = (name, blob) => deliverFile(name, blob);
 window.__stGotoPage = pg => gotoPage(String(pg));
 function respitePage() {
-  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=57a306183b" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
+  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=35e8e99869" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
   document.title = 'Respite — Vanadium';
 }
 
@@ -838,6 +838,9 @@ function syncPage() {
       <div class="synccard"><h2>Your sync key</h2><p>Use it to connect your other devices. The setup link is easiest on a phone: send it to yourself and open it there. Don’t share either with your players.</p>
         <div class="row"><code class="sykey">${syncShowKey ? esc(s.key) : '•'.repeat(24)}</code><button class="btn ghost" id="syshow">${syncShowKey ? 'Hide' : 'Show'}</button></div>
         <div class="row"><button class="btn ghost" id="sycopy">Copy key</button><button class="btn ghost" id="sycopyl" data-url="${esc(url)}">Copy setup link</button></div></div>
+      ${s.info && ((s.info.cards && s.info.cards.count) || (s.info.cardTraffic && s.info.cardTraffic.views)) ? `<div class="synccard"><h2>Card pictures</h2>
+        <p>${s.info.cards.count} card picture${s.info.cards.count === 1 ? '' : 's'} uploaded for the QR codes on your card backs (${mb(s.info.cards.bytes)}). Anyone with a printed card can open its picture.${s.info.cardTraffic ? ` In the last 30 days they were opened <b>${s.info.cardTraffic.views}</b> time${s.info.cardTraffic.views === 1 ? '' : 's'} (${mb(s.info.cardTraffic.bytes)} sent, all keys on this server).` : ''}</p>
+        ${s.info.cards.count ? '<p>Deleting them makes the QR codes on printed cards stop working. Exporting the cards again uploads them again (with the same QR codes).</p><div class="row"><button class="btn ghost danger" id="sycards">Delete all card pictures</button></div>' : ''}</div>` : ''}
       ${s.info && s.info.owner ? `<div class="synccard"><h2>Server owner</h2><p>Your key created the first sync space on this server, so you decide whether other people (your players, for example) may create their own sync keys. Their data would be separate from yours; they can never see your books or notes.</p>
         <label class="sychk"><input type="checkbox" id="syopen" ${s.info.open ? 'checked' : ''}> Let others create their own sync keys</label></div>` : ''}
       <div class="synccard"><h2>Key leaked or device lost?</h2><p><b>Replace key</b> gives your data a new key; the old one stops working everywhere, so reconnect your other devices with the new key. <b>Turn off on this device</b> stops syncing here and keeps the data on this device.</p>
@@ -857,6 +860,7 @@ function syncPage() {
   on('sycopyl', b => copy(b.dataset.url, 'Setup link'));
   on('syrot', async b => { if (await confirmSheet('Replace your sync key? The old key stops working on all your other devices until you connect them with the new one.', 'Replace key')) run(b, 'Replacing…', async () => { await V.rotate(); syncShowKey = true; toast('New key created. Reconnect your other devices with it.', 6000); }); });
   on('syoff', async () => { if (await confirmSheet('Stop syncing on this device? Your data stays on this device and on the server.', 'Turn off')) { V.disconnect(); syncPage(); } });
+  on('sycards', async b => { if (await confirmSheet('Delete all uploaded card pictures? The QR codes on cards you already printed will stop working.', 'Delete')) run(b, 'Deleting…', async () => { const n = await V.cardClear(); toast(`Deleted ${n} card picture${n === 1 ? '' : 's'}`); }); });
   const op = $('#syopen'); if (op) op.onchange = () => run(null, '', () => V.setOpen(op.checked));
   if (link && s.enabled) history.replaceState(null, '', '#sync');  // already connected: don't keep the key in the address bar
 }
@@ -3137,6 +3141,7 @@ function cardsPage() {
       <label class="row-c"><input type="checkbox" id="c-wm" ${CARDS.watermark !== false ? 'checked' : ''}> Icon watermark</label>
       <label class="row-c"><input type="checkbox" id="c-backs" ${CARDS.backs ? 'checked' : ''}> Print backs</label>
       <label class="row-c"><input type="checkbox" id="c-iback" ${CARDS.iconBack !== false ? 'checked' : ''}> Card icon on back</label>
+      ${(() => { const syncOn = window.VSync && VSync.status().enabled; return `<label class="row-c" title="${syncOn ? 'Each card back gets a QR code. Players scan it to get the card as a JPG. The pictures are uploaded to this site and public to anyone with the code.' : 'Needs sync: the card pictures are uploaded with your sync key.'}"><input type="checkbox" id="c-qr" ${CARDS.qr && syncOn ? 'checked' : ''} ${syncOn ? '' : 'disabled'}> QR code on back (JPG for players)${syncOn ? '' : ' · <a href="#sync">needs sync</a>'}</label>`; })()}
       <label class="row-c"><input type="checkbox" id="c-craft" ${CARDS.craft ? 'checked' : ''}> Crafting info</label></div></div>
     <div class="negacts"><button class="btn" id="c-pdf" ${rows.length ? '' : 'disabled'}>Export cards PDF (${rows.reduce((s, x) => s + x.d.n, 0)})</button>${rows.length ? '<button class="btn ghost" id="c-clear">Clear deck</button>' : ''}</div>
     ${rows.length ? `<div class="cdeck">${rows.map(({ d, i, e }) => `<div class="cdeck-r"><button class="cd-ic" data-cicon="${i}" style="--cc:${e.c.color}" title="Change icon">${e.c.icon ? iconSvg(e.c.icon) : '—'}</button><b>${esc(e.c.name)}</b><span>${esc(e.kind)}</span><button class="ibtn" data-cust="${i}" title="Customise">✎</button><div class="step"><button data-cdec="${i}">−</button><b>${d.n}</b><button data-cinc="${i}">+</button></div><button class="ibtn" data-crm="${i}" title="Remove from deck">✕</button></div>`).join('')}</div>
@@ -3165,6 +3170,7 @@ function cardsPage() {
   $('#c-wm').onchange = e => { CARDS.watermark = e.target.checked; re(); };
   $('#c-backs').onchange = e => { CARDS.backs = e.target.checked; saveCards(); };
   $('#c-iback').onchange = e => { CARDS.iconBack = e.target.checked; saveCards(); };
+  $('#c-qr').onchange = e => { CARDS.qr = e.target.checked; if (CARDS.qr) CARDS.backs = true; re(); };  // QR codes live on the backs
   $('#c-craft').onchange = e => { CARDS.craft = e.target.checked; re(); };
   if ($('#c-clear')) $('#c-clear').onclick = async () => { if (await confirmSheet('Remove all cards from the deck? (Your quests and followers stay saved.)', 'Clear')) { CARDS.deck = []; re(); } };
   $$('[data-cinc]').forEach(b => b.onclick = () => { CARDS.deck[+b.dataset.cinc].n++; re(); });
@@ -3172,7 +3178,7 @@ function cardsPage() {
   $$('[data-crm]').forEach(b => b.onclick = () => { CARDS.deck.splice(+b.dataset.crm, 1); re(); });
   $$('[data-cust]').forEach(b => b.onclick = () => cardCustomizer(+b.dataset.cust));
   $$('[data-cicon]').forEach(b => b.onclick = () => { const d = CARDS.deck[+b.dataset.cicon]; const e = deckEntry(d); iconPicker(e.c, ref => { setCust(d, { icon: ref }); re(); }); });
-  if ($('#c-pdf')) $('#c-pdf').onclick = () => runPdfJob($('#c-pdf'), 'Export cards PDF', async () => { const b = await buildCardsPdf(); await deliverFile('vanadium-cards.pdf', new Blob([b], { type: 'application/pdf' })); });
+  if ($('#c-pdf')) $('#c-pdf').onclick = () => runPdfJob($('#c-pdf'), 'Export cards PDF', async () => { const b = await exportCardsPdf($('#c-pdf')); await deliverFile('vanadium-cards.pdf', new Blob([b], { type: 'application/pdf' })); });
   document.title = 'Cards — Vanadium';
 }
 function setCust(d, patch) { CARDS.custom = CARDS.custom || {}; const k = cardKey(d); const cur = { ...(CARDS.custom[k] || {}), ...patch }; Object.keys(cur).forEach(x => { if (cur[x] === '' || cur[x] == null) delete cur[x]; }); if (Object.keys(cur).length) CARDS.custom[k] = cur; else delete CARDS.custom[k]; saveCards(); }
@@ -3371,7 +3377,11 @@ function questsFromAdventureDialog() {
   draw(); document.body.appendChild(el);
 }
 // ---- PDF ----
-async function buildCardsPdf() {
+// opt.frontsOnly: no back pages (used to render card JPGs)
+// opt.collect:    filled with {faces: [content key per face], geo: page layout}
+// opt.qr:         [url per face] → QR code on each back (implies backs)
+async function buildCardsPdf(opt = {}) {
+  if (opt.qr) await loadQr();
   await loadIcons('gi'); if (CARDS.deck.some(d => (custOf(d).icon || '').startsWith('mdi:'))) await loadIcons('mdi');
   const w = await makeWriter('Cards', { footer: false }); const { rgb } = w; const ST = CARDS.style || 'modern';
   const [, mw, mh] = CARD_SIZES[CARDS.size] || CARD_SIZES.poker; const mm = 2.83465; const cw = mw * mm, ch = mh * mm, gap = 3 * mm;
@@ -3406,6 +3416,9 @@ async function buildCardsPdf() {
     while (pos < lines.length || !chunks.length) { const n = Math.max(1, Math.floor(avail(k) / (size * 1.22))); let sl = lines.slice(pos, pos + n); while (sl.length && !sl[0].length) { pos++; sl = lines.slice(pos, pos + n); } chunks.push(sl); pos += n; k++; if (pos >= lines.length) break; }
     for (let n = 0; n < d.n; n++) chunks.forEach((ls, i) => faces.push({ c, lines: ls, size, first: i === 0, part: chunks.length > 1 ? `${i + 1}/${chunks.length}` : '' }));
   }
+  faces.forEach((f, i) => f.idx = i);
+  // everything that changes how a face looks → same key means the same picture
+  if (opt.collect) { opt.collect.faces = faces.map(f => JSON.stringify({ v: 1, ST, cs: CARDS.size || 'poker', wm: CARDS.watermark !== false, fs: f.size, part: f.part, c: f.c })); opt.collect.geo = { cols, rows, per, ox, oy, cw, ch, gap, W: w.W, H: w.H }; }
   const drawText = (f, x, yy, ink) => {
     for (const ln of f.lines) { let xx = x;
       for (const t of ln) { if (t.sp) xx += fonts.r.widthOfTextAtSize(' ', f.size);
@@ -3475,9 +3488,26 @@ async function buildCardsPdf() {
     drawText(f, bx, yy, ink);
     if (c.foot) { const ft = fit(c.foot, 5.5, fonts.r, bodyW); if (ST === 'classic') w.T(ft, x + cw / 2 - w.tw(ft, 5.5, fonts.r) / 2, y + 11, 5.5, fonts.r, mut); else w.T(ft, bx, y + (ST === 'bold' || ST === 'modern' ? G.inset + 5 : 8), 5.5, fonts.r, mut); }
   };
-  const drawBack = (f, x, y) => {
-    const c = f.c, col = hex(c.color); const cx = x + cw / 2, cy = y + ch / 2 + 8;
-    const ref = CARDS.iconBack !== false && c.icon ? c.icon : null; const s = Math.min(cw, ch) * 0.42;
+  // QR code as vector squares (one rectangle per horizontal run), on a white rounded tile
+  const drawQr = (url, x0, y0, size) => {
+    const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+    const n = qr.getModuleCount(), quiet = 2, m = size / (n + 2 * quiet), ink = rgb(0, 0, 0);
+    shape(x0, y0, size, size, 3, { color: white });
+    for (let r = 0; r < n; r++) for (let c0 = 0; c0 < n;) {
+      if (!qr.isDark(r, c0)) { c0++; continue; }
+      let e = c0; while (e < n && qr.isDark(r, e)) e++;
+      w.page.drawRectangle({ x: x0 + (quiet + c0) * m, y: y0 + size - (quiet + r + 1) * m - 0.02, width: (e - c0) * m, height: m + 0.04, color: ink }); // tiny overlap: no hairline gaps
+      c0 = e;
+    }
+  };
+  const qrGeo = (f, x, y) => { const url = opt.qr && opt.qr[f.idx]; const q = url ? Math.min(cw * 0.36, ch * 0.26) : 0; return { url, q, qx: x + cw / 2 - q / 2, qy: y + 12 }; };
+  const drawBack = (f, x, y) => { drawBackArt(f, x, y); const g = qrGeo(f, x, y); if (g.url) drawQr(g.url, g.qx, g.qy, g.q); };
+  const drawBackArt = (f, x, y) => {
+    const c = f.c, col = hex(c.color), url = opt.qr && opt.qr[f.idx];
+    // with a QR code: tile at the bottom centre, icon + label centred in the space above it
+    const q = url ? Math.min(cw * 0.36, ch * 0.26) : 0, qy = y + 12;
+    const cx = x + cw / 2, cy = url ? (qy + q + 8 + y + ch) / 2 + 6 : y + ch / 2 + 8;
+    const ref = CARDS.iconBack !== false && c.icon ? c.icon : null; const s = url ? Math.min(cw * 0.42, (ch - q - 20) * 0.42) : Math.min(cw, ch) * 0.42;
     const lab = String(c.back || 'Card').toUpperCase();
     if (ST === 'classic' || ST === 'minimal') {
       if (ST === 'classic') { shape(x, y, cw, ch, 6, { color: parch }); w.page.drawRectangle({ x: x + 4, y: y + 4, width: cw - 8, height: ch - 8, borderColor: col, borderWidth: 1.6 }); w.page.drawRectangle({ x: x + 7, y: y + 7, width: cw - 14, height: ch - 14, borderColor: col, borderWidth: 0.5 }); }
@@ -3499,9 +3529,58 @@ async function buildCardsPdf() {
     const pageFaces = faces.slice(p0, p0 + per);
     w.newPage(); credit();
     pageFaces.forEach((f, i) => { const c = i % cols, r = Math.floor(i / cols); const x = ox + c * (cw + gap), y = w.H - oy - (r + 1) * ch - r * gap; crop(x, y); drawFront(f, x, y); });
-    if (CARDS.backs) { w.newPage(); pageFaces.forEach((f, i) => { const c = cols - 1 - (i % cols), r = Math.floor(i / cols); const x = ox + c * (cw + gap), y = w.H - oy - (r + 1) * ch - r * gap; drawBack(f, x, y); }); }
+    if (!opt.frontsOnly && (CARDS.backs || opt.qr)) { w.newPage(); pageFaces.forEach((f, i) => { const c = cols - 1 - (i % cols), r = Math.floor(i / cols); const x = ox + c * (cw + gap), y = w.H - oy - (r + 1) * ch - r * gap; drawBack(f, x, y); }); }
   }
   return w.bytes();
+}
+
+// ---- QR codes → public card JPGs (uploaded through sync.php, served by card.php) ----
+let qrLoad = null;
+function loadQr() {  // lib/qrcode.js: qrcode-generator 1.4.4 (MIT), defines window.qrcode
+  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=35e8e99869'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
+}
+// 22-char id from the key's private salt + what the face looks like: stable, but unguessable
+async function cardImageId(salt, content) {
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salt + '\n' + content)));
+  return btoa(String.fromCharCode(...h)).replace(/\+/g, '-').replace(/\//g, '_').slice(0, 22);
+}
+async function exportCardsPdf(btn) {
+  if (!CARDS.qr) return buildCardsPdf();
+  const V = window.VSync;
+  if (!V || !V.status().enabled) throw new Error('QR codes need sync to be on (Utilities → Sync across devices)');
+  const say = t => { if (btn) btn.textContent = t; };
+  say('Drawing cards…');
+  const col = {}; const fronts = await buildCardsPdf({ frontsOnly: true, collect: col });
+  const salt = await V.cardSalt();
+  const ids = await Promise.all(col.faces.map(c => cardImageId(salt, c)));
+  const have = new Set(await V.cardHas([...new Set(ids)]));
+  const need = []; ids.forEach((id, i) => { if (!have.has(id) && !need.some(n => n.id === id)) need.push({ id, i }); });
+  if (need.length) {
+    const pdfjs = await loadPdfjs();
+    const doc = await pdfjs.getDocument({ data: fronts }).promise;
+    const g = col.geo, scale = 3.5;  // ≈ 250 dpi
+    let pageNo = 0, pageCanvas = null, done = 0;
+    for (const { id, i } of need) {
+      const p = Math.floor(i / g.per) + 1, k = i % g.per, cc = k % g.cols, rr = Math.floor(k / g.cols);
+      if (p !== pageNo) {
+        const page = await doc.getPage(p), vp = page.getViewport({ scale });
+        pageCanvas = document.createElement('canvas'); pageCanvas.width = Math.ceil(vp.width); pageCanvas.height = Math.ceil(vp.height);
+        const ctx = pageCanvas.getContext('2d');
+        await page.render({ canvasContext: ctx, canvas: pageCanvas, viewport: vp }).promise; pageNo = p;
+      }
+      const card = document.createElement('canvas'); card.width = Math.round(g.cw * scale); card.height = Math.round(g.ch * scale);
+      const sx = (g.ox + cc * (g.cw + g.gap)) * scale, sy = (g.oy + rr * (g.ch + g.gap)) * scale;  // pdf y is from the bottom, canvas from the top
+      const cx = card.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, card.width, card.height);
+      cx.drawImage(pageCanvas, sx, sy, card.width, card.height, 0, 0, card.width, card.height);
+      const blob = await new Promise(r => card.toBlob(r, 'image/jpeg', 0.88));
+      say(`Uploading card pictures ${++done}/${need.length}…`);
+      await V.cardPut(id, blob);
+    }
+    doc.destroy();
+  }
+  const base = new URL('card.php', location.href); base.hash = ''; base.search = '';
+  say('Building PDF…');
+  return buildCardsPdf({ qr: ids.map(id => base.href + '?id=' + id) });
 }
 
 boot();

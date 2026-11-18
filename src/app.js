@@ -838,6 +838,9 @@ function syncPage() {
       <div class="synccard"><h2>Your sync key</h2><p>Use it to connect your other devices. The setup link is easiest on a phone: send it to yourself and open it there. Don’t share either with your players.</p>
         <div class="row"><code class="sykey">${syncShowKey ? esc(s.key) : '•'.repeat(24)}</code><button class="btn ghost" id="syshow">${syncShowKey ? 'Hide' : 'Show'}</button></div>
         <div class="row"><button class="btn ghost" id="sycopy">Copy key</button><button class="btn ghost" id="sycopyl" data-url="${esc(url)}">Copy setup link</button></div></div>
+      ${s.info && ((s.info.cards && s.info.cards.count) || (s.info.cardTraffic && s.info.cardTraffic.views)) ? `<div class="synccard"><h2>Card pictures</h2>
+        <p>${s.info.cards.count} card picture${s.info.cards.count === 1 ? '' : 's'} uploaded for the QR codes on your card backs (${mb(s.info.cards.bytes)}). Anyone with a printed card can open its picture.${s.info.cardTraffic ? ` In the last 30 days they were opened <b>${s.info.cardTraffic.views}</b> time${s.info.cardTraffic.views === 1 ? '' : 's'} (${mb(s.info.cardTraffic.bytes)} sent, all keys on this server).` : ''}</p>
+        ${s.info.cards.count ? '<p>Deleting them makes the QR codes on printed cards stop working. Exporting the cards again uploads them again (with the same QR codes).</p><div class="row"><button class="btn ghost danger" id="sycards">Delete all card pictures</button></div>' : ''}</div>` : ''}
       ${s.info && s.info.owner ? `<div class="synccard"><h2>Server owner</h2><p>Your key created the first sync space on this server, so you decide whether other people (your players, for example) may create their own sync keys. Their data would be separate from yours; they can never see your books or notes.</p>
         <label class="sychk"><input type="checkbox" id="syopen" ${s.info.open ? 'checked' : ''}> Let others create their own sync keys</label></div>` : ''}
       <div class="synccard"><h2>Key leaked or device lost?</h2><p><b>Replace key</b> gives your data a new key; the old one stops working everywhere, so reconnect your other devices with the new key. <b>Turn off on this device</b> stops syncing here and keeps the data on this device.</p>
@@ -857,6 +860,7 @@ function syncPage() {
   on('sycopyl', b => copy(b.dataset.url, 'Setup link'));
   on('syrot', async b => { if (await confirmSheet('Replace your sync key? The old key stops working on all your other devices until you connect them with the new one.', 'Replace key')) run(b, 'Replacing…', async () => { await V.rotate(); syncShowKey = true; toast('New key created. Reconnect your other devices with it.', 6000); }); });
   on('syoff', async () => { if (await confirmSheet('Stop syncing on this device? Your data stays on this device and on the server.', 'Turn off')) { V.disconnect(); syncPage(); } });
+  on('sycards', async b => { if (await confirmSheet('Delete all uploaded card pictures? The QR codes on cards you already printed will stop working.', 'Delete')) run(b, 'Deleting…', async () => { const n = await V.cardClear(); toast(`Deleted ${n} card picture${n === 1 ? '' : 's'}`); }); });
   const op = $('#syopen'); if (op) op.onchange = () => run(null, '', () => V.setOpen(op.checked));
   if (link && s.enabled) history.replaceState(null, '', '#sync');  // already connected: don't keep the key in the address bar
 }

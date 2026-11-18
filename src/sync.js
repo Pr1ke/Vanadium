@@ -73,7 +73,7 @@
   }
   async function pull() {
     const st = await api('state', { query: '&since=' + (jget(K.rev, 0) || 0) });
-    S.info = { owner: st.owner, open: st.open, usage: st.usage, quota: st.quota };
+    S.info = { owner: st.owner, open: st.open, usage: st.usage, quota: st.quota, cards: st.cards, cardTraffic: st.cardTraffic, salt: st.salt };
     S.remotePacks = st.packs || {};
     const meta = jget(K.meta, {}), dirty = new Set(jget(K.dirty, [])), changed = [];
     for (const [k, it] of Object.entries(st.items || {})) {
@@ -225,6 +225,11 @@
     async rotate() { await push(); const r = await api('rotate', { method: 'POST', body: {} }); rset(K.key, r.key); emit(); return r.key; },
     async setOpen(open) { await api('setopen', { method: 'POST', body: { open } }); if (S.info) S.info.open = open; emit(); },
     syncNow,
+    // ---- public card images (QR codes on card backs; see card.php) ----
+    async cardSalt() { if (!S.info || !S.info.salt) await pull(); return S.info.salt; },
+    async cardHas(ids) { return (await api('card_has', { method: 'POST', body: { ids } })).have || []; },
+    async cardPut(id, blob) { await api('card_put', { method: 'POST', query: '&id=' + encodeURIComponent(id), raw: blob }); },
+    async cardClear() { const r = await api('card_clear', { method: 'POST', body: {} }); await pull(); emit(); return r.removed; },
     packsChanged() { if (key()) syncPacks(); },
     packDeleted(id) { if (!key()) return; const l = jget(K.pdel, []).filter(x => x.id !== id); l.push({ id, t: Date.now() }); jset(K.pdel, l); syncPacks(); },
     appReady(hooks) {

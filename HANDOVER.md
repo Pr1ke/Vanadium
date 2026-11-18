@@ -25,6 +25,7 @@ Features:
   - Icon libraries with search: game-icons.net and Material Design Icons.
   - Can create quests from an adventure's text.
   - PDF export.
+  - Optional **QR code on each back** (needs sync). Players scan it and get that card as a JPG. See §5a, "Card pictures".
 - **PDF importer.**
   - The user drops in their own Draw Steel PDF (an adventure, bestiary or supplement). It is parsed in the browser into chapters, headings, tables, read-aloud text, monster stat blocks and abilities.
   - Pictures and maps go back where they appeared, monster art sits on its stat block, and a lightbox opens on click.
@@ -169,6 +170,13 @@ VS Code: **Terminal → Run Build Task** (Ctrl/Cmd+Shift+B) builds. Run the "Ser
   - **Owner:** the first key created on the server becomes the owner (stored in `config.php`). Others can only create keys if the owner allows it on the Sync page.
   - **Limits:** at most 30 unknown-key attempts per IP per 15 minutes, and 1 GB per key.
   - **Recovery:** if the owner key is lost, delete `.vanadium-data/config.php` over FTP.
+- **Card pictures (QR codes on card backs):**
+  - **Export:** with "QR code on back" checked, `exportCardsPdf()` in cards.js first builds a PDF of the fronts only, using `buildCardsPdf({frontsOnly, collect})`. It renders those pages with pdf.js at about 250 dpi and crops out each face as a JPG.
+  - **Ids:** each face's id is `sha256(salt + face content)`, cut to 22 characters. The salt is a private value for the key, returned by `state`, and it's kept when the key is replaced. The same card always gets the same id and URL, so only new or changed faces are uploaded (checked with `card_has`, then sent with `card_put`). It then builds the real PDF with `buildCardsPdf({qr: urls})`, which draws a vector QR code (version ~5, about 0.55 mm squares on poker cards) at the bottom of each back.
+  - **Serving:** images are stored at `.vanadium-data/cards/<id>.php` with the guard prefix. **`card.php?id=`** serves them publicly as `image/jpeg`.
+  - **Traffic:** `card.php` counts views and bytes per day in `cards/stats.php`, keeping 90 days. The Sync page shows the owner the last 30 days, plus a "Delete all card pictures" button (`card_clear`). Card pictures count toward the key's 1 GB.
+  - **QR library:** `site/lib/qrcode.js` is qrcode-generator 1.4.4 (MIT). The build copies it from `node_modules`, and it's lazy-loaded by `loadQr()`.
+  - **Licensing:** card pictures are public to anyone holding the QR code, and that includes quest cards made from imported adventure text. That was the owner's call.
 - **Updaters:** neither updater touches `.vanadium-*` files. `update.php` only deletes files from its own manifest, and `serve.py` skips them. `serve.py` can't run PHP, so sync is unavailable locally and the Sync page says so.
 - **Tests:** `node tests/sync_client.mjs site/sync.js` runs a simulation of several devices against an in-memory JS copy of the `sync.php` API. It covers merging, conflicts, removal, books (multi-chunk), loading data before the app starts, rotating the key and owner permissions. If you change the API, keep that copy in step with `sync.php`. The PHP itself is only tested on the real host.
 

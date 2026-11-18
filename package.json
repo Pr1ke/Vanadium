@@ -9,6 +9,7 @@
     "update": "python serve.py --check"
   },
   "devDependencies": {
-    "pdfjs-dist": "6.2.108"
+    "pdfjs-dist": "6.2.108",
+    "qrcode-generator": "1.4.4"
   }
 }

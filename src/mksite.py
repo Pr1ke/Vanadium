@@ -34,3 +34,6 @@ shutil.copy(ROOT+'/importer/dsparse.mjs',SITE+'/lib/dsparse.mjs')
 shutil.copy(SRC+'/update.php',SITE+'/update.php')  # self-updater for PHP hosts
 shutil.copy(SRC+'/sync.php',SITE+'/sync.php')      # sync server for PHP hosts
 shutil.copy(SRC+'/sync.js',SITE+'/sync.js')        # sync client; loads app.js
+shutil.copy(SRC+'/card.php',SITE+'/card.php')      # public card JPGs behind the QR codes
+q=ROOT+'/node_modules/qrcode-generator/qrcode.js'   # qrcode-generator 1.4.4 (MIT), vendored like pdf-lib
+if os.path.exists(q): shutil.copy(q,SITE+'/lib/qrcode.js')

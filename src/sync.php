@@ -23,6 +23,9 @@
  *   POST pack_del {id,t}
  *   POST rotate                  → {key}   (new key, same data; old key stops working)
  *   POST setopen {open}          (owner only)
+ *   POST card_has {ids}          → {have:[ids already uploaded]}
+ *   POST card_put&id (body = JPG) stores a public card image (see card.php)
+ *   POST card_clear              deletes all card images of this key (printed QR codes stop working)
  */
 
 const QUOTA = 1024 * 1024 * 1024;   // bytes per space
@@ -132,9 +135,22 @@ $isOwner = ($cfg['owner'] ?? '') === $id;
 switch ($a) {
 case 'state': {
     $st = jread($ST); $since = (int)($_GET['since'] ?? 0); $items = [];
+    if (empty($st['salt'])) {   // secret for card-image ids; kept when the key is replaced, so ids stay stable
+        $fp = lock($ST); $st = jread($ST);
+        if (empty($st['salt'])) { $st['salt'] = new_key(); jwrite($ST, $st); }
+        flock($fp, LOCK_UN);
+    }
     foreach ($st['items'] ?? [] as $k => $it) if (($it['r'] ?? 0) > $since) $items[$k] = ['t' => $it['t'], 'v' => $it['v']];
-    ok(['rev' => $st['rev'] ?? 0, 'items' => (object)$items, 'packs' => (object)($st['packs'] ?? []),
-        'owner' => $isOwner, 'open' => !empty($cfg['open']), 'usage' => dir_size($dir), 'quota' => QUOTA]);
+    $cards = $st['cards'] ?? [];
+    $r = ['rev' => $st['rev'] ?? 0, 'items' => (object)$items, 'packs' => (object)($st['packs'] ?? []),
+        'owner' => $isOwner, 'open' => !empty($cfg['open']), 'usage' => dir_size($dir) + array_sum($cards), 'quota' => QUOTA,
+        'cards' => ['count' => count($cards), 'bytes' => array_sum($cards)], 'salt' => $st['salt']];
+    if ($isOwner) {   // traffic on card.php over the last 30 days (all keys; written by card.php)
+        $views = 0; $sent = 0; $cut = date('Y-m-d', time() - 30 * 86400);
+        foreach (jread("$DATA/cards/stats.php") as $day => $v) if ($day >= $cut) { $views += $v[0]; $sent += $v[1]; }
+        $r['cardTraffic'] = ['views' => $views, 'bytes' => $sent];
+    }
+    ok($r);
 }
 case 'put': {
     $in = body_json()['items'] ?? [];
@@ -199,6 +215,35 @@ case 'rotate': {
     $cfg = jread($CFG);
     if (($cfg['owner'] ?? '') === $id) { $cfg['owner'] = $nid; jwrite($CFG, $cfg); }
     ok(['key' => $nk]);
+}
+// ---- card images (public JPGs behind the QR codes on printed card backs; served by card.php) ----
+case 'card_has': {
+    $ids = body_json()['ids'] ?? [];
+    $st = jread($ST); $have = [];
+    foreach (is_array($ids) ? $ids : [] as $cid)
+        if (is_string($cid) && isset($st['cards'][$cid]) && is_file("$DATA/cards/$cid.php")) $have[] = $cid;
+    ok(['have' => $have]);
+}
+case 'card_put': {
+    $cid = $_GET['id'] ?? '';
+    if (!preg_match('/^[A-Za-z0-9_-]{22}$/', $cid)) fail(400, 'bad card id');
+    $data = file_get_contents('php://input');
+    if ($data === false || strlen($data) > CHUNK_MAX || strncmp($data, "\xFF\xD8\xFF", 3) !== 0) fail(400, 'not a JPG (or larger than 4 MB)');
+    $fp = lock($ST); $st = jread($ST);
+    $cardBytes = array_sum($st['cards'] ?? []);
+    if (dir_size($dir) + $cardBytes + strlen($data) > QUOTA) fail(413, 'Sync storage is full.');
+    if (!is_dir("$DATA/cards")) { @mkdir("$DATA/cards", 0700); file_put_contents("$DATA/cards/index.html", ''); }
+    gwrite("$DATA/cards/$cid.php", $data);
+    $st['cards'][$cid] = strlen($data);
+    jwrite($ST, $st);
+    ok(['ok' => true]);
+}
+case 'card_clear': {
+    $fp = lock($ST); $st = jread($ST); $n = 0;
+    foreach (array_keys($st['cards'] ?? []) as $cid) if (preg_match('/^[A-Za-z0-9_-]{22}$/', $cid) && @unlink("$DATA/cards/$cid.php")) $n++;
+    $st['cards'] = [];
+    jwrite($ST, $st);
+    ok(['removed' => $n]);
 }
 case 'setopen': {
     if (!$isOwner) fail(403, 'Only the owner can change this.');
