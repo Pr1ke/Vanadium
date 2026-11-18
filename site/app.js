@@ -134,17 +134,20 @@ async function manualUpdate() {  // Utilities → Check for updates
     else say(b ? 'No new version found. (This server doesn’t run update.php.)' : 'Updates are not available on this server.');
   } finally { updRunning = false; }
 }
-function showUpdateBar(b) {
-  let el = $('#updbar');
+function showUpdateBar(b) { updSeen = b; vShowBar('updbar', 'A new version of Vanadium is available.'); }
+// a top bar with a Reload button (new version, or changes synced from another device)
+function vShowBar(id, msg) {
+  let el = document.getElementById(id);
   if (!el) {
-    el = document.createElement('div'); el.id = 'updbar'; el.setAttribute('role', 'status');
-    el.innerHTML = '<span>A new version of Vanadium is available.</span><button class="upd-go">Reload</button><button class="upd-x" aria-label="Dismiss">×</button>';
+    el = document.createElement('div'); el.id = id; el.className = 'vbar'; el.setAttribute('role', 'status');
+    el.innerHTML = '<span></span><button class="upd-go">Reload</button><button class="upd-x" aria-label="Dismiss">×</button>';
     document.body.appendChild(el);
     el.querySelector('.upd-go').onclick = () => location.reload();
     el.querySelector('.upd-x').onclick = () => { el.hidden = true; };
   }
-  updSeen = b; el.hidden = false;
+  el.querySelector('span').textContent = msg; el.hidden = false;
 }
+window.vShowBar = vShowBar;
 async function initUpdateCheck() {
   bootBuild = await fetchBuild();  // the build this page was loaded from
   if (!bootBuild) return;          // no version.json (old build or file://): nothing to compare
@@ -171,6 +174,12 @@ async function boot() {
   buildIndex(); buildMenu();
   const h = location.hash.slice(1);
   if (/^(monsters|book|library|import|pinned|negotiation|montage|encounter|session)/.test(h) || !h) route();
+  // sync (sync.js): books arriving from / removed on other devices
+  const onBooks = /^(library|book|monsters|sync)/;
+  if (window.VSync) VSync.appReady({
+    added(p) { p.builtin = false; addPack(p); buildIndex(); buildMenu(); toast('Synced “' + esc(p.title) + '” from another device'); if (onBooks.test(location.hash.slice(1))) route(); },
+    removed(id) { if (!PK[id]) return; removePack(id); buildIndex(); buildMenu(); if (onBooks.test(location.hash.slice(1))) route(); }
+  });
 }
 
 function initHeroes() {
@@ -382,7 +391,7 @@ function MENU() {
     ['Heroes', [['classes'], ['ancestries'], ['cultures'], ['careers'], ['complications'], ['-'], ['kits'], ['perks'], ['abilities'], ['-'], ['respite', 'Respite & Downtime']]],
     ['Director', [['sessions', 'Sessions'], ['encounter', 'Encounter Builder'], ['negotiation', 'Negotiation Tracker'], ['montage', 'Montage Tests'], ['monsters'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title]), ['book--monsters', 'Monsters Book'], ['book--encounters', 'Encounters Book'], ['-'], ['book--heroes--for-the-director', 'For the Director'], ['gods']]],
     ['Rewards', [['treasures'], ['cards', 'Cards: items, quests, followers'], ['titles']]],
-    ['Utilities', [['import', 'Import a PDF'], ['roller', 'Power Roller'], ['pinned', 'Pinned Items'], ['-'], ['!update', 'Check for updates']]]
+    ['Utilities', [['import', 'Import a PDF'], ['roller', 'Power Roller'], ['pinned', 'Pinned Items'], ['-'], ['sync', 'Sync across devices'], ['!update', 'Check for updates']]]
   ];
 }
 function buildMenu() {
@@ -635,7 +644,7 @@ function libraryPage() {
       <div class="cnt">${nch} chapters${nm ? ' · ' + nm + ' monsters' : ''}${p.heroes ? ' · ' + D.abilities.length + ' abilities' : ''}</div>
       <div class="acts"><a class="btn" href="#book--${p.id}">Read</a>${nm ? `<a class="btn ghost" href="#monsters" data-srcfilter="${esc(p.title)}">Monsters</a>` : ''}${p.builtin ? '' : `<button class="btn danger" data-delpack="${p.id}">Remove</button>`}</div></div>`;
   };
-  $('#main').innerHTML = `<div class="lib"><h1>Library</h1><p class="note">Every book in Vanadium. Imported PDFs live only in this browser.</p>
+  $('#main').innerHTML = `<div class="lib"><h1>Library</h1><p class="note">Every book in Vanadium. ${window.VSync && VSync.status().enabled ? 'Imported PDFs are synced to your other devices.' : 'Imported PDFs live only in this browser (<a href="#sync">sync them across devices</a>).'}</p>
     <div class="books">${PACKS.map(card).join('')}<a class="bookc" href="#import" style="text-decoration:none;color:var(--ink);border-style:dashed;align-items:flex-start;justify-content:center"><div class="kind">Add content</div><b>Import a PDF →</b><div class="cnt">Adventures, bestiaries, supplements</div></a></div></div>`;
   document.title = 'Library — Vanadium';
 }
@@ -732,15 +741,18 @@ function showPreview() {
     let persisted = true;
     try { await IDB.put(clean); } catch (e) { persisted = false; memPacks.push(clean); }
     addPack(clean); buildIndex(); buildMenu(); pending = null;
+    if (persisted && window.VSync) VSync.packsChanged();  // uploads it if sync is on
     toast(persisted ? 'Added to your library' : 'Added for this session (browser storage unavailable)');
     go('book--' + clean.id);
   };
 }
 async function deletePack(id) {
   const p = PK[id]; if (!p || p.builtin) return;
-  const ok = await confirmSheet(`Remove “${p.title}” from this browser? You can import it again later.`, 'Remove');
+  const synced = window.VSync && VSync.status().enabled;
+  const ok = await confirmSheet(synced ? `Remove “${p.title}” from all your synced devices? You can import it again later.` : `Remove “${p.title}” from this browser? You can import it again later.`, 'Remove');
   if (!ok) return;
   try { await IDB.del(id); } catch (e) { }
+  if (window.VSync) VSync.packDeleted(id);
   removePack(id); buildIndex(); buildMenu();
   pins = pins.filter(k => !k.startsWith('monsters--') || MON[k.split('--')[1]]); store.set('pins', pins); updatePins();
   toast('Removed'); route();
@@ -798,6 +810,57 @@ function home() {
 }
 
 // ---------- pinned ----------
+// ---------- sync across devices (sync.js + sync.php) ----------
+let syncShowKey = false, syncSub = null;
+function syncPage() {
+  document.title = 'Sync — Vanadium';
+  const V = window.VSync, box = h => `<div class="lib syncp"><h1>Sync across devices</h1>${h}</div>`;
+  if (!V) { $('#main').innerHTML = box('<p class="note">Sync isn’t available in this copy of Vanadium.</p>'); return; }
+  if (!syncSub) syncSub = V.onChange(() => { if (/^#sync/.test(location.hash) && !document.activeElement.closest('.syncp input')) syncPage(); });
+  const s = V.status(), link = location.hash.match(/^#sync--connect--([A-Za-z0-9_-]{43})$/);
+  const ago = t => { if (!t) return 'never'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
+  const mb = n => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + ' MB';
+  const what = '<p class="note">Keeps your sessions, encounters, montages, negotiations, cards, pins, characters, Respite heroes, settings and imported books the same on every device and browser you use. Your data is stored on this site’s server under a private sync key. Anyone with the key can see and change everything, so keep it to yourself.</p>';
+  const err = s.error ? `<div class="warn">${esc(s.error)}${/Unknown sync key/.test(s.error) ? ' The key may have been replaced on another device. Turn sync off here and connect again with the new key.' : ''}</div>` : '';
+  let h;
+  if (!s.https) h = what + '<div class="warn">Sync needs a secure (https://) connection, so your key is never sent unencrypted. Open this site with https:// to use it.</div>';
+  else if (link && !s.enabled) h = what + `<div class="synccard"><h2>Connect this device?</h2><p>This device will join the sync key from the link you opened. Where both this device and the synced copy have the same thing (for example your card list), the <b>synced copy wins</b>. Imported books from both are kept.</p>
+      <div class="row"><button class="btn" id="sylink">Connect this device</button><a class="btn ghost" href="#sync">Cancel</a></div></div>`;
+  else if (!s.enabled) h = what + err + `<div class="synccards"><div class="synccard"><h2>Start syncing</h2><p>Creates a new sync key and uploads everything from this device, including imported books. Do this on your main device.</p><button class="btn" id="sycreate">Turn on sync</button></div>
+      <div class="synccard"><h2>Connect a device</h2><p>Already syncing somewhere else? Paste the key from Sync on that device, or open its setup link on this one. Where both have the same thing, the synced copy wins.</p><div class="row"><input id="sykey" placeholder="Sync key" autocomplete="off" spellcheck="false"><button class="btn" id="syconn">Connect</button></div></div></div>`;
+  else {
+    const st = s.status === 'syncing' ? 'Syncing…' : s.status === 'error' ? 'Sync problem' : 'Up to date';
+    const p = s.progress, url = location.origin + location.pathname + '#sync--connect--' + s.key;
+    h = `<div class="synccard"><h2><span class="sydot ${s.status}"></span>${st}</h2>${err}
+        <p>Last synced ${ago(s.last)}${s.pending ? ` · ${s.pending} change${s.pending > 1 ? 's' : ''} waiting` : ''}${s.books != null ? ` · ${s.books} imported book${s.books === 1 ? '' : 's'} synced` : ''}${s.info ? ` · ${mb(s.info.usage)} of ${mb(s.info.quota)} used` : ''}</p>
+        ${p ? `<div class="syprog"><div>${esc(p.label)} ${p.total > 1 ? `(${p.done}/${p.total} MB)` : ''}</div><progress max="${p.total}" value="${p.done}"></progress></div>` : ''}
+        <div class="row"><button class="btn" id="synow" ${s.status === 'syncing' ? 'disabled' : ''}>Sync now</button></div></div>
+      <div class="synccard"><h2>Your sync key</h2><p>Use it to connect your other devices. The setup link is easiest on a phone: send it to yourself and open it there. Don’t share either with your players.</p>
+        <div class="row"><code class="sykey">${syncShowKey ? esc(s.key) : '•'.repeat(24)}</code><button class="btn ghost" id="syshow">${syncShowKey ? 'Hide' : 'Show'}</button></div>
+        <div class="row"><button class="btn ghost" id="sycopy">Copy key</button><button class="btn ghost" id="sycopyl" data-url="${esc(url)}">Copy setup link</button></div></div>
+      ${s.info && s.info.owner ? `<div class="synccard"><h2>Server owner</h2><p>Your key created the first sync space on this server, so you decide whether other people (your players, for example) may create their own sync keys. Their data would be separate from yours; they can never see your books or notes.</p>
+        <label class="sychk"><input type="checkbox" id="syopen" ${s.info.open ? 'checked' : ''}> Let others create their own sync keys</label></div>` : ''}
+      <div class="synccard"><h2>Key leaked or device lost?</h2><p><b>Replace key</b> gives your data a new key; the old one stops working everywhere, so reconnect your other devices with the new key. <b>Turn off on this device</b> stops syncing here and keeps the data on this device.</p>
+        <div class="row"><button class="btn ghost" id="syrot">Replace key</button><button class="btn danger" id="syoff">Turn off on this device</button></div></div>`;
+  }
+  $('#main').innerHTML = box(h);
+  const busy = (b, label) => { if (b) { b.disabled = true; b.textContent = label; } };
+  const run = async (b, label, f) => { busy(b, label); try { await f(); } catch (e) { toast(esc(e.message), 6000); } syncPage(); };
+  const copy = async (txt, what) => { try { await navigator.clipboard.writeText(txt); toast(what + ' copied'); } catch (e) { prompt('Copy this:', txt); } };
+  const on = (id, f) => { const el = $('#' + id); if (el) el.onclick = () => f(el); };
+  on('sycreate', b => run(b, 'Turning on…', async () => { await V.create(); toast('Sync is on'); }));
+  on('syconn', b => run(b, 'Connecting…', async () => { await V.connect($('#sykey').value); toast('Connected. Reload to see the synced data.', 6000); }));
+  on('sylink', b => run(b, 'Connecting…', async () => { await V.connect(link[1]); history.replaceState(null, '', '#sync'); toast('Connected. Reload to see the synced data.', 6000); }));
+  on('synow', b => run(b, 'Syncing…', () => V.syncNow()));
+  on('syshow', () => { syncShowKey = !syncShowKey; syncPage(); });
+  on('sycopy', () => copy(s.key, 'Key'));
+  on('sycopyl', b => copy(b.dataset.url, 'Setup link'));
+  on('syrot', async b => { if (await confirmSheet('Replace your sync key? The old key stops working on all your other devices until you connect them with the new one.', 'Replace key')) run(b, 'Replacing…', async () => { await V.rotate(); syncShowKey = true; toast('New key created. Reconnect your other devices with it.', 6000); }); });
+  on('syoff', async () => { if (await confirmSheet('Stop syncing on this device? Your data stays on this device and on the server.', 'Turn off')) { V.disconnect(); syncPage(); } });
+  const op = $('#syopen'); if (op) op.onchange = () => run(null, '', () => V.setOpen(op.checked));
+  if (link && s.enabled) history.replaceState(null, '', '#sync');  // already connected: don't keep the key in the address bar
+}
+
 function pinnedPage() {
   const valid = pins.map(k => { const [t, id] = k.split('--'); return [t, BYID[t] && BYID[t][id], k]; }).filter(x => x[1]);
   const abs = valid.filter(x => x[0] === 'abilities'), mons = valid.filter(x => x[0] === 'monsters'), rest = valid.filter(x => x[0] !== 'abilities' && x[0] !== 'monsters');
@@ -1009,6 +1072,7 @@ function route() {
   if (a === 'library') { lastType = null; libraryPage(); return done(); }
   if (a === 'import') { lastType = null; importPage(); return done(); }
   if (a === 'pinned') { lastType = null; pinnedPage(); return done(); }
+  if (a === 'sync') { lastType = null; syncPage(); return done(); }
   if (a === 'encounter') { lastType = null; encounterPage(); return done(); }
   if (a === 'respite') { lastType = null; respitePage(); return done(); }
   if (a === 'negotiation') { lastType = null; b ? negotiationPage(b) : negotiationHub(); return done(); }

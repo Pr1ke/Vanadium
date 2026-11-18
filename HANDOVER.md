@@ -28,7 +28,8 @@ Features:
 - **PDF importer.**
   - The user drops in their own Draw Steel PDF (an adventure, bestiary or supplement). It is parsed in the browser into chapters, headings, tables, read-aloud text, monster stat blocks and abilities.
   - Pictures and maps go back where they appeared, monster art sits on its stat block, and a lightbox opens on click.
-  - Everything is saved **only in that browser's IndexedDB**.
+  - Everything is saved in that browser's IndexedDB, and on the owner's own server when sync is on (see below).
+- **Sync across devices** (Utilities → Sync across devices) needs the PHP host. A private sync key keeps app data and imported books the same on every device. See §5a.
 - **Other.** Light/dark theme, mobile layout, offline-friendly data cache.
 
 ## 2. Licensing — read before adding content
@@ -38,7 +39,13 @@ Features:
   - MCDM artwork or page images. The license allows text, not art or screenshots, so even Heroes/Monsters art is out.
   - MCDM or DRAW STEEL logos.
   - Content from books the license doesn't cover. *Draw Steel: Encounters* and *The Fall of Blackbottom* were deliberately removed from the built-ins.
-- Those books are supported **only through the importer**. The user supplies their own PDF, and the parsed result stays in their browser. The importer must never upload anything; the code only makes GET requests for the app's own static files. A test confirms that importing makes no other requests (see §8).
+- Those books are supported **only through the importer**. The user supplies their own PDF, and the parsed result stays in their browser. The importer itself never uploads anything. A test confirms that importing makes no other requests while sync is off (see §8).
+- **Sync (opt-in) is the one exception.** When the user turns it on, their imports are stored on *their own* server under *their* private sync key. They must never become reachable without that key:
+  - no public URLs
+  - no sharing between keys
+  - each person imports their own PDFs
+  
+  Keep it that way when changing sync.
 - The required notice must stay visible on the site, and is also in README:
   > Vanadium is an independent product published under the DRAW STEEL Creator License and is not affiliated with MCDM Productions, LLC. DRAW STEEL © 2024 MCDM Productions, LLC.
 - Icon credits must stay too: game-icons.net (CC BY 3.0) and Material Design Icons (Apache 2.0).
@@ -133,6 +140,37 @@ VS Code: **Terminal → Run Build Task** (Ctrl/Cmd+Shift+B) builds. Run the "Ser
 - **User state** is in localStorage, `st_` prefix: `cards`, `chars`, `enc`, `encs`, `mtg`, `mtgsess`, `negs`, `negsess`, `pins`, `sessions`, `stones`, `stoneson`, `theme2`.
 - **PDF output** uses pdf-lib's StandardFonts, Helvetica and Times sets, chosen with `base.times`. The standard fonts are WinAnsi only, so text goes through a sanitiser that replaces ≤ ≥ − etc. Icons are drawn with `drawSvgPath`.
 - **Respite** is a separate page (`respite.html`) shown in an iframe. `applyTheme()` calls the iframe's `__stTheme` to keep themes in sync.
+
+## 5a. Sync across devices (src/sync.js + src/sync.php)
+
+- **Boot order:** `index.html` loads `sync.js` (a classic script), **not** `app.js`. When sync is on, `sync.js` pulls the latest data into localStorage first, waiting at most 4 s, and then injects `app.js` as a module. Every module therefore reads current data at load time. With sync off, it loads `app.js` immediately.
+- **What syncs:**
+  - Every localStorage key starting `st_`, except `st_sync_*` (sync bookkeeping) and `st_updchk`.
+  - The Respite key `drawsteel-respite-v1`.
+  - Imported books.
+- **Change tracking:** `sync.js` patches `Storage.prototype.setItem/removeItem`, so a write only marks a key dirty when its value actually changes. Writes go through the patch from any code path. The Respite iframe calls `parent.VSync.patch(window)`; `mkrespite.py` injects that call.
+- **Bookkeeping keys:**
+  - `st_sync_meta`: the last write time for each key
+  - `st_sync_dirty`: keys waiting to be pushed
+  - `st_sync_rev`: the server revision this device has seen
+  - `st_sync_pdel`: book deletions not yet sent
+- **Conflicts:** the last write wins for each key. The server rejects older writes and returns its newer value. When a device connects to an existing key, its data is marked with time 1, so the synced copy wins wherever both devices have the same key. Keys only that device has are uploaded.
+- **Timing:**
+  - Pushes go out 1.5 s after the last change, and on `pagehide` with `keepalive`.
+  - Pulls run when the tab becomes visible (at most every 20 s) and every 2 min while it's visible.
+  - Changes pulled while the app is open show a "Reload" bar (`vShowBar('syncbar', …)`).
+- **Books:** the pack JSON is gzipped and uploaded in 1 MB chunks, then committed with `pack_done`. Other devices download the books they don't have and call `VSync.appReady` hooks, which `addPack` the book. Removing a book sends `pack_del`, which leaves a tombstone so every device removes it. app.js calls `VSync.packsChanged()` after an import and `VSync.packDeleted(id)` after a removal.
+- **Server (`sync.php`):** the API is documented at the top of the file.
+  - **HTTPS:** sync only works over HTTPS; localhost is allowed for testing.
+  - **Storage:** data lives in `site/.vanadium-data/`, because there's nothing above the web root on the host. It has three protections:
+    1. an `.htaccess` file that denies all access
+    2. every data file is a `.php` file whose first line exits
+    3. each space's folder is `s-<sha256(key)>`
+  - **Owner:** the first key created on the server becomes the owner (stored in `config.php`). Others can only create keys if the owner allows it on the Sync page.
+  - **Limits:** at most 30 unknown-key attempts per IP per 15 minutes, and 1 GB per key.
+  - **Recovery:** if the owner key is lost, delete `.vanadium-data/config.php` over FTP.
+- **Updaters:** neither updater touches `.vanadium-*` files. `update.php` only deletes files from its own manifest, and `serve.py` skips them. `serve.py` can't run PHP, so sync is unavailable locally and the Sync page says so.
+- **Tests:** `node tests/sync_client.mjs site/sync.js` runs a simulation of several devices against an in-memory JS copy of the `sync.php` API. It covers merging, conflicts, removal, books (multi-chunk), loading data before the app starts, rotating the key and owner permissions. If you change the API, keep that copy in step with `sync.php`. The PHP itself is only tested on the real host.
 
 ## 6. The PDF parser (importer/dsparse.mjs)
 

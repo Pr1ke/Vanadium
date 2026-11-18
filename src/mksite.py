@@ -27,3 +27,5 @@ for p in (ROOT+'/node_modules/pdf-lib/dist/pdf-lib.esm.min.js','/opt/npm-tools/n
     if os.path.exists(p): shutil.copy(p,SITE+'/lib/pdf-lib.esm.min.js'); break
 shutil.copy(ROOT+'/importer/dsparse.mjs',SITE+'/lib/dsparse.mjs')
 shutil.copy(SRC+'/update.php',SITE+'/update.php')  # self-updater for PHP hosts
+shutil.copy(SRC+'/sync.php',SITE+'/sync.php')      # sync server for PHP hosts
+shutil.copy(SRC+'/sync.js',SITE+'/sync.js')        # sync client; loads app.js

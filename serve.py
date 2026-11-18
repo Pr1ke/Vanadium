@@ -125,7 +125,10 @@ class Updater:
             # drop files the new build no longer has
             keep = {os.path.normcase(os.path.join(SITE, *r.split('/'))) for r in files}
             for dp, dns, fns in os.walk(SITE, topdown=False):
+                if os.path.relpath(dp, SITE).split(os.sep)[0].startswith('.vanadium'):
+                    continue  # sync data / updater state, never part of the build
                 for fn in fns:
+                    if dp == SITE and fn.startswith('.vanadium'): continue
                     p = os.path.join(dp, fn)
                     if os.path.normcase(p) not in keep:
                         try: os.remove(p)
