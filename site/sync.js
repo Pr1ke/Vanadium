@@ -241,9 +241,11 @@
   window.VSync = VSync;
 
   // ---- boot: pull first (max 4 s), then start the app ----
+  // index.html loads this as sync.js?v=<build> data-v=<build>; pass the same version to app.js
+  const ASSET_V = (document.currentScript && document.currentScript.dataset && document.currentScript.dataset.v) || '';
   function startApp() {
     if (S.appStarted) return; S.appStarted = true;
-    const s = document.createElement('script'); s.type = 'module'; s.src = 'app.js'; document.body.appendChild(s);
+    const s = document.createElement('script'); s.type = 'module'; s.src = ASSET_V ? 'app.js?v=' + ASSET_V : 'app.js'; document.body.appendChild(s);
   }
   if (LS && key()) {
     S.status = 'syncing';

@@ -22,7 +22,12 @@ rj=lambda f: open(f,'rb').read().replace(b'\r\n',b'\n')  # a Windows checkout ha
 h=hashlib.md5(b''.join(rj(f) for f in sorted(glob.glob(SITE+'/data/*.json')))).hexdigest()[:10]
 for f in glob.glob(SITE+'/data/*.json'):
     open(f[:-5]+'.gz.txt','wb').write(__import__('base64').b64encode(gzip.compress(rj(f),9,mtime=0)))
-open(SITE+'/app.js','w').write((js[:i]+enc+'\n'+neg+'\n'+js[i:]).replace('__DATAV__',h))
+# asset version: changes whenever any source changes; added as ?v= to sync.js, app.js and respite.html
+# so browsers never keep running an old copy after an update (hosts often let them cache heuristically)
+av=hashlib.md5(b''.join(open(f,'rb').read().replace(b'\r\n',b'\n') for f in sorted(glob.glob(SRC+'/*'))+[ROOT+'/importer/dsparse.mjs'] if os.path.isfile(f))).hexdigest()[:10]
+html=html.replace('<script src="sync.js">','<script src="sync.js?v=%s" data-v="%s">'%(av,av))
+open(SITE+'/index.html','w').write(html)
+open(SITE+'/app.js','w').write((js[:i]+enc+'\n'+neg+'\n'+js[i:]).replace('__DATAV__',h).replace('__ASSETV__',av))
 for p in (ROOT+'/node_modules/pdf-lib/dist/pdf-lib.esm.min.js','/opt/npm-tools/node_modules/pdf-lib/dist/pdf-lib.esm.min.js'):
     if os.path.exists(p): shutil.copy(p,SITE+'/lib/pdf-lib.esm.min.js'); break
 shutil.copy(ROOT+'/importer/dsparse.mjs',SITE+'/lib/dsparse.mjs')

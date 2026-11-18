@@ -771,7 +771,7 @@ function confirmSheet(msg, okLabel) {
 window.__stSave = (name, blob) => deliverFile(name, blob);
 window.__stGotoPage = pg => gotoPage(String(pg));
 function respitePage() {
-  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
+  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=__ASSETV__" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
   document.title = 'Respite — Vanadium';
 }
 
