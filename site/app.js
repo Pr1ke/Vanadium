@@ -771,7 +771,7 @@ function confirmSheet(msg, okLabel) {
 window.__stSave = (name, blob) => deliverFile(name, blob);
 window.__stGotoPage = pg => gotoPage(String(pg));
 function respitePage() {
-  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=0f34f447f2" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
+  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=1a3f0b1297" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
   document.title = 'Respite — Vanadium';
 }
 
@@ -3537,7 +3537,7 @@ async function buildCardsPdf(opt = {}) {
 // ---- QR codes → public card JPGs (uploaded through sync.php, served by card.php) ----
 let qrLoad = null;
 function loadQr() {  // lib/qrcode.js: qrcode-generator 1.4.4 (MIT), defines window.qrcode
-  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=0f34f447f2'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
+  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=1a3f0b1297'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
 }
 // 22-char id from the key's private salt + what the face looks like: stable, but unguessable
 async function cardImageId(salt, content) {

@@ -20,9 +20,12 @@ html[data-theme=dark]{
   --sub:#1F2024; --field:#111214; --sh1:0 1px 2px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.25);
   color-scheme:dark;
 }
-.night{--mat:var(--mat)}
+/* The respite dialog gets class "night" (a dark overlay in the old ornate theme). Here it should look
+   like the page, so take every variable the base .night rule changes from the page instead.
+   (Was --mat:var(--mat): a self-reference is invalid CSS, which made the dialog transparent.) */
+.night{--mat:inherit;--acc:inherit;--muted:inherit;--dim:inherit;--soft:inherit;--vig:inherit;--sheen:inherit;--line:inherit;--line2:inherit;--noise:inherit}
 .card,.tile,.pick,.contcard,.res,.callout,.celebrate,.chip,.btn.gold,.seg button,.stepper{
-  --text:var(--ink);--soft:inherit;--line:var(--edge);--line2:var(--line2);--gold:var(--acc);--gold2:var(--gold2);--focus:var(--acc)}
+  --text:var(--ink);--soft:inherit;--line:var(--edge);--line2:inherit;--gold:var(--acc);--gold2:inherit;--focus:var(--acc)}
 html,body{font-size:14.5px;letter-spacing:-.003em}
 .matbg,body{background:var(--mat)!important}
 h1,h2,h3{font-family:var(--display);letter-spacing:-.02em;font-weight:700}
