@@ -18,7 +18,7 @@ open(SITE+'/index.html','w').write(html)
 # app.js = core (src/app.js up to its trailing boot();) + each game system's files (they call
 # registerSystem) + core modules + boot(). One global script, so order only matters for code that
 # runs at load time: systems come after the core helpers they use.
-SYSTEM_FILES={'drawsteel':['drawsteel.js','enc.js','neg.js','mtg.js','ds-print.js']}
+SYSTEM_FILES={'drawsteel':['drawsteel.js','enc.js','neg.js','mtg.js','ds-print.js','ds-sessions.js','ds-cards.js','register.js']}  # register.js last
 CORE_MODULES=['print.js','sess.js','cards.js']
 js=open(SRC+'/app.js').read(); i=js.rindex('boot();')
 parts=[open(SRC+'/systems/%s/%s'%(s,f)).read() for s,fs in SYSTEM_FILES.items() for f in fs]+[open(SRC+'/'+f).read() for f in CORE_MODULES]

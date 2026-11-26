@@ -49,6 +49,14 @@ let isMob = false;
 //   importer: {module, stats(p)}  PDF parser module and import-preview stats
 //   onClick(e)                    delegated clicks for system buttons; true if handled
 //   pdfNotice                     licence line on exported PDFs
+//   notice                        licence notice in the page footer
+//   roller: {title, html, mount}  dice roller panel (#roller) and its floating button's tooltip
+//   session: {kinds, party, partyNote, partyLine(S), newParty(), planText, overviewExtra(S)}
+//                                 what Sessions can hold besides pages (sess.js documents each kind)
+//   cards: {tabs, kinds, icons, rewards, intro, questsFromChapter, questRewardsText, optionsHtml, wireOptions}
+//                                 card kinds besides quest cards (cards.js), reward types, adventure quests
+//   syncWhat                      what sync keeps in step, in words (Sync page)
+// A system's registerSystem call runs at load time, so it goes in the system's last file.
 const SYSTEMS = {};
 let SYS = null;
 function registerSystem(s) { SYSTEMS[s.id] = s; if (!SYS) SYS = s; }
@@ -172,6 +180,7 @@ async function initUpdateCheck() {
 }
 
 async function boot() {
+  mountSystemChrome();
   applyTheme(store.get('theme2', 'light'));
   setupMobile();
   try { D = await getJSON(SYS.data.file, (g, t) => { $('#loadmsg').textContent = `${SYS.data.loading} ${(g / 1048576).toFixed(1)}${t ? ' / ' + (t / 1048576).toFixed(1) : ''} MB`; }); }
@@ -621,7 +630,7 @@ function syncPage() {
   const s = V.status(), link = location.hash.match(/^#sync--connect--([A-Za-z0-9_-]{43})$/);
   const ago = t => { if (!t) return 'never'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
   const mb = n => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + ' MB';
-  const what = '<p class="note">Keeps your sessions, encounters, montages, negotiations, cards, pins, characters, Respite heroes, settings and imported books the same on every device and browser you use. Your data is stored on this site’s server under a private sync key. Anyone with the key can see and change everything, so keep it to yourself.</p>';
+  const what = `<p class="note">Keeps your ${esc(SYS.syncWhat || 'sessions, cards, pins, settings')} and imported books the same on every device and browser you use. Your data is stored on this site’s server under a private sync key. Anyone with the key can see and change everything, so keep it to yourself.</p>`;
   const err = s.error ? `<div class="warn">${esc(s.error)}${/Unknown sync key/.test(s.error) ? ' The key may have been replaced on another device. Turn sync off here and connect again with the new key.' : ''}</div>` : '';
   let h;
   if (!s.https) h = what + '<div class="warn">Sync needs a secure (https://) connection, so your key is never sent unencrypted. Open this site with https:// to use it.</div>';
@@ -753,7 +762,12 @@ $('#mres').addEventListener('click', e => { const r = e.target.closest('.sr[data
 const openRoller = () => { $('#roller').classList.add('on'); if (!isMob) $('#fab').style.display = 'none'; };
 const closeRoller = () => { $('#roller').classList.remove('on'); $('#fab').style.display = ''; };
 $('#fab').onclick = openRoller;
-$('#rclose').onclick = closeRoller;
+$('#roller').addEventListener('click', e => { if (e.target.closest('#rclose')) closeRoller(); });   // the panel's content comes from the system
+// the system's dice roller panel and licence notice (called first thing in boot)
+function mountSystemChrome() {
+  if (SYS.roller) { $('#roller').innerHTML = SYS.roller.html; $('#fab').title = SYS.roller.title; if (SYS.roller.mount) SYS.roller.mount(); }
+  $('footer').innerHTML = SYS.notice || '';
+}
 
 // ---------- scrim / sheets / peek ----------
 let scrimCb = null;
@@ -1069,7 +1083,7 @@ function classIndex() {
 window.__stSave = (name, blob) => deliverFile(name, blob);
 window.__stGotoPage = pg => gotoPage(String(pg));
 function respitePage() {
-  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=d0ea0eb4d4" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
+  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=fdeb7faca6" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
   document.title = 'Respite — Vanadium';
 }
 
@@ -1099,8 +1113,27 @@ function dsHome() {
 // ==== moved from app.js: chars ====
 const CH = ['Might', 'Agility', 'Reason', 'Intuition', 'Presence'];
 let chars = store.get('chars', { Might: 0, Agility: 0, Reason: 0, Intuition: 0, Presence: 0 });
-$('#chars').innerHTML = CH.map(c => `<label>${c.slice(0, 3)}<input type="number" inputmode="numeric" data-ch="${c}" value="${chars[c] ?? 0}"></label>`).join('');
-$$('#chars input').forEach(i => i.oninput = () => { chars[i.dataset.ch] = parseInt(i.value) || 0; store.set('chars', chars); });
+// the power roller panel: the core puts SYS.roller.html into #roller, then calls SYS.roller.mount()
+const DS_ROLLER_HTML = `
+  <div class="rh">Power Roll <button id="rclose">×</button></div>
+  <div class="rb">
+    <div class="chars" id="chars"></div>
+    <div class="rrow">
+      <select id="rchar"><option value="">No characteristic</option><option>Might</option><option>Agility</option><option>Reason</option><option>Intuition</option><option>Presence</option></select>
+      <label>Bonus <input id="rbonus" type="number" value="0" style="width:52px"></label>
+    </div>
+    <div class="rrow">
+      <select id="redge"><option value="0">No edge/bane</option><option value="1">Edge (+2)</option><option value="2">Double edge (tier up)</option><option value="-1">Bane (−2)</option><option value="-2">Double bane (tier down)</option></select>
+    </div>
+    <button class="bigroll" id="rgo">Roll 2d10</button>
+    <div id="rlog"></div>
+  </div>
+`;
+function dsMountRoller() {
+  $('#chars').innerHTML = CH.map(c => `<label>${c.slice(0, 3)}<input type="number" inputmode="numeric" data-ch="${c}" value="${chars[c] ?? 0}"></label>`).join('');
+  $$('#chars input').forEach(i => i.oninput = () => { chars[i.dataset.ch] = parseInt(i.value) || 0; store.set('chars', chars); });
+  $('#rgo').onclick = () => powerRoll('', null, null);
+}
 
 // ==== moved from app.js: roll ====
 function powerRoll(label, charList, abKey, fixed) {
@@ -1122,7 +1155,6 @@ function powerRoll(label, charList, abKey, fixed) {
   if (abKey) { $$(`[data-ab="${CSS.escape(abKey)}"] .tier`).forEach(t => t.classList.toggle('hit', t.classList.contains('n' + tier))); setTimeout(() => $$('.tier.hit').forEach(t => t.classList.remove('hit')), 6000); }
   toast(`${label ? esc(label) + ': ' : ''}<b>${tot}</b> → Tier ${tier}${nat >= 19 ? ' (natural ' + nat + '!)' : ''}`);
 }
-$('#rgo').onclick = () => powerRoll('', null, null);
 
 // ==== moved from app.js: browse ====
 function dsBrowse() {
@@ -1211,40 +1243,6 @@ function dsOnClick(e) {
   const le = e.target.closest('[data-loadenc]'); if (le) { e.preventDefault(); const [p, c, i] = le.dataset.loadenc.split('|'); loadBookEncounter(p, c, +i); return true; }
   const ae = e.target.closest('[data-addenc]'); if (ae) { e.preventDefault(); addToEncounter(ae.dataset.addenc); return true; }
 }
-
-registerSystem({
-  id: 'drawsteel', name: 'Draw Steel',
-  data: { file: 'data/heroes.json', loading: 'Loading the rules…' },
-  init: initHeroes,
-  corePack: () => ({ id: 'heroes', title: 'Draw Steel: Heroes', kind: 'core', builtin: true, chapters: D.book, monsters: [], abilities: [], heroes: true }),
-  builtin: BUILTIN,
-  lists: DS_LISTS,
-  menu: dsMenu, home: dsHome, browse: dsBrowse,
-  routes: {
-    encounter: () => encounterPage(),
-    respite: () => respitePage(),
-    negotiation: b => b ? negotiationPage(b) : negotiationHub(),
-    montage: b => b ? montagePage(b) : montageHub(),
-    classes: b => b ? classPage(b) : classIndex()
-  },
-  packRoutes: ['monsters', 'negotiation', 'montage', 'encounter'],
-  renderMonster, renderAbility,
-  renderBlock: dsRenderBlock, afterHeading: dsAfterHeading, afterTable: dsAfterTable, chapterExtras: dsChapterExtras,
-  onAddPack: dsOnAddPack,
-  entityMeta: dsEntityMeta, entitySource: dsEntitySource, preview: dsPreview,
-  pinGroups: [
-    { type: 'monsters', title: ms => `Monsters · ${ms.reduce((s, m) => s + (parseInt(m.ev) || 0), 0)} EV total`, render: m => renderMonster(m) },
-    { type: 'abilities', title: () => 'Abilities', render: a => renderAbility(a) }
-  ],
-  linkTypes: ['conditions'],
-  noLink: '.ab-n,.ma-n,.mon-n,.pot,.chr',   // names inside ability cards and stat blocks are never auto-linked
-  searchExtra: dsSearchExtra, searchIndex: dsSearchIndex,
-  searchPriority: { conditions: 0, classes: 0, ancestries: 1, kits: 2, monsters: 2, abilities: 3, glossary: 3 },
-  packSummary: p => p.core ? ' · ' + D.abilities.length + ' abilities' : '',
-  importer: { module: './lib/dsparse.mjs', hint: 'Works best with MCDM-format Draw Steel PDFs that contain selectable text', stats: dsImportStats },
-  onClick: dsOnClick,
-  pdfNotice: 'Draw Steel © MCDM Productions, LLC, used under the DRAW STEEL Creator License'
-});
 
 
 // ================= ENCOUNTER BUILDER =================
@@ -2820,8 +2818,309 @@ async function buildNegotiationPdf(N) {
   return w.bytes();
 }
 
+// Draw Steel items for Sessions (the core sess.js handles folders, pages and export):
+// combat encounters, montage tests and negotiations, plus the party used for encounter maths.
+// Registered as SYS.session in drawsteel.js.
+function syncEncToSession() {
+  const r = ENC.sessionRef; const S = sessById(r.sid); const d = S && S.docs.find(x => x.id === r.did);
+  if (!d) { delete ENC.sessionRef; return; }
+  const c = JSON.parse(JSON.stringify(ENC)); delete c.sessionRef; d.enc = c; d.title = c.name || d.title; saveSessions();
+}
+const dsSessParty = S => ({ heroes: S.heroes, level: S.level, victories: S.victories, retainers: 0 });
+function dsSessRefHtml(S, d, top) {
+  const ref = d.type === 'mtg' ? (refreshMontages(), mtById(d.ref)) : (refreshNegotiations(), negById(d.ref));
+  if (!ref) return top + `<div class="empty">This ${sessKind(d.type).label.toLowerCase()} is no longer available (was its book removed?).</div>`;
+  if (d.type === 'mtg') return top + `<div class="actrow"><a class="btn" href="#montage--${ref.id}">▶ Run this montage</a></div>
+    ${ref.intro ? `<p>${esc(ref.intro)}</p>` : ''}${ref.scene.map(x => `<div class="ra">${esc(x)}</div>`).join('')}
+    <h3>Challenges</h3>${ref.challenges.map(c => `<div class="mtch"><div class="mtch-h"><b>${esc(c.name)}</b>${c.round > 1 ? `<span class="tagk">round ${c.round}</span>` : ''}</div><p>${esc(c.desc)}</p><div class="mtsug">${c.chars.map(x => `<span class="ck">${esc(x)}</span>`).join('')}${c.skills.map(x => `<span>${esc(x)}</span>`).join('')}</div></div>`).join('')}`;
+  return top + `<div class="actrow"><a class="btn" href="#negotiation--${ref.id}">▶ Run this negotiation</a></div>
+    ${ref.intro ? `<p>${esc(ref.intro)}</p>` : ''}<p><b>Interest</b> ${ref.interest} · <b>Patience</b> ${ref.patience} · <b>Impression</b> ${ref.impression ?? '—'}${ref.language ? ' · <b>Language</b> ' + esc(ref.language) : ''}</p>
+    <h3>Motivations</h3>${ref.motivations.map(m => `<p><b>${esc(m.name)}:</b> ${esc(m.text)}</p>`).join('') || '<p class="note">None</p>'}
+    <h3>Pitfalls</h3>${ref.pitfalls.map(m => `<p><b>${esc(m.name)}:</b> ${esc(m.text)}</p>`).join('') || '<p class="note">None</p>'}`;
+}
+const DS_SESSION = {
+  planText: 'combat encounters, montages and negotiations',
+  party: [{ id: 'h', key: 'heroes', label: 'Heroes', min: 1, max: 12 }, { id: 'l', key: 'level', label: 'Level', min: 1, max: 10 }, { id: 'v', key: 'victories', label: 'Avg. Victories', min: 0 }],
+  partyNote: 'The party here is used for encounters you add to this session.',
+  newParty: () => ({ heroes: ENC?.heroes || 4, level: ENC?.level || 1, victories: ENC?.victories || 0 }),
+  partyLine: S => `${S.heroes} heroes, level ${S.level}, ${S.victories} avg. Victories`,
+  overviewExtra: S => { const encs = S.docs.filter(x => x.type === 'enc'); return encs.length ? `<p class="note">Combat this session: ${encs.map(x => esc(x.title)).join(', ')}.</p>` : ''; },
+  kinds: {
+    enc: {
+      icon: '⚔', label: 'Combat encounter', noun: 'encounter', addLabel: '⚔ Encounter',
+      summary: x => x.enc ? ' · ' + (() => { const m = encMath(x.enc); return m.diff + ', ' + m.ev + ' EV'; })() : '',
+      html(S, d, top) {
+        const E = d.enc; if (!E) return top + '<div class="empty">Missing encounter.</div>';
+        const M = encMath(E);
+        const SAVED = ENC; ENC = E; if (STONES_ON) assignStones(false); const sc = scalingHtml(); ENC = SAVED;
+        return top + `<div class="sencsum"><span class="dlabel" style="color:${DCOL[M.diff]}">${M.diff}</span> <b>${M.ev} EV</b> vs encounter strength ${M.ES} · ${E.heroes} heroes, level ${M.L}, ${E.victories} Victories · worth ${M.worth} Victor${M.worth === 1 ? 'y' : 'ies'}</div>
+      <div class="actrow"><button class="btn" id="d-open">Open in Encounter Builder</button><button class="btn ghost" id="d-repl">Replace with the builder’s current encounter</button></div>
+      ${E.groups.map(g => `<div class="grp"><div class="grp-t"><b class="gname" style="border:0">${esc(g.name)}</b></div>${g.entries.map(e => { const m = MON[e.gid]; return m ? `<div class="ent"><div class="ent-n"><a class="lnk" data-go="monsters--${m.gid}">${e.n} × ${esc(m.name)}</a>${(() => { const S2 = ENC; ENC = E; const h = entStones(g, e, m); ENC = S2; return h; })()}<span>Lv ${m.level} ${esc(m.role)} · ${isMinion(m) ? esc(m.ev) : 'EV ' + esc(m.ev)} · Stamina ${esc((m.stats || {}).Stamina || '—')}</span></div></div>` : ''; }).join('')}</div>`).join('')}
+      ${sc}`;
+      },
+      onRename: d => { if (d.enc) d.enc.name = d.title; },
+      wire(S, d) {
+        if ($('#d-open')) $('#d-open').onclick = () => { ENC = JSON.parse(JSON.stringify(d.enc)); ENC.sessionRef = { sid: S.id, did: d.id }; ENC.setup = false; store.set('enc', ENC); go('encounter'); };
+        if ($('#d-repl')) $('#d-repl').onclick = async () => { if (!ENC.groups.some(g => g.entries.length)) { toast('The encounter builder is empty'); return; } if (await confirmSheet(`Replace “${d.title}” with “${ENC.name}” from the builder?`, 'Replace')) { const c = JSON.parse(JSON.stringify(ENC)); delete c.sessionRef; d.enc = c; d.title = c.name; saveSessions(); sessionPage(S.id, d.id); } };
+      },
+      add(S, add) {
+        const party = dsSessParty(S);
+        const items = [];
+        if (ENC.groups.some(g => g.entries.length)) items.push({ id: 'cur', name: ENC.name, sub: (() => { const m = encMath(); return m.diff + ' · ' + m.ev + ' EV'; })(), group: 'In the Encounter Builder now' });
+        ENCS.forEach(e => items.push({ id: 'saved:' + e.id, name: e.name, sub: e.groups.reduce((s, g) => s + g.entries.length, 0) + ' kinds of creature', group: 'Saved encounters' }));
+        items.push({ id: 'new', name: 'Empty encounter', sub: 'Build it in the Encounter Builder', group: 'New' }, { id: 'book', name: 'From a book…', sub: 'Any delve or adventure encounter table', group: 'New' });
+        return pickerSheet('Add a combat encounter', items, id => {
+          let e;
+          if (id === 'cur') e = JSON.parse(JSON.stringify(ENC));
+          else if (id.startsWith('saved:')) e = JSON.parse(JSON.stringify(ENCS.find(x => 'saved:' + x.id === id)));
+          else if (id === 'new') e = newEnc(party);
+          else return bookEncounterSheet((p, c, i) => { const bd = bookEncounterData(p, c, i); if (!bd || !bd.groups.length) { toast('Couldn’t match any creatures in that table'); return; } const e2 = newEnc(party); e2.name = bd.name; e2.groups = bd.groups; e2.bookAdjust = bd.adj; e2.setup = false; add({ type: 'enc', title: e2.name, enc: e2 }); });
+          delete e.sessionRef; e.id = 'e' + Date.now().toString(36); e.setup = false;
+          if (id === 'new') e.name = 'Encounter ' + (S.docs.filter(x => x.type === 'enc').length + 1);
+          add({ type: 'enc', title: e.name, enc: e });
+        });
+      },
+      async pdf(S, d) { if (!d.enc.groups.some(g => g.entries.some(e => MON[e.gid]))) return null; const b = await buildEncounterPdf(d.enc); saveSessions(); return b; }
+    },
+    mtg: {
+      icon: '🏃', label: 'Montage test', noun: 'montage', addLabel: '🏃 Montage',
+      html: dsSessRefHtml,
+      add(S, add) { refreshMontages(); return pickerSheet('Add a montage test', allMt().map(m => ({ id: m.id, name: m.name, sub: m.challenges.length + ' challenges', group: m.user ? 'Your montages' : (PK[m.pack]?.title || '') })), id => add({ type: 'mtg', ref: id, title: mtById(id).name })); },
+      pdf(S, d) { refreshMontages(); const m = mtById(d.ref); return m ? buildMontagePdf(m) : null; }
+    },
+    neg: {
+      icon: '🗣', label: 'Negotiation', noun: 'negotiation', addLabel: '🗣 Negotiation',
+      html: dsSessRefHtml,
+      add(S, add) { refreshNegotiations(); return pickerSheet('Add a negotiation', allNegs().map(n => ({ id: n.id, name: n.name, sub: `Interest ${n.interest} · Patience ${n.patience}`, group: n.user ? 'Your negotiations' : (PK[n.pack]?.title || '') })), id => add({ type: 'neg', ref: id, title: negById(id).name })); },
+      pdf(S, d) { refreshNegotiations(); const n = negById(d.ref); return n ? buildNegotiationPdf(n) : null; }
+    }
+  }
+};
 
-// ================= PRINTING: shared PDF writer, montage & negotiation sheets, markdown =================
+// Draw Steel card kinds for the core card generator (cards.js): treasure cards, retainer and
+// follower cards, Draw Steel quest rewards and how rewards are found in adventure text.
+// Registered as SYS.cards in register.js. (Moved verbatim from cards.js where possible.)
+
+const DS_CARD_COL = { Consumable: '#3d7a4a', Trinket: '#2d5f8a', Leveled: '#6b3fa0', Artifact: '#a8322d', quest: '#a87a1e', follower: '#2a7f7a', retainer: '#7a4a2a' };
+
+const REWARD_LABELS = ['Victories', 'Title', 'Treasure', 'Project Source', 'Renown', 'Wealth', 'Retainer', 'Other'];
+
+const CRAFT_RE = /^(Item Prerequisite|Project Source|Project Roll Characteristic|Project Goal)s?:/i;
+
+const retainerList = () => MONS.filter(m => /Retainer/i.test(m.role || ''));
+
+function itemCard(t, craft) {
+  const sub = [t.type === 'Leveled' ? 'Leveled ' + (t.sub || 'treasure').toLowerCase() : t.type, t.echelon ? ORD(t.echelon) + ' echelon' : ''].filter(Boolean).join(' · ');
+  const paras = [];
+  for (const b of t.body || []) {
+    const html = (b.html || (b.text ? esc(b.text) : '')).trim(); if (!html) continue;
+    const txt = strip(html);
+    if (/^Keywords?:/i.test(txt)) continue;
+    if (!craft && CRAFT_RE.test(txt)) continue;
+    if (b.t === 'tier') { paras.push(`<b>${['', '≤11', '12–16', '17+'][b.n]}:</b> ${html}`); continue; }
+    html.split(/(?=<b>\s*\d+(?:st|nd|rd|th) Level)/).forEach(h => paras.push((b.t === 'li' ? '• ' : '') + h.trim()));
+  }
+  return { name: t.name, sub, keywords: t.keywords || '', paras, color: DS_CARD_COL[t.type] || '#555555', back: t.type || 'Treasure', foot: 'Draw Steel' + (t.src?.pg ? ' · Heroes p. ' + t.src.pg : '') };
+}
+
+const tierTxt = rows => { const t = rows.filter(r => r.k === 'tier'); return t.length ? t.map(r => `<b>${['', '≤11', '12–16', '17+'][r.n]}</b> ${r.html}`).join('; ') : ''; };
+
+function followerCard(f) {
+  if (f.type === 'retainer') {
+    const m = MON[f.gid]; if (!m) return { name: f.name || 'Retainer', sub: 'Retainer (stat block not found)', paras: [], color: DS_CARD_COL.retainer, back: 'Retainer' };
+    const st = m.stats || {}, ch = m.chars || {};
+    const stats = [['Stamina', st.Stamina], ['Speed', (st.Speed || '') + (m.movement && m.movement !== '—' ? '*' : '')], ['Size', st.Size], ['Stability', st.Stability], ['Free strike', st['Free Strike']], ['Might', ch.Might], ['Agility', ch.Agility], ['Reason', ch.Reason], ['Intuition', ch.Intuition], ['Presence', ch.Presence]].filter(x => x[1] != null && x[1] !== '');
+    const paras = [];
+    if (f.name) paras.push(`<i>${esc(m.name)}${m.desc ? ' · ' + esc(m.desc) : ''}</i>`);
+    const misc = [m.movement && m.movement !== '—' ? '<b>*Movement:</b> ' + esc(m.movement) : '', m.immunity && m.immunity !== '—' ? '<b>Immunity:</b> ' + esc(m.immunity) : '', m.weakness && m.weakness !== '—' ? '<b>Weakness:</b> ' + esc(m.weakness) : ''].filter(Boolean);
+    if (misc.length) paras.push(misc.join(' · '));
+    for (const a of m.items || []) {
+      const head = `<b>${esc(a.name)}${a.action ? '' : '.'}</b>${a.action ? ` <i>(${esc([a.action, a.distance, a.target].filter(Boolean).join(', '))})</i>` : ''}`;
+      const fields = (a.rows || []).filter(r => r.k === 'field').map(r => r.html).join(' ');
+      const tiers = tierTxt(a.rows || []);
+      paras.push(head + (tiers ? ' ' + tiers + '.' : '') + (fields ? ' ' + fields : ''));
+    }
+    if (f.notes) paras.push(esc(f.notes));
+    paras.push('<b>Mentor:</b> ____________________');
+    return { name: f.name || m.name, sub: `Level ${m.level} ${m.role}`, keywords: '', stats, paras, color: DS_CARD_COL.retainer, back: 'Retainer', foot: (PK[m.pack]?.title || '') + (m.pg ? ' p. ' + m.pg : '') };
+  }
+  const art = f.type === 'artisan';
+  const chars = { Might: 0, Agility: 0, Reason: 1, Intuition: art ? 0 : 1, Presence: 0 }; if (art) chars[f.char === 'Agility' ? 'Agility' : 'Might'] = 1;
+  const stats = Object.entries(chars).map(([k, v]) => [k, (v > 0 ? '+' : '') + v]);
+  const langs = ['Caelian', ...(f.languages || []).filter(Boolean)];
+  const paras = [`<b>Skills:</b> ${esc((f.skills || []).join(', ') || '—')}`, `<b>Languages:</b> ${esc(langs.join(', '))}`,
+    `${art ? 'A crafting expert' : 'A research expert'}. Contributes one project roll per day to a downtime project you choose, whether you spend those days in respite, adventuring, or other activities. Must remain at your stronghold or the project site, with access to the necessary materials.`];
+  if (f.notes) paras.push(esc(f.notes));
+  return { name: f.name || (art ? 'Artisan' : 'Sage'), sub: (art ? 'Artisan' : 'Sage') + ' follower' + (f.ancestry ? ' · ' + f.ancestry : ''), keywords: '', stats, paras, color: DS_CARD_COL.follower, back: 'Follower', foot: 'Draw Steel · Heroes p. 350' };
+}
+
+const DS_CARD_ICONS = { Consumable: 'gi:potion-ball', Trinket: 'gi:gem-pendant', Artifact: 'gi:crystal-ball', Weapon: 'gi:broadsword', Armor: 'gi:breastplate', Implement: 'gi:wizard-staff', Other: 'gi:gem-chain', Leveled: 'gi:crossed-swords', quest: 'gi:scroll-unfurled', retainer: 'gi:swordman', artisan: 'gi:anvil-impact', sage: 'gi:spell-book' };
+
+// ---- follower editor ----
+function followerEditor(f0) {
+  const isNew = !f0.id; const f = JSON.parse(JSON.stringify({ name: '', ancestry: '', skills: [], languages: ['', ''], char: 'Might', notes: '', ...f0 }));
+  const el = document.createElement('div'); el.className = 'dlg';
+  const rets = retainerList(); const byPack = {}; rets.forEach(m => (byPack[m.pack] = byPack[m.pack] || []).push(m));
+  if (f.type === 'retainer' && !f.gid && rets[0]) f.gid = rets[0].gid;
+  const draw = () => {
+    const grp = f.type === 'artisan' ? 'Crafting' : 'Lore';
+    const skills = D.skills.filter(s => s.group === grp).map(s => s.name);
+    el.innerHTML = `<div class="dlg-b negedit"><h2>${isNew ? 'New' : 'Edit'} ${f.type === 'retainer' ? 'retainer' : f.type} card</h2>
+      ${f.type === 'retainer' ? `<label class="negnotes">Retainer<select id="fe-g">${Object.entries(byPack).map(([p, ms]) => `<optgroup label="${esc(PK[p]?.title || p)}">${ms.map(m => `<option value="${m.gid}" ${f.gid === m.gid ? 'selected' : ''}>${esc(m.name)} (level ${m.level} ${esc(m.role.replace(/ Retainer$/, ''))})</option>`).join('')}</optgroup>`).join('')}</select></label>
+        ${!rets.length ? '<div class="warn">No retainer stat blocks found. Retainers come from the Monsters book.</div>' : ''}
+        <label class="negnotes">Name (optional)<input id="fe-n" value="${esc(f.name)}" placeholder="Leave empty to use the stat block’s name"></label>`
+      : `<div class="mtrow"><label>Name<input id="fe-n" value="${esc(f.name)}"></label><label>Ancestry<input id="fe-a" value="${esc(f.ancestry)}"></label>${f.type === 'artisan' ? `<label>Characteristic at 1<select id="fe-c"><option ${f.char === 'Might' ? 'selected' : ''}>Might</option><option ${f.char === 'Agility' ? 'selected' : ''}>Agility</option></select></label>` : ''}</div>
+        <div class="negnotes">Four ${grp.toLowerCase()} skills (${f.skills.length}/4)</div>
+        <div class="fskills">${skills.map(s => `<label><input type="checkbox" data-sk="${esc(s)}" ${f.skills.includes(s) ? 'checked' : ''}> ${esc(s)}</label>`).join('')}</div>
+        <div class="mtrow"><label>Languages: Caelian +<input id="fe-l1" value="${esc(f.languages[0] || '')}"></label><label>and<input id="fe-l2" value="${esc(f.languages[1] || '')}"></label></div>`}
+      <label class="negnotes">Notes (optional)<input id="fe-x" value="${esc(f.notes)}"></label>
+      <div class="dlgfoot">${!isNew ? '<button class="btn danger" id="fe-del">Delete</button>' : ''}<span style="flex:1"></span><button class="btn ghost" id="fe-q">Cancel</button><button class="btn" id="fe-ok">${isNew ? 'Add card' : 'Save'}</button></div></div>`;
+    const keep = () => { f.name = $('#fe-n', el).value.trim(); f.notes = $('#fe-x', el).value.trim(); if ($('#fe-g', el)) f.gid = $('#fe-g', el).value; if ($('#fe-a', el)) f.ancestry = $('#fe-a', el).value.trim(); if ($('#fe-c', el)) f.char = $('#fe-c', el).value; if ($('#fe-l1', el)) f.languages = [$('#fe-l1', el).value.trim(), $('#fe-l2', el).value.trim()]; };
+    $$('[data-sk]', el).forEach(c => c.onchange = () => { keep(); const s = c.dataset.sk; if (c.checked) { if (f.skills.length >= 4) { toast('A follower knows four skills'); c.checked = false; return; } f.skills.push(s); } else f.skills = f.skills.filter(x => x !== s); draw(); });
+    $('#fe-q', el).onclick = () => el.remove();
+    if ($('#fe-del', el)) $('#fe-del', el).onclick = async () => { if (await confirmSheet('Delete this card?', 'Delete')) { CARDS.followers = CARDS.followers.filter(x => x.id !== f.id); CARDS.deck = CARDS.deck.filter(x => !(x.k === 'follower' && x.id === f.id)); saveCards(); el.remove(); cardsPage(); } };
+    $('#fe-ok', el).onclick = () => { keep(); if (f.type === 'retainer' && !MON[f.gid]) { toast('Pick a retainer'); return; } if (!f.id) { f.id = uid('f'); CARDS.followers.push(f); addToDeck('follower', f.id); } else { const i = CARDS.followers.findIndex(x => x.id === f.id); CARDS.followers[i] = f; } CARDS.tab = 'follower'; saveCards(); el.remove(); cardsPage(); };
+  };
+  draw(); document.body.appendChild(el);
+}
+
+const NUMWORD = { one: 1, two: 2, three: 3, four: 4, five: 5, a: 1, an: 1 };
+function sectionRewards(blocks) {
+  const R = { vic: 0, treasure: [], title: [], renown: 0, wealth: 0, source: [], retainer: [], other: [] };
+  const add = (arr, v) => { v = v.trim().replace(/\s+/g, ' '); const k = v.toLowerCase().replace(/s$/, ''); if (v && !arr.some(x => x.toLowerCase().replace(/s$/, '') === k)) arr.push(v); };
+  const tnames = D.treasures.map(t => t.name).sort((a, b) => b.length - a.length);
+  for (const b of blocks) {
+    if (b.t === 'h') { const m = b.text.match(/^Title:\s*(.+)$/i); if (m) add(R.title, m[1]); continue; }
+    const txt = strip(b.html || (b.rows ? b.rows.flat().join(' ') : '') || '');
+    let m; const vre = /\b(?:earns?|gains?)\s+(\d+|one|two|three|four|five)\s+(?:additional\s+)?Victor(?:y|ies)\b/gi;
+    while ((m = vre.exec(txt))) R.vic = Math.max(R.vic, +m[1] || NUMWORD[m[1].toLowerCase()] || 0);
+    const tre = /\(see\s+([^)]*?)\s+in\s+Treasures?\s+in\s+Handouts\)|((?:[A-Z][\w’'\-]*\s?){1,5})\s*\(see\s+Treasures?\s+in\s+Handouts\)/g;
+    while ((m = tre.exec(txt))) add(R.treasure, (m[1] || m[2]).replace(/^(?:a|an|the)\s+/i, ''));
+    for (const n of tnames) if (new RegExp('\\b' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(txt) && !R.treasure.some(x => x.includes(n))) add(R.treasure, n);
+    const rre = /\bgains?\s+(\d+|one|two)\s+Renown/gi; while ((m = rre.exec(txt))) R.renown = Math.max(R.renown, +m[1] || NUMWORD[m[1].toLowerCase()]);
+    const wre = /Wealth\s+(?:score\s+)?(?:increases|goes up)\s+by\s+(\d+|one|two)/gi; while ((m = wre.exec(txt))) R.wealth = Math.max(R.wealth, +m[1] || NUMWORD[m[1].toLowerCase()]);
+    const pre = /project source (?:for|of) (?:an? |the )?([A-Z][\w’'\- ]+)/gi; while ((m = pre.exec(txt))) add(R.source, m[1]);
+    const tie = /([A-Z][\w’'\- ]+?)\s+title\s+\(see Titles/g; while ((m = tie.exec(txt))) add(R.title, m[1]);
+    if (/becom\w* a retainer/i.test(txt)) { const who = txt.match(/([A-Z][\w’']+)\s+(?:also\s+)?pledges/); if (who) add(R.retainer, who[1]); }
+  }
+  return R;
+}
+function questsFromChapter(pack, ch, L) {
+  const B = ch.blocks; const out = [];
+  const leadDesc = name => { const li = B.find(b => b.t === 'li' && new RegExp('^\\s*<b>\\s*' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:?\\s*</b>', 'i').test(b.html || '')); return li ? strip(li.html).replace(/^[^:]+:\s*/, '') : ''; };
+  for (let i = 0; i < B.length; i++) {
+    const h = B[i]; if (h.t !== 'h' || h.lvl !== L) continue;
+    let end = B.length; for (let k = i + 1; k < B.length; k++) if (B[k].t === 'h' && B[k].lvl <= L) { end = k; break; }
+    const sec = B.slice(i + 1, end);
+    // scenes one level down are added up; inside a scene, alternative outcomes take the best
+    const subL = Math.min(...sec.filter(b => b.t === 'h').map(b => b.lvl).concat([99]));
+    const isScene = b => b.t === 'h' && b.lvl === subL && subL <= L + 2 && !/^(Total|Partial|Victor|Reward|Ending|Encounter Adjust|Tactics|Terrain|Development)/i.test(b.text);
+    let vic = 0; const R = sectionRewards(sec);
+    if (subL < 99 && sec.some(isScene)) { let cur = []; const parts = []; for (const b of sec) { if (isScene(b)) { parts.push(cur); cur = []; } cur.push(b); } parts.push(cur); vic = parts.reduce((s, p) => s + sectionRewards(p).vic, 0); } else vic = R.vic;
+    let desc = leadDesc(h.text);
+    if (!desc) { const p = sec.find(b => (b.t === 'p') && !/^[“"]/.test(strip(b.html || '')) && strip(b.html || '').length > 40); desc = p ? strip(p.html) : ''; }
+    if (desc.length > 260) { const cut = desc.slice(0, 260); desc = cut.slice(0, Math.max(cut.lastIndexOf('. ') + 1, 180)) || cut; if (!/[.!?]$/.test(desc)) desc += '…'; }
+    const rewards = [];
+    if (vic) rewards.push({ label: 'Victories', value: (sec.some(isScene) ? 'up to ' : '') + vic });
+    R.title.forEach(v => rewards.push({ label: 'Title', value: v }));
+    R.treasure.forEach(v => rewards.push({ label: 'Treasure', value: v }));
+    R.source.forEach(v => rewards.push({ label: 'Project Source', value: v }));
+    if (R.renown) rewards.push({ label: 'Renown', value: '+' + R.renown });
+    if (R.wealth) rewards.push({ label: 'Wealth', value: '+' + R.wealth });
+    R.retainer.forEach(v => rewards.push({ label: 'Retainer', value: v }));
+    out.push({ id: uid('q'), title: h.text, text: desc, rewards, source: `${pack.title} · ${ch.title}`, pg: h.pg });
+  }
+  return out;
+}
+
+// ---- the Draw Steel part of the card generator (SYS.cards) ----
+const dsTreasuresByType = () => { const byType = {}; D.treasures.forEach(t => (byType[t.type] = byType[t.type] || []).push(t)); return byType; };
+const DS_CARDS = {
+  intro: 'treasures, quests, followers and retainers',
+  tabs: [['item', 'Items'], ['quest', 'Quests'], ['follower', 'Followers & retainers']],
+  icons: DS_CARD_ICONS,
+  rewards: {
+    labels: REWARD_LABELS,
+    hints: { Victories: '2', Title: 'Fey Friend', Treasure: 'Healing Potion', 'Project Source': 'Quantum Satchel', Renown: '+1', Wealth: '+1', Retainer: 'Lamprey', Other: '' },
+    defaults: [{ label: 'Victories', value: '' }, { label: 'Treasure', value: '' }]
+  },
+  questsFromChapter,
+  questRewardsText: 'Victories, treasures, titles, Renown and retainers',
+  optionsHtml: () => `<label class="row-c"><input type="checkbox" id="c-craft" ${CARDS.craft ? 'checked' : ''}> Crafting info</label>`,
+  wireOptions: re => { $('#c-craft').onchange = e => { CARDS.craft = e.target.checked; re(); }; },
+  kinds: {
+    item: {
+      entry(d) { const t = D.treasures.find(x => x.id === d.id); const e = t && { label: t.name, kind: t.type, c: itemCard(t, CARDS.craft) }; if (e) e.c.hint = t.type === 'Leveled' ? (t.sub || 'Leveled') : t.type; return e; },
+      adder() { const T = D.treasures, byType = dsTreasuresByType(); return `<div class="cardadd"><div class="csearch">${ico('search', 16)}<input id="c-q" placeholder="Search ${T.length} treasures…" autocomplete="off"><div id="c-qres" class="cqres"></div></div>
+      <select id="c-addall"><option value="">Add all of a type…</option>${Object.keys(byType).map(ty => `<option>${esc(ty)}</option>`).join('')}</select></div>`; },
+      wire(re) {
+        const T = D.treasures, byType = dsTreasuresByType();
+      const cq = $('#c-q');
+      if (cq) {
+        const show = () => { const q = cq.value.trim().toLowerCase(); const box = $('#c-qres'); if (!q) { box.innerHTML = ''; box.classList.remove('on'); return; }
+          const hits = T.filter(t => (t.name + ' ' + t.type + ' ' + (t.keywords || '') + ' ' + (t.sub || '')).toLowerCase().includes(q)).sort((a, b) => (b.name.toLowerCase().startsWith(q) - a.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name)).slice(0, 12);
+          box.innerHTML = hits.map(t => { const c = { name: t.name, hint: t.type === 'Leveled' ? (t.sub || 'Leveled') : t.type }; return `<button data-addi="${t.id}"><span class="cd-ic" style="--cc:${DS_CARD_COL[t.type] || '#555'}">${iconSvg(autoIcon(c))}</span><b>${esc(t.name)}</b><small>${esc(t.type)}${t.echelon ? ' · ' + ORD(t.echelon) + ' echelon' : ''}</small>${CARDS.deck.some(x => x.k === 'item' && x.id === t.id) ? '<em>in deck</em>' : ''}</button>`; }).join('') || '<div class="empty">No treasure matches.</div>';
+          box.classList.add('on');
+          $$('[data-addi]', box).forEach(b => b.onmousedown = e => { e.preventDefault(); addToDeck('item', b.dataset.addi); saveCards(); cardsPage(); setTimeout(() => { const n = $('#c-q'); if (n) { n.value = cq.value; n.focus(); n.dispatchEvent(new Event('input')); } }, 0); });
+        };
+        cq.oninput = show; cq.onfocus = show; cq.onblur = () => setTimeout(() => $('#c-qres')?.classList.remove('on'), 150);
+        cq.onkeydown = e => { if (e.key === 'Enter') { const f = $('#c-qres [data-addi]'); if (f) f.dispatchEvent(new MouseEvent('mousedown')); } if (e.key === 'Escape') { cq.value = ''; show(); } };
+        $('#c-addall').onchange = e => { const ty = e.target.value; if (!ty) return; byType[ty].forEach(t => { if (!CARDS.deck.some(x => x.k === 'item' && x.id === t.id)) CARDS.deck.push({ k: 'item', id: t.id, n: 1 }); }); re(); };
+      }
+      }
+    },
+    follower: {
+      entry(d) { const f = CARDS.followers.find(x => x.id === d.id); const e = f && { label: f.name || MON[f.gid]?.name || f.type, kind: f.type === 'retainer' ? 'Retainer' : f.type === 'artisan' ? 'Artisan' : 'Sage', c: followerCard(f), obj: f }; if (e) e.c.hint = f.type; return e; },
+      adder: () => `<div class="cardadd"><button class="btn" id="f-ret">+ Retainer</button><button class="btn ghost" id="f-art">+ Artisan</button><button class="btn ghost" id="f-sage">+ Sage</button></div>`,
+      wire() { $('#f-ret').onclick = () => followerEditor({ type: 'retainer' }); $('#f-art').onclick = () => followerEditor({ type: 'artisan' }); $('#f-sage').onclick = () => followerEditor({ type: 'sage' }); }
+    }
+  }
+};
+
+// Registers Draw Steel with the core. Loaded LAST of the Draw Steel files (see SYSTEM_FILES in
+// mksite.py): the object below is built at load time, so everything it names must already exist.
+// Hook contract: see registerSystem in app.js.
+registerSystem({
+  id: 'drawsteel', name: 'Draw Steel',
+  data: { file: 'data/heroes.json', loading: 'Loading the rules…' },
+  init: initHeroes,
+  corePack: () => ({ id: 'heroes', title: 'Draw Steel: Heroes', kind: 'core', builtin: true, chapters: D.book, monsters: [], abilities: [], heroes: true }),
+  builtin: BUILTIN,
+  lists: DS_LISTS,
+  menu: dsMenu, home: dsHome, browse: dsBrowse,
+  routes: {
+    encounter: () => encounterPage(),
+    respite: () => respitePage(),
+    negotiation: b => b ? negotiationPage(b) : negotiationHub(),
+    montage: b => b ? montagePage(b) : montageHub(),
+    classes: b => b ? classPage(b) : classIndex()
+  },
+  packRoutes: ['monsters', 'negotiation', 'montage', 'encounter'],
+  renderMonster, renderAbility,
+  renderBlock: dsRenderBlock, afterHeading: dsAfterHeading, afterTable: dsAfterTable, chapterExtras: dsChapterExtras,
+  onAddPack: dsOnAddPack,
+  entityMeta: dsEntityMeta, entitySource: dsEntitySource, preview: dsPreview,
+  pinGroups: [
+    { type: 'monsters', title: ms => `Monsters · ${ms.reduce((s, m) => s + (parseInt(m.ev) || 0), 0)} EV total`, render: m => renderMonster(m) },
+    { type: 'abilities', title: () => 'Abilities', render: a => renderAbility(a) }
+  ],
+  linkTypes: ['conditions'],
+  noLink: '.ab-n,.ma-n,.mon-n,.pot,.chr',   // names inside ability cards and stat blocks are never auto-linked
+  searchExtra: dsSearchExtra, searchIndex: dsSearchIndex,
+  searchPriority: { conditions: 0, classes: 0, ancestries: 1, kits: 2, monsters: 2, abilities: 3, glossary: 3 },
+  packSummary: p => p.core ? ' · ' + D.abilities.length + ' abilities' : '',
+  importer: { module: './lib/dsparse.mjs', hint: 'Works best with MCDM-format Draw Steel PDFs that contain selectable text', stats: dsImportStats },
+  onClick: dsOnClick,
+  pdfNotice: 'Draw Steel © MCDM Productions, LLC, used under the DRAW STEEL Creator License',
+  session: DS_SESSION,
+  cards: DS_CARDS,
+  roller: { title: 'Power roll (2d10)', html: DS_ROLLER_HTML, mount: dsMountRoller },
+  notice: 'Vanadium is an independent product published under the DRAW STEEL Creator License and is not affiliated with MCDM Productions, LLC. DRAW STEEL © 2024 MCDM Productions, LLC.',
+  syncWhat: 'sessions, encounters, montages, negotiations, cards, pins, characters, Respite heroes, settings',
+});
+
+
+// ================= PRINTING: shared PDF writer, file delivery, markdown (system sheets live in systems/*) =================
 // ---------- pdf-lib, WinAnsi text and file delivery (moved from enc.js: used by every PDF) ----------
 let PDFLib = null;
 async function loadPdfLib() { if (!PDFLib) PDFLib = await import('./lib/pdf-lib.esm.min.js'); return PDFLib; }
@@ -3017,27 +3316,26 @@ async function buildMarkdownPdf(title, src, sub) {
 
 
 // ================= SESSIONS =================
+// One folder per game night. Pages (markdown) are built in; everything else a session can hold
+// comes from the game system (SYS.session.kinds, e.g. Draw Steel encounters, montages,
+// negotiations), together with the party fields shown on the overview (SYS.session.party).
 let SESSIONS = store.get('sessions', []);
 const saveSessions = () => store.set('sessions', SESSIONS);
 const sessById = id => SESSIONS.find(s => s.id === id);
-const DOCICON = { page: '📝', enc: '⚔', mtg: '🏃', neg: '🗣' };
-const DOCKIND = { page: 'Page', enc: 'Combat encounter', mtg: 'Montage test', neg: 'Negotiation' };
+const SESS_PAGE = { icon: '📝', label: 'Page' };
+const sessKind = t => t === 'page' ? SESS_PAGE : ((SYS.session || {}).kinds || {})[t] || { icon: '•', label: t };
+const sessKinds = () => Object.entries((SYS.session || {}).kinds || {});
 const today = () => new Date().toISOString().slice(0, 10);
 function newSessionObj() {
   const n = SESSIONS.length + 1;
-  return { id: 's' + Date.now().toString(36), name: 'Session ' + n, date: today(), heroes: ENC?.heroes || 4, level: ENC?.level || 1, victories: ENC?.victories || 0,
+  return { id: 's' + Date.now().toString(36), name: 'Session ' + n, date: today(), ...(SYS.session?.newParty ? SYS.session.newParty() : {}),
     docs: [{ id: 'd' + Date.now().toString(36), type: 'page', title: 'Session plan', md: '# Session ' + n + '\n\n## Recap\n\n- \n\n## Scenes\n\n1. \n\n> Read-aloud text goes in a quote block like this.\n\n## Loose ends\n\n- [ ] \n' }] };
-}
-function syncEncToSession() {
-  const r = ENC.sessionRef; const S = sessById(r.sid); const d = S && S.docs.find(x => x.id === r.did);
-  if (!d) { delete ENC.sessionRef; return; }
-  const c = JSON.parse(JSON.stringify(ENC)); delete c.sessionRef; d.enc = c; d.title = c.name || d.title; saveSessions();
 }
 function sessionsHub() {
   $('#main').innerHTML = `<div class="neghub"><h1>Sessions</h1>
-    <p class="note">One folder per game night. Write notes and read-aloud text in markdown, add the combat encounters, montages and negotiations you plan to run, and export the whole session as one PDF for the table.</p>
+    <p class="note">One folder per game night. Write notes and read-aloud text in markdown, add the ${esc(SYS.session?.planText || 'material')} you plan to run, and export the whole session as one PDF for the table.</p>
     <div class="negacts"><button class="btn" id="snew">+ New session</button></div>
-    ${SESSIONS.length ? `<div class="negg">${SESSIONS.map(s => `<a class="negc sesc" href="#session--${s.id}"><b>${esc(s.name)}</b><span>${esc(s.date || '')} · ${s.docs.length} item${s.docs.length === 1 ? '' : 's'}</span><em>${s.docs.map(d => DOCICON[d.type] + ' ' + esc(d.title)).slice(0, 4).join(' · ')}${s.docs.length > 4 ? ' …' : ''}</em></a>`).join('')}</div>` : '<div class="empty">No sessions yet.</div>'}</div>`;
+    ${SESSIONS.length ? `<div class="negg">${SESSIONS.map(s => `<a class="negc sesc" href="#session--${s.id}"><b>${esc(s.name)}</b><span>${esc(s.date || '')} · ${s.docs.length} item${s.docs.length === 1 ? '' : 's'}</span><em>${s.docs.map(d => sessKind(d.type).icon + ' ' + esc(d.title)).slice(0, 4).join(' · ')}${s.docs.length > 4 ? ' …' : ''}</em></a>`).join('')}</div>` : '<div class="empty">No sessions yet.</div>'}</div>`;
   $('#snew').onclick = () => { const s = newSessionObj(); SESSIONS.unshift(s); saveSessions(); go('session--' + s.id + '--' + s.docs[0].id); };
   document.title = 'Sessions — Vanadium';
 }
@@ -3046,20 +3344,21 @@ function sessionPage(sid, did) {
   const S = sessById(sid); if (!S) { go('sessions'); return; }
   if (!PACKS.length) { $('#main').innerHTML = '<div class="empty">Loading…</div>'; return; }
   const d = did ? S.docs.find(x => x.id === did) : null;
+  const party = SYS.session?.party || [];
+  const nouns = ['page', ...sessKinds().map(([, k]) => k.noun)];
   const nav = `<div class="bk-books"><a class="ch" href="#sessions">← All sessions</a></div>
     <div class="sess-meta"><input id="s-name" value="${esc(S.name)}" aria-label="Session name"><input id="s-date" type="date" value="${esc(S.date || '')}"></div>
     <a class="ch ${!d ? 'cur' : ''}" href="#session--${S.id}">Overview</a>
-    ${S.docs.map((x, i) => `<div class="sdoc ${d && d.id === x.id ? 'cur' : ''}"><a href="#session--${S.id}--${x.id}"><span class="di">${DOCICON[x.type]}</span>${esc(x.title || DOCKIND[x.type])}</a><span class="sdoc-b"><button data-up="${i}" title="Move up">↑</button><button data-dn="${i}" title="Move down">↓</button></span></div>`).join('')}
-    <div class="sadd"><b>Add</b><button class="btn ghost sm" data-add="page">📝 Page</button><button class="btn ghost sm" data-add="enc">⚔ Encounter</button><button class="btn ghost sm" data-add="mtg">🏃 Montage</button><button class="btn ghost sm" data-add="neg">🗣 Negotiation</button></div>
+    ${S.docs.map((x, i) => `<div class="sdoc ${d && d.id === x.id ? 'cur' : ''}"><a href="#session--${S.id}--${x.id}"><span class="di">${sessKind(x.type).icon}</span>${esc(x.title || sessKind(x.type).label)}</a><span class="sdoc-b"><button data-up="${i}" title="Move up">↑</button><button data-dn="${i}" title="Move down">↓</button></span></div>`).join('')}
+    <div class="sadd"><b>Add</b><button class="btn ghost sm" data-add="page">📝 Page</button>${sessKinds().map(([t, k]) => `<button class="btn ghost sm" data-add="${t}">${k.addLabel}</button>`).join('')}</div>
     <div class="sadd"><button class="btn" id="s-export">⬇ Export this session</button><button class="btn ghost sm danger" id="s-del">Delete session</button></div>`;
   let main = '';
   if (!d) {
-    const encs = S.docs.filter(x => x.type === 'enc');
     main = `<h1 class="chap-title">${esc(S.name)}</h1><div class="kind">${esc(S.date || '')}</div>
-      <div class="party dlgp" style="margin:12px 0"><label>Heroes<input type="number" id="s-h" min="1" max="12" value="${S.heroes}"></label><label>Level<input type="number" id="s-l" min="1" max="10" value="${S.level}"></label><label>Avg. Victories<input type="number" id="s-v" min="0" value="${S.victories}"></label></div>
-      <p class="note">The party here is used for encounters you add to this session.</p>
-      <div class="soverview">${S.docs.map(x => `<a class="beitem" href="#session--${S.id}--${x.id}"><b>${DOCICON[x.type]} ${esc(x.title || DOCKIND[x.type])}</b><span>${DOCKIND[x.type]}${x.type === 'enc' && x.enc ? ' · ' + (() => { const m = encMath(x.enc); return m.diff + ', ' + m.ev + ' EV'; })() : ''}${x.type === 'page' ? ' · ' + (x.md || '').split(/\s+/).filter(Boolean).length + ' words' : ''}</span></a>`).join('') || '<div class="empty">Nothing in this session yet. Add a page, encounter, montage or negotiation.</div>'}</div>
-      ${encs.length ? `<p class="note">Combat this session: ${encs.map(x => esc(x.title)).join(', ')}.</p>` : ''}`;
+      ${party.length ? `<div class="party dlgp" style="margin:12px 0">${party.map(f => `<label>${f.label}<input type="number" id="s-${f.id}" min="${f.min}"${f.max != null ? ` max="${f.max}"` : ''} value="${S[f.key]}"></label>`).join('')}</div>
+      <p class="note">${SYS.session.partyNote}</p>` : ''}
+      <div class="soverview">${S.docs.map(x => `<a class="beitem" href="#session--${S.id}--${x.id}"><b>${sessKind(x.type).icon} ${esc(x.title || sessKind(x.type).label)}</b><span>${sessKind(x.type).label}${sessKind(x.type).summary ? sessKind(x.type).summary(x) : ''}${x.type === 'page' ? ' · ' + (x.md || '').split(/\s+/).filter(Boolean).length + ' words' : ''}</span></a>`).join('') || `<div class="empty">Nothing in this session yet. Add a ${nouns.length > 1 ? nouns.slice(0, -1).join(', ') + ' or ' + nouns[nouns.length - 1] : nouns[0]}.</div>`}</div>
+      ${SYS.session?.overviewExtra ? SYS.session.overviewExtra(S) : ''}`;
   } else main = sessDocHtml(S, d);
   $('#main').innerHTML = `<div class="bk sess"><div class="bk-nav" id="bnav">${nav}</div><div class="bk-main" id="bmain">${main}</div>
     <button class="mtoc-btn" id="mtoc"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Session</button></div>`;
@@ -3071,45 +3370,29 @@ function sessionPage(sid, did) {
   $$('[data-add]').forEach(b => b.onclick = () => sessAdd(S, b.dataset.add));
   $('#s-export').onclick = () => exportSession(S, $('#s-export'));
   $('#s-del').onclick = async () => { if (await confirmSheet(`Delete “${S.name}” and everything in it?`, 'Delete')) { SESSIONS = SESSIONS.filter(x => x !== S); saveSessions(); go('sessions'); } };
-  if (!d) ['h', 'l', 'v'].forEach(k => { const el = $('#s-' + k); el.onchange = () => { S[{ h: 'heroes', l: 'level', v: 'victories' }[k]] = Math.max(k === 'v' ? 0 : 1, +el.value || 0); saveSessions(); }; });
+  if (!d) party.forEach(f => { const el = $('#s-' + f.id); el.onchange = () => { S[f.key] = Math.max(f.min, +el.value || 0); saveSessions(); }; });
   if (d) wireSessDoc(S, d);
   document.title = (d ? d.title + ' · ' : '') + S.name + ' — Vanadium';
 }
 function sessDocHtml(S, d) {
-  const top = `<div class="sdoc-top"><input id="d-title" class="encname" value="${esc(d.title)}" aria-label="Title"><div class="negtb">${d.type === 'page' ? `<button class="btn ghost sm" id="d-edit">${sessEdit ? 'Done' : 'Edit'}</button>` : ''}<button class="btn ghost sm" id="d-pdf">PDF</button><button class="btn ghost sm danger" id="d-del">Remove</button></div></div><div class="kind">${DOCKIND[d.type]}</div>`;
+  const top = `<div class="sdoc-top"><input id="d-title" class="encname" value="${esc(d.title)}" aria-label="Title"><div class="negtb">${d.type === 'page' ? `<button class="btn ghost sm" id="d-edit">${sessEdit ? 'Done' : 'Edit'}</button>` : ''}<button class="btn ghost sm" id="d-pdf">PDF</button><button class="btn ghost sm danger" id="d-del">Remove</button></div></div><div class="kind">${sessKind(d.type).label}</div>`;
   if (d.type === 'page') {
     if (sessEdit) return top + `<div class="mdedit"><textarea id="d-md" spellcheck="true">${esc(d.md || '')}</textarea><div class="rd mdprev" id="d-prev">${mdHtml(d.md)}</div></div>
       <p class="note">Markdown: <code># Heading</code>, <code>**bold**</code>, <code>*italic*</code>, <code>- list</code>, <code>1. list</code>, <code>- [ ] checkbox</code>, <code>&gt; read-aloud</code>, <code>| tables |</code>, <code>---</code>, <code>[link](https://…)</code>.</p>`;
     return top + `<div class="rd mdview">${mdHtml(d.md) || '<p class="note">Empty page. Click Edit to write.</p>'}</div>`;
   }
-  if (d.type === 'enc') {
-    const E = d.enc; if (!E) return top + '<div class="empty">Missing encounter.</div>';
-    const M = encMath(E);
-    const SAVED = ENC; ENC = E; if (STONES_ON) assignStones(false); const sc = scalingHtml(); ENC = SAVED;
-    return top + `<div class="sencsum"><span class="dlabel" style="color:${DCOL[M.diff]}">${M.diff}</span> <b>${M.ev} EV</b> vs encounter strength ${M.ES} · ${E.heroes} heroes, level ${M.L}, ${E.victories} Victories · worth ${M.worth} Victor${M.worth === 1 ? 'y' : 'ies'}</div>
-      <div class="actrow"><button class="btn" id="d-open">Open in Encounter Builder</button><button class="btn ghost" id="d-repl">Replace with the builder’s current encounter</button></div>
-      ${E.groups.map(g => `<div class="grp"><div class="grp-t"><b class="gname" style="border:0">${esc(g.name)}</b></div>${g.entries.map(e => { const m = MON[e.gid]; return m ? `<div class="ent"><div class="ent-n"><a class="lnk" data-go="monsters--${m.gid}">${e.n} × ${esc(m.name)}</a>${(() => { const S2 = ENC; ENC = E; const h = entStones(g, e, m); ENC = S2; return h; })()}<span>Lv ${m.level} ${esc(m.role)} · ${isMinion(m) ? esc(m.ev) : 'EV ' + esc(m.ev)} · Stamina ${esc((m.stats || {}).Stamina || '—')}</span></div></div>` : ''; }).join('')}</div>`).join('')}
-      ${sc}`;
-  }
-  const ref = d.type === 'mtg' ? (refreshMontages(), mtById(d.ref)) : (refreshNegotiations(), negById(d.ref));
-  if (!ref) return top + `<div class="empty">This ${DOCKIND[d.type].toLowerCase()} is no longer available (was its book removed?).</div>`;
-  if (d.type === 'mtg') return top + `<div class="actrow"><a class="btn" href="#montage--${ref.id}">▶ Run this montage</a></div>
-    ${ref.intro ? `<p>${esc(ref.intro)}</p>` : ''}${ref.scene.map(x => `<div class="ra">${esc(x)}</div>`).join('')}
-    <h3>Challenges</h3>${ref.challenges.map(c => `<div class="mtch"><div class="mtch-h"><b>${esc(c.name)}</b>${c.round > 1 ? `<span class="tagk">round ${c.round}</span>` : ''}</div><p>${esc(c.desc)}</p><div class="mtsug">${c.chars.map(x => `<span class="ck">${esc(x)}</span>`).join('')}${c.skills.map(x => `<span>${esc(x)}</span>`).join('')}</div></div>`).join('')}`;
-  return top + `<div class="actrow"><a class="btn" href="#negotiation--${ref.id}">▶ Run this negotiation</a></div>
-    ${ref.intro ? `<p>${esc(ref.intro)}</p>` : ''}<p><b>Interest</b> ${ref.interest} · <b>Patience</b> ${ref.patience} · <b>Impression</b> ${ref.impression ?? '—'}${ref.language ? ' · <b>Language</b> ' + esc(ref.language) : ''}</p>
-    <h3>Motivations</h3>${ref.motivations.map(m => `<p><b>${esc(m.name)}:</b> ${esc(m.text)}</p>`).join('') || '<p class="note">None</p>'}
-    <h3>Pitfalls</h3>${ref.pitfalls.map(m => `<p><b>${esc(m.name)}:</b> ${esc(m.text)}</p>`).join('') || '<p class="note">None</p>'}`;
+  const k = sessKind(d.type);
+  return k.html ? k.html(S, d, top) : top + `<div class="empty">This item type isn’t available in ${esc(SYS.name)}.</div>`;
 }
 function wireSessDoc(S, d) {
-  $('#d-title').onchange = e => { d.title = e.target.value || DOCKIND[d.type]; if (d.type === 'enc' && d.enc) d.enc.name = d.title; saveSessions(); sessionPage(S.id, d.id); };
+  const k = sessKind(d.type);
+  $('#d-title').onchange = e => { d.title = e.target.value || k.label; if (k.onRename) k.onRename(d); saveSessions(); sessionPage(S.id, d.id); };
   $('#d-del').onclick = async () => { if (await confirmSheet(`Remove “${d.title}” from this session?`, 'Remove')) { S.docs = S.docs.filter(x => x !== d); saveSessions(); go('session--' + S.id); } };
   $('#d-pdf').onclick = () => runPdfJob($('#d-pdf'), 'PDF', async () => { const b = await docPdf(S, d); if (b) await deliverFile(pdfFileName(d.title), new Blob([b], { type: 'application/pdf' })); });
   if ($('#d-edit')) $('#d-edit').onclick = () => { sessEdit = !sessEdit; sessionPage(S.id, d.id); if (sessEdit) setTimeout(() => $('#d-md')?.focus(), 30); };
   const ta = $('#d-md'); let tm;
   if (ta) ta.oninput = () => { d.md = ta.value; clearTimeout(tm); tm = setTimeout(() => { saveSessions(); $('#d-prev').innerHTML = mdHtml(d.md); }, 250); };
-  if ($('#d-open')) $('#d-open').onclick = () => { ENC = JSON.parse(JSON.stringify(d.enc)); ENC.sessionRef = { sid: S.id, did: d.id }; ENC.setup = false; store.set('enc', ENC); go('encounter'); };
-  if ($('#d-repl')) $('#d-repl').onclick = async () => { if (!ENC.groups.some(g => g.entries.length)) { toast('The encounter builder is empty'); return; } if (await confirmSheet(`Replace “${d.title}” with “${ENC.name}” from the builder?`, 'Replace')) { const c = JSON.parse(JSON.stringify(ENC)); delete c.sessionRef; d.enc = c; d.title = c.name; saveSessions(); sessionPage(S.id, d.id); } };
+  if (k.wire) k.wire(S, d);
 }
 function pickerSheet(title, items, onPick) { // items: [{id, name, sub, group}]
   const el = document.createElement('div'); el.className = 'dlg';
@@ -3125,43 +3408,23 @@ function pickerSheet(title, items, onPick) { // items: [{id, name, sub, group}]
 }
 function sessAdd(S, type) {
   const add = doc => { doc.id = 'd' + Date.now().toString(36); S.docs.push(doc); saveSessions(); if (doc.type === 'page') sessEdit = true; go('session--' + S.id + '--' + doc.id); };
-  const party = { heroes: S.heroes, level: S.level, victories: S.victories, retainers: 0 };
   if (type === 'page') return add({ type: 'page', title: 'New page', md: '# New page\n\n' });
-  if (type === 'mtg') { refreshMontages(); return pickerSheet('Add a montage test', allMt().map(m => ({ id: m.id, name: m.name, sub: m.challenges.length + ' challenges', group: m.user ? 'Your montages' : (PK[m.pack]?.title || '') })), id => add({ type: 'mtg', ref: id, title: mtById(id).name })); }
-  if (type === 'neg') { refreshNegotiations(); return pickerSheet('Add a negotiation', allNegs().map(n => ({ id: n.id, name: n.name, sub: `Interest ${n.interest} · Patience ${n.patience}`, group: n.user ? 'Your negotiations' : (PK[n.pack]?.title || '') })), id => add({ type: 'neg', ref: id, title: negById(id).name })); }
-  if (type === 'enc') {
-    const items = [];
-    if (ENC.groups.some(g => g.entries.length)) items.push({ id: 'cur', name: ENC.name, sub: (() => { const m = encMath(); return m.diff + ' · ' + m.ev + ' EV'; })(), group: 'In the Encounter Builder now' });
-    ENCS.forEach(e => items.push({ id: 'saved:' + e.id, name: e.name, sub: e.groups.reduce((s, g) => s + g.entries.length, 0) + ' kinds of creature', group: 'Saved encounters' }));
-    items.push({ id: 'new', name: 'Empty encounter', sub: 'Build it in the Encounter Builder', group: 'New' }, { id: 'book', name: 'From a book…', sub: 'Any delve or adventure encounter table', group: 'New' });
-    return pickerSheet('Add a combat encounter', items, id => {
-      let e;
-      if (id === 'cur') e = JSON.parse(JSON.stringify(ENC));
-      else if (id.startsWith('saved:')) e = JSON.parse(JSON.stringify(ENCS.find(x => 'saved:' + x.id === id)));
-      else if (id === 'new') e = newEnc(party);
-      else return bookEncounterSheet((p, c, i) => { const bd = bookEncounterData(p, c, i); if (!bd || !bd.groups.length) { toast('Couldn’t match any creatures in that table'); return; } const e2 = newEnc(party); e2.name = bd.name; e2.groups = bd.groups; e2.bookAdjust = bd.adj; e2.setup = false; add({ type: 'enc', title: e2.name, enc: e2 }); });
-      delete e.sessionRef; e.id = 'e' + Date.now().toString(36); e.setup = false;
-      if (id === 'new') e.name = 'Encounter ' + (S.docs.filter(x => x.type === 'enc').length + 1);
-      add({ type: 'enc', title: e.name, enc: e });
-    });
-  }
+  const k = sessKind(type); if (k.add) k.add(S, add);
 }
 async function docPdf(S, d) {
   if (d.type === 'page') return buildMarkdownPdf(d.title, d.md, S.name);
-  if (d.type === 'enc') { if (!d.enc.groups.some(g => g.entries.some(e => MON[e.gid]))) return null; const b = await buildEncounterPdf(d.enc); saveSessions(); return b; }
-  if (d.type === 'mtg') { refreshMontages(); const m = mtById(d.ref); return m ? buildMontagePdf(m) : null; }
-  if (d.type === 'neg') { refreshNegotiations(); const n = negById(d.ref); return n ? buildNegotiationPdf(n) : null; }
+  const k = sessKind(d.type); return k.pdf ? k.pdf(S, d) : null;
 }
 async function exportSession(S, btn) {
   await runPdfJob(btn, '⬇ Export this session', async () => {
     const w = await makeWriter(S.name); w.newPage();
-    w.header(S.name, `${S.date || ''} · ${S.heroes} heroes, level ${S.level}, ${S.victories} avg. Victories`, 'Session');
+    w.header(S.name, `${S.date || ''}${SYS.session?.partyLine ? ' · ' + SYS.session.partyLine(S) : ''}`, 'Session');
     w.h('Contents', 2);
     const parts = [], skipped = [];
     for (const d of S.docs) { const b = await docPdf(S, d); if (b) parts.push([d, b]); else skipped.push(d.title); }
     const { PDFDocument } = await loadPdfLib();
     let pg = 2;
-    for (const [d, b] of parts) { const n = (await PDFDocument.load(b)).getPageCount(); w.ensure(16); w.T(`${DOCKIND[d.type]}`, w.MG, w.y - 11, 8.5, w.F, w.grey); w.T(d.title, w.MG + 110, w.y - 11, 10.5, w.FB); w.T('p. ' + pg, w.MG + w.CW - w.tw('p. ' + pg, 10, w.F), w.y - 11, 10, w.F); w.y -= 18; pg += n; }
+    for (const [d, b] of parts) { const n = (await PDFDocument.load(b)).getPageCount(); w.ensure(16); w.T(`${sessKind(d.type).label}`, w.MG, w.y - 11, 8.5, w.F, w.grey); w.T(d.title, w.MG + 110, w.y - 11, 10.5, w.FB); w.T('p. ' + pg, w.MG + w.CW - w.tw('p. ' + pg, 10, w.F), w.y - 11, 10, w.F); w.y -= 18; pg += n; }
     if (skipped.length) w.para(`<i>Skipped (empty or unavailable): ${esc(skipped.join(', '))}</i>`, { size: 8 });
     const cover = await w.bytes();
     const out = await mergePdfs([cover, ...parts.map(x => x[1])], S.name);
@@ -3173,30 +3436,14 @@ async function exportSession(S, btn) {
 
 // ================= CARDS: items, quests, followers =================
 const CARD_SIZES = { poker: ['Poker (63 × 88 mm)', 63, 88], tarot: ['Tarot (70 × 120 mm)', 70, 120], large: ['Large (89 × 127 mm)', 89, 127] };
-const CARD_COL = { Consumable: '#3d7a4a', Trinket: '#2d5f8a', Leveled: '#6b3fa0', Artifact: '#a8322d', quest: '#a87a1e', follower: '#2a7f7a', retainer: '#7a4a2a' };
-const REWARD_LABELS = ['Victories', 'Title', 'Treasure', 'Project Source', 'Renown', 'Wealth', 'Retainer', 'Other'];
+const CARD_COL = { quest: '#a87a1e' };   // colours per card kind; systems add theirs (SYS.cards.colors)
 let CARDS = store.get('cards', null) || {};
 if (!CARDS.deck) CARDS.deck = (CARDS.items || []).map(x => ({ k: 'item', id: x.id, n: x.n }));
 delete CARDS.items;
 CARDS = { size: 'poker', backs: true, craft: false, tab: 'item', quests: [], followers: [], ...CARDS };
 const saveCards = () => store.set('cards', CARDS);
-const CRAFT_RE = /^(Item Prerequisite|Project Source|Project Roll Characteristic|Project Goal)s?:/i;
-const retainerList = () => MONS.filter(m => /Retainer/i.test(m.role || ''));
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
-function itemCard(t, craft) {
-  const sub = [t.type === 'Leveled' ? 'Leveled ' + (t.sub || 'treasure').toLowerCase() : t.type, t.echelon ? ORD(t.echelon) + ' echelon' : ''].filter(Boolean).join(' · ');
-  const paras = [];
-  for (const b of t.body || []) {
-    const html = (b.html || (b.text ? esc(b.text) : '')).trim(); if (!html) continue;
-    const txt = strip(html);
-    if (/^Keywords?:/i.test(txt)) continue;
-    if (!craft && CRAFT_RE.test(txt)) continue;
-    if (b.t === 'tier') { paras.push(`<b>${['', '≤11', '12–16', '17+'][b.n]}:</b> ${html}`); continue; }
-    html.split(/(?=<b>\s*\d+(?:st|nd|rd|th) Level)/).forEach(h => paras.push((b.t === 'li' ? '• ' : '') + h.trim()));
-  }
-  return { name: t.name, sub, keywords: t.keywords || '', paras, color: CARD_COL[t.type] || '#555555', back: t.type || 'Treasure', foot: 'Draw Steel' + (t.src?.pg ? ' · Heroes p. ' + t.src.pg : '') };
-}
 function questCard(q) {
   const paras = [];
   if (q.text) q.text.split(/\n+/).forEach(p => paras.push(esc(p)));
@@ -3204,42 +3451,14 @@ function questCard(q) {
   if (rw.length) paras.push('<b>Rewards</b><br>' + rw.map(r => `[] <b>${esc(r.label)}:</b> ${esc(r.value)}`).join('<br>'));
   return { name: q.title || 'Quest', sub: 'Quest' + (q.from ? ' · ' + q.from : ''), keywords: '', paras, color: q.color || CARD_COL.quest, back: 'Quest', check: true, foot: q.source || '' };
 }
-const tierTxt = rows => { const t = rows.filter(r => r.k === 'tier'); return t.length ? t.map(r => `<b>${['', '≤11', '12–16', '17+'][r.n]}</b> ${r.html}`).join('; ') : ''; };
-function followerCard(f) {
-  if (f.type === 'retainer') {
-    const m = MON[f.gid]; if (!m) return { name: f.name || 'Retainer', sub: 'Retainer (stat block not found)', paras: [], color: CARD_COL.retainer, back: 'Retainer' };
-    const st = m.stats || {}, ch = m.chars || {};
-    const stats = [['Stamina', st.Stamina], ['Speed', (st.Speed || '') + (m.movement && m.movement !== '—' ? '*' : '')], ['Size', st.Size], ['Stability', st.Stability], ['Free strike', st['Free Strike']], ['Might', ch.Might], ['Agility', ch.Agility], ['Reason', ch.Reason], ['Intuition', ch.Intuition], ['Presence', ch.Presence]].filter(x => x[1] != null && x[1] !== '');
-    const paras = [];
-    if (f.name) paras.push(`<i>${esc(m.name)}${m.desc ? ' · ' + esc(m.desc) : ''}</i>`);
-    const misc = [m.movement && m.movement !== '—' ? '<b>*Movement:</b> ' + esc(m.movement) : '', m.immunity && m.immunity !== '—' ? '<b>Immunity:</b> ' + esc(m.immunity) : '', m.weakness && m.weakness !== '—' ? '<b>Weakness:</b> ' + esc(m.weakness) : ''].filter(Boolean);
-    if (misc.length) paras.push(misc.join(' · '));
-    for (const a of m.items || []) {
-      const head = `<b>${esc(a.name)}${a.action ? '' : '.'}</b>${a.action ? ` <i>(${esc([a.action, a.distance, a.target].filter(Boolean).join(', '))})</i>` : ''}`;
-      const fields = (a.rows || []).filter(r => r.k === 'field').map(r => r.html).join(' ');
-      const tiers = tierTxt(a.rows || []);
-      paras.push(head + (tiers ? ' ' + tiers + '.' : '') + (fields ? ' ' + fields : ''));
-    }
-    if (f.notes) paras.push(esc(f.notes));
-    paras.push('<b>Mentor:</b> ____________________');
-    return { name: f.name || m.name, sub: `Level ${m.level} ${m.role}`, keywords: '', stats, paras, color: CARD_COL.retainer, back: 'Retainer', foot: (PK[m.pack]?.title || '') + (m.pg ? ' p. ' + m.pg : '') };
-  }
-  const art = f.type === 'artisan';
-  const chars = { Might: 0, Agility: 0, Reason: 1, Intuition: art ? 0 : 1, Presence: 0 }; if (art) chars[f.char === 'Agility' ? 'Agility' : 'Might'] = 1;
-  const stats = Object.entries(chars).map(([k, v]) => [k, (v > 0 ? '+' : '') + v]);
-  const langs = ['Caelian', ...(f.languages || []).filter(Boolean)];
-  const paras = [`<b>Skills:</b> ${esc((f.skills || []).join(', ') || '—')}`, `<b>Languages:</b> ${esc(langs.join(', '))}`,
-    `${art ? 'A crafting expert' : 'A research expert'}. Contributes one project roll per day to a downtime project you choose, whether you spend those days in respite, adventuring, or other activities. Must remain at your stronghold or the project site, with access to the necessary materials.`];
-  if (f.notes) paras.push(esc(f.notes));
-  return { name: f.name || (art ? 'Artisan' : 'Sage'), sub: (art ? 'Artisan' : 'Sage') + ' follower' + (f.ancestry ? ' · ' + f.ancestry : ''), keywords: '', stats, paras, color: CARD_COL.follower, back: 'Follower', foot: 'Draw Steel · Heroes p. 350' };
-}
 // ---- icons (game-icons.net CC BY 3.0, Material Design Icons Apache 2.0) ----
 const ICON_LIBS = { gi: { name: 'Game icons', n: 4134, credit: 'game-icons.net (CC BY 3.0)' }, mdi: { name: 'Material icons', n: 7636, credit: 'Material Design Icons (Apache 2.0)' } };
 const ICONS = {}; const iconLoads = {};
 function loadIcons(pre) { if (ICONS[pre]) return Promise.resolve(ICONS[pre]); return iconLoads[pre] || (iconLoads[pre] = getJSON(`data/icons-${pre}.json`).then(d => { ICONS[pre] = d; d.names = Object.keys(d.icons); return d; })); }
 const iconDef = ref => { if (!ref) return null; const [pre, name] = ref.split(':'); const L = ICONS[pre]; const v = L && L.icons[name]; return v ? { w: L.w, d: v[0], eo: !!v[1] } : null; };
 const iconSvg = (ref, cls = '') => { const d = iconDef(ref); return d ? `<svg class="${cls}" viewBox="0 0 ${d.w} ${d.w}" aria-hidden="true"><path fill="currentColor"${d.eo ? ' fill-rule="evenodd"' : ''} d="${d.d}"/></svg>` : ''; };
-const ICON_DEFAULT = { Consumable: 'gi:potion-ball', Trinket: 'gi:gem-pendant', Artifact: 'gi:crystal-ball', Weapon: 'gi:broadsword', Armor: 'gi:breastplate', Implement: 'gi:wizard-staff', Other: 'gi:gem-chain', Leveled: 'gi:crossed-swords', quest: 'gi:scroll-unfurled', retainer: 'gi:swordman', artisan: 'gi:anvil-impact', sage: 'gi:spell-book' };
+const ICON_DEFAULT = { quest: 'gi:scroll-unfurled' };   // systems add theirs (SYS.cards.icons)
+const cardIconFor = k => (SYS.cards?.icons || {})[k] || ICON_DEFAULT[k];
 const ICON_SYN = { potion: 'potion-ball', elixir: 'potion-ball', draught: 'round-bottom-flask', tonic: 'round-bottom-flask', oil: 'oil-drum', salve: 'round-bottom-flask', ring: 'diamond-ring', amulet: 'gem-pendant', necklace: 'gem-pendant', pendant: 'gem-pendant', cloak: 'cloak', mantle: 'cloak', boots: 'boots', helm: 'visored-helm', helmet: 'visored-helm', crown: 'crown', shield: 'shield', armor: 'breastplate', plate: 'breastplate', mail: 'chain-mail', blade: 'broadsword', sword: 'broadsword', axe: 'battle-axe', hammer: 'war-pick', spear: 'spear-head', bow: 'pocket-bow', dagger: 'bowie-knife', dart: 'dart', staff: 'wizard-staff', wand: 'orb-wand', orb: 'crystal-ball', book: 'spell-book', tome: 'spell-book', scroll: 'scroll-unfurled', map: 'treasure-map', key: 'key', lantern: 'lantern-flame', lamp: 'lantern-flame', bag: 'swap-bag', satchel: 'knapsack', gloves: 'gloves', gauntlet: 'mailed-fist', belt: 'belt', mask: 'mask', coin: 'two-coins', bell: 'ringing-bell', horn: 'hunting-horn', skull: 'skull-crossed-bones', bone: 'bone-knife', eye: 'eye-target', feather: 'feather', heart: 'heart-bottle', egg: 'egg-clutch', seed: 'seedling', flower: 'flower-emblem', fire: 'fire', flame: 'fire', ice: 'ice-cube', snow: 'snowflake-1', storm: 'lightning-storm', lightning: 'lightning-storm', star: 'star-swirl', moon: 'moon', sun: 'sun', chain: 'chain', rope: 'rope-coil', hourglass: 'hourglass', mirror: 'hand-mirror', dust: 'powder', powder: 'powder', bomb: 'unlit-bomb', bead: 'bead', stone: 'stone-pile', gem: 'cut-diamond', crystal: 'crystal-growth', spider: 'spider-alt', dragon: 'dragon-head', wing: 'feathered-wing', blood: 'drop', water: 'water-drop', poison: 'poison-bottle', thorn: 'thorny-vine', smoke: 'smoke-bomb', mead: 'beer-stein', ale: 'beer-stein', wine: 'wine-bottle', food: 'meat', bread: 'sliced-bread' };
 function autoIcon(c) {
   const gi = ICONS.gi;
@@ -3248,7 +3467,7 @@ function autoIcon(c) {
     for (const w of words) { const sg = w.replace(/s$/, ''); const syn = ICON_SYN[w] || ICON_SYN[sg]; if (syn && gi.icons[syn]) return 'gi:' + syn; }
     for (const w of words.slice().reverse()) { const sg = w.replace(/s$/, ''); if (gi.icons[sg]) return 'gi:' + sg; }
   }
-  return ICON_DEFAULT[c.hint] || ICON_DEFAULT[c.type] || 'gi:sparkles';
+  return cardIconFor(c.hint) || cardIconFor(c.type) || 'gi:sparkles';
 }
 const CARD_STYLES = { modern: ['Modern', 'Coloured header band, clean white body'], classic: ['Classic', 'Parchment, serif type, ornamental frame'], bold: ['Bold', 'Full-colour card with a big icon'], minimal: ['Ink saver', 'White card, thin coloured frame — cheap to print'] };
 const CARD_PALETTE = ['#3d7a4a', '#2d5f8a', '#6b3fa0', '#a8322d', '#a87a1e', '#2a7f7a', '#7a4a2a', '#c2531f', '#b0406f', '#3b4a63', '#5b6b2e', '#1d1d1f'];
@@ -3256,9 +3475,8 @@ const cardKey = d => d.k + ':' + d.id;
 function custOf(d) { return (CARDS.custom || {})[cardKey(d)] || {}; }
 function deckEntry(d) {
   let e = null;
-  if (d.k === 'item') { const t = D.treasures.find(x => x.id === d.id); e = t && { label: t.name, kind: t.type, c: itemCard(t, CARDS.craft) }; if (e) e.c.hint = t.type === 'Leveled' ? (t.sub || 'Leveled') : t.type; }
   if (d.k === 'quest') { const q = CARDS.quests.find(x => x.id === d.id); e = q && { label: q.title, kind: 'Quest', c: questCard(q), obj: q }; if (e) e.c.hint = 'quest'; }
-  if (d.k === 'follower') { const f = CARDS.followers.find(x => x.id === d.id); e = f && { label: f.name || MON[f.gid]?.name || f.type, kind: f.type === 'retainer' ? 'Retainer' : f.type === 'artisan' ? 'Artisan' : 'Sage', c: followerCard(f), obj: f }; if (e) e.c.hint = f.type; }
+  else { const k = (SYS.cards?.kinds || {})[d.k]; e = k ? k.entry(d) : null; }   // system card kinds (Draw Steel: treasures, followers)
   if (!e) return null;
   const cu = custOf(d), c = e.c;
   if (cu.title) c.name = cu.title; if (cu.sub) c.sub = cu.sub; if (cu.color) c.color = cu.color; if (cu.back) c.back = cu.back;
@@ -3275,20 +3493,21 @@ function cardHtml(c, n, i) {
     <div class="ic-b">${st === 'classic' ? '<div class="ic-orn"><i></i><span></span><i></i></div>' : ''}${c.keywords ? `<div class="ic-kw">${esc(c.keywords)}</div>` : ''}${body}${CARDS.watermark !== false && ic ? `<span class="ic-wm">${ic}</span>` : ''}</div>
     ${n > 1 ? `<span class="ic-n">×${n}</span>` : ''}</div>`;
 }
+// Card kinds: quest cards are built in; a system adds its own (SYS.cards.kinds: Draw Steel treasures,
+// followers & retainers), each with a tab, an "add" row and how a deck entry becomes a card.
 function cardsPage() {
-  const T = D.treasures; const byType = {}; T.forEach(t => (byType[t.type] = byType[t.type] || []).push(t));
+  const C = SYS.cards || {}, kinds = C.kinds || {};
   if (!ICONS.gi) { $('#main').innerHTML = '<div class="neghub cardsp"><h1>Cards</h1><div class="empty">Loading icons…</div></div>'; loadIcons('gi').then(() => { if (/^#cards/.test(location.hash)) cardsPage(); }).catch(() => { ICONS.gi = { w: 512, icons: {}, names: [] }; cardsPage(); }); return; }
   const rows = CARDS.deck.map((d, i) => ({ d, i, e: deckEntry(d) })).filter(x => x.e);
-  const tab = CARDS.tab; const st = CARDS.style || 'modern';
-  const tabs = `<div class="seg4 ctabs">${[['item', 'Items'], ['quest', 'Quests'], ['follower', 'Followers & retainers']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-ctab="${k}">${l}</button>`).join('')}</div>`;
+  const tabList = C.tabs || [['quest', 'Quests']];
+  const tab = tabList.some(([k]) => k === CARDS.tab) ? CARDS.tab : tabList[0][0]; const st = CARDS.style || 'modern';
+  const tabs = `<div class="seg4 ctabs">${tabList.map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-ctab="${k}">${l}</button>`).join('')}</div>`;
   let adder = '';
-  if (tab === 'item') adder = `<div class="cardadd"><div class="csearch">${ico('search', 16)}<input id="c-q" placeholder="Search ${T.length} treasures…" autocomplete="off"><div id="c-qres" class="cqres"></div></div>
-      <select id="c-addall"><option value="">Add all of a type…</option>${Object.keys(byType).map(ty => `<option>${esc(ty)}</option>`).join('')}</select></div>`;
-  else if (tab === 'quest') adder = `<div class="cardadd"><button class="btn" id="q-new">+ New quest card</button><button class="btn ghost" id="q-adv">Create from adventure…</button>
+  if (tab === 'quest') adder = `<div class="cardadd"><button class="btn" id="q-new">+ New quest card</button>${C.questsFromChapter ? '<button class="btn ghost" id="q-adv">Create from adventure…</button>' : ''}
       ${CARDS.quests.length ? `<select id="q-pick"><option value="">Add one of your quests again…</option>${CARDS.quests.map(q => `<option value="${q.id}">${esc(q.title)}</option>`).join('')}</select>` : ''}</div>`;
-  else adder = `<div class="cardadd"><button class="btn" id="f-ret">+ Retainer</button><button class="btn ghost" id="f-art">+ Artisan</button><button class="btn ghost" id="f-sage">+ Sage</button></div>`;
+  else if (kinds[tab]) adder = kinds[tab].adder();
   $('#main').innerHTML = `<div class="neghub cardsp"><h1>Cards</h1>
-    <p class="note">Print treasures, quests, followers and retainers as cards. Click any card to change its icon, colour or text.</p>
+    <p class="note">Print ${esc(C.intro || 'quests')} as cards. Click any card to change its icon, colour or text.</p>
     ${tabs}${adder}
     <div class="cdesign"><div class="cd-h">Card style</div><div class="cstyles">${Object.entries(CARD_STYLES).map(([k, [l, d]]) => `<button class="cstyle ${st === k ? 'on' : ''}" data-cstyle="${k}"><span class="cs-prev st-${k}"><i></i><em></em><em></em></span><b>${l}</b><small>${d}</small></button>`).join('')}</div>
       <div class="cardopts"><label>Size <select id="c-size">${Object.entries(CARD_SIZES).map(([k, v]) => `<option value="${k}" ${CARDS.size === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></label>
@@ -3297,7 +3516,7 @@ function cardsPage() {
       <label class="row-c"><input type="checkbox" id="c-backs" ${CARDS.backs ? 'checked' : ''}> Print backs</label>
       <label class="row-c"><input type="checkbox" id="c-iback" ${CARDS.iconBack !== false ? 'checked' : ''}> Card icon on back</label>
       ${(() => { const syncOn = window.VSync && VSync.status().enabled; return `<label class="row-c" title="${syncOn ? 'Each card back gets a QR code. Players scan it to get the card as a JPG. The pictures are uploaded to this site and public to anyone with the code.' : 'Needs sync: the card pictures are uploaded with your sync key.'}"><input type="checkbox" id="c-qr" ${CARDS.qr && syncOn ? 'checked' : ''} ${syncOn ? '' : 'disabled'}> QR code on back (JPG for players)${syncOn ? '' : ' · <a href="#sync">needs sync</a>'}</label>`; })()}
-      <label class="row-c"><input type="checkbox" id="c-craft" ${CARDS.craft ? 'checked' : ''}> Crafting info</label></div></div>
+      ${C.optionsHtml ? C.optionsHtml() : ''}</div></div>
     <div class="negacts"><button class="btn" id="c-pdf" ${rows.length ? '' : 'disabled'}>Export cards PDF (${rows.reduce((s, x) => s + x.d.n, 0)})</button>${rows.length ? '<button class="btn ghost" id="c-clear">Clear deck</button>' : ''}</div>
     ${rows.length ? `<div class="cdeck">${rows.map(({ d, i, e }) => `<div class="cdeck-r"><button class="cd-ic" data-cicon="${i}" style="--cc:${e.c.color}" title="Change icon">${e.c.icon ? iconSvg(e.c.icon) : '—'}</button><b>${esc(e.c.name)}</b><span>${esc(e.kind)}</span><button class="ibtn" data-cust="${i}" title="Customise">✎</button><div class="step"><button data-cdec="${i}">−</button><b>${d.n}</b><button data-cinc="${i}">+</button></div><button class="ibtn" data-crm="${i}" title="Remove from deck">✕</button></div>`).join('')}</div>
       <div class="cgrid">${rows.map(x => cardHtml(x.e.c, x.d.n, x.i)).join('')}</div>` : '<div class="empty">No cards yet.</div>'}
@@ -3305,28 +3524,17 @@ function cardsPage() {
   const re = () => { saveCards(); cardsPage(); };
   $$('[data-ctab]').forEach(b => b.onclick = () => { CARDS.tab = b.dataset.ctab; re(); });
   $$('[data-cstyle]').forEach(b => b.onclick = () => { CARDS.style = b.dataset.cstyle; re(); });
-  const cq = $('#c-q');
-  if (cq) {
-    const show = () => { const q = cq.value.trim().toLowerCase(); const box = $('#c-qres'); if (!q) { box.innerHTML = ''; box.classList.remove('on'); return; }
-      const hits = T.filter(t => (t.name + ' ' + t.type + ' ' + (t.keywords || '') + ' ' + (t.sub || '')).toLowerCase().includes(q)).sort((a, b) => (b.name.toLowerCase().startsWith(q) - a.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name)).slice(0, 12);
-      box.innerHTML = hits.map(t => { const c = { name: t.name, hint: t.type === 'Leveled' ? (t.sub || 'Leveled') : t.type }; return `<button data-addi="${t.id}"><span class="cd-ic" style="--cc:${CARD_COL[t.type] || '#555'}">${iconSvg(autoIcon(c))}</span><b>${esc(t.name)}</b><small>${esc(t.type)}${t.echelon ? ' · ' + ORD(t.echelon) + ' echelon' : ''}</small>${CARDS.deck.some(x => x.k === 'item' && x.id === t.id) ? '<em>in deck</em>' : ''}</button>`; }).join('') || '<div class="empty">No treasure matches.</div>';
-      box.classList.add('on');
-      $$('[data-addi]', box).forEach(b => b.onmousedown = e => { e.preventDefault(); addToDeck('item', b.dataset.addi); saveCards(); cardsPage(); setTimeout(() => { const n = $('#c-q'); if (n) { n.value = cq.value; n.focus(); n.dispatchEvent(new Event('input')); } }, 0); });
-    };
-    cq.oninput = show; cq.onfocus = show; cq.onblur = () => setTimeout(() => $('#c-qres')?.classList.remove('on'), 150);
-    cq.onkeydown = e => { if (e.key === 'Enter') { const f = $('#c-qres [data-addi]'); if (f) f.dispatchEvent(new MouseEvent('mousedown')); } if (e.key === 'Escape') { cq.value = ''; show(); } };
-    $('#c-addall').onchange = e => { const ty = e.target.value; if (!ty) return; byType[ty].forEach(t => { if (!CARDS.deck.some(x => x.k === 'item' && x.id === t.id)) CARDS.deck.push({ k: 'item', id: t.id, n: 1 }); }); re(); };
-  }
-  if ($('#q-new')) { $('#q-new').onclick = () => questEditor(null); $('#q-adv').onclick = questsFromAdventureDialog; }
+  if ($('#q-new')) $('#q-new').onclick = () => questEditor(null);
+  if ($('#q-adv')) $('#q-adv').onclick = questsFromAdventureDialog;
   if ($('#q-pick')) $('#q-pick').onchange = e => { if (e.target.value) { addToDeck('quest', e.target.value); re(); } };
-  if ($('#f-ret')) { $('#f-ret').onclick = () => followerEditor({ type: 'retainer' }); $('#f-art').onclick = () => followerEditor({ type: 'artisan' }); $('#f-sage').onclick = () => followerEditor({ type: 'sage' }); }
+  if (kinds[tab] && kinds[tab].wire) kinds[tab].wire(re);
   $('#c-size').onchange = e => { CARDS.size = e.target.value; re(); };
   $('#c-text').onchange = e => { CARDS.text = e.target.value; saveCards(); };
   $('#c-wm').onchange = e => { CARDS.watermark = e.target.checked; re(); };
   $('#c-backs').onchange = e => { CARDS.backs = e.target.checked; saveCards(); };
   $('#c-iback').onchange = e => { CARDS.iconBack = e.target.checked; saveCards(); };
   $('#c-qr').onchange = e => { CARDS.qr = e.target.checked; if (CARDS.qr) CARDS.backs = true; re(); };  // QR codes live on the backs
-  $('#c-craft').onchange = e => { CARDS.craft = e.target.checked; re(); };
+  if (C.wireOptions) C.wireOptions(re);
   if ($('#c-clear')) $('#c-clear').onclick = async () => { if (await confirmSheet('Remove all cards from the deck? (Your quests and followers stay saved.)', 'Clear')) { CARDS.deck = []; re(); } };
   $$('[data-cinc]').forEach(b => b.onclick = () => { CARDS.deck[+b.dataset.cinc].n++; re(); });
   $$('[data-cdec]').forEach(b => b.onclick = () => { const x = CARDS.deck[+b.dataset.cdec]; x.n--; if (x.n <= 0) CARDS.deck.splice(+b.dataset.cdec, 1); re(); });
@@ -3370,7 +3578,7 @@ function cardCustomizer(i) {
 function iconPicker(c, onPick) {
   const el = document.createElement('div'); el.className = 'dlg';
   const st = { lib: 'gi', q: '' };
-  const sugg = () => { const words = String(c.name || '').toLowerCase().split(/[^a-z]+/).filter(w => w.length > 2); const L = ICONS.gi; if (!L) return []; const out = new Set([autoIcon(c)]); for (const w of words) { const sg = w.replace(/s$/, ''); L.names.filter(n => n.split('-').includes(sg) || n.split('-').includes(w)).slice(0, 8).forEach(n => out.add('gi:' + n)); } [ICON_DEFAULT[c.hint], ICON_DEFAULT[c.type]].filter(Boolean).forEach(x => out.add(x)); return [...out].slice(0, 16); };
+  const sugg = () => { const words = String(c.name || '').toLowerCase().split(/[^a-z]+/).filter(w => w.length > 2); const L = ICONS.gi; if (!L) return []; const out = new Set([autoIcon(c)]); for (const w of words) { const sg = w.replace(/s$/, ''); L.names.filter(n => n.split('-').includes(sg) || n.split('-').includes(w)).slice(0, 8).forEach(n => out.add('gi:' + n)); } [cardIconFor(c.hint), cardIconFor(c.type)].filter(Boolean).forEach(x => out.add(x)); return [...out].slice(0, 16); };
   el.innerHTML = `<div class="dlg-b ipick"><h2>Choose an icon</h2>
     <div class="ip-top"><div class="seg4 iplib">${Object.entries(ICON_LIBS).map(([k, v]) => `<button data-lib="${k}" class="${k === st.lib ? 'on' : ''}">${v.name} <small>${v.n.toLocaleString()}</small></button>`).join('')}</div>
     <div class="csearch">${ico('search', 16)}<input id="ip-q" placeholder="Search icons, e.g. potion, sword, skull, castle…" autocomplete="off"></div></div>
@@ -3401,7 +3609,8 @@ function iconPicker(c, onPick) {
 }
 // ---- quest editor ----
 function questEditor(q) {
-  const isNew = !q; q = q ? JSON.parse(JSON.stringify(q)) : { id: uid('q'), title: '', text: '', rewards: [{ label: 'Victories', value: '' }, { label: 'Treasure', value: '' }] };
+  const RW = SYS.cards?.rewards || { labels: ['Other'], hints: {}, defaults: [] };   // reward types are the system's (Draw Steel: Victories, Renown, …)
+  const isNew = !q; q = q ? JSON.parse(JSON.stringify(q)) : { id: uid('q'), title: '', text: '', rewards: JSON.parse(JSON.stringify(RW.defaults)) };
   const el = document.createElement('div'); el.className = 'dlg';
   const draw = () => {
     el.innerHTML = `<div class="dlg-b negedit"><h2>${isNew ? 'New' : 'Edit'} quest card</h2>
@@ -3409,7 +3618,7 @@ function questEditor(q) {
       <label class="negnotes">What the heroes were asked to do<textarea id="qe-x" rows="3" placeholder="Brother Aldo asked you to find out who stole the temple bell.">${esc(q.text)}</textarea></label>
       <label class="negnotes">Given by / where (optional, shown under the title)<input id="qe-f" value="${esc(q.from || '')}" placeholder="Brother Aldo · Temple of the Tide"></label>
       <div class="negnotes">Rewards</div>
-      ${q.rewards.map((r, i) => `<div class="qrow"><select data-rl="${i}">${REWARD_LABELS.map(l => `<option ${r.label === l ? 'selected' : ''}>${l}</option>`).join('')}</select><input data-rv="${i}" value="${esc(r.value)}" placeholder="${{ Victories: '2', Title: 'Fey Friend', Treasure: 'Healing Potion', 'Project Source': 'Quantum Satchel', Renown: '+1', Wealth: '+1', Retainer: 'Lamprey', Other: '' }[r.label] || ''}"><button class="ibtn" data-rd="${i}">✕</button></div>`).join('')}
+      ${q.rewards.map((r, i) => `<div class="qrow"><select data-rl="${i}">${RW.labels.map(l => `<option ${r.label === l ? 'selected' : ''}>${l}</option>`).join('')}</select><input data-rv="${i}" value="${esc(r.value)}" placeholder="${RW.hints[r.label] || ''}"><button class="ibtn" data-rd="${i}">✕</button></div>`).join('')}
       <button class="btn ghost sm" id="qe-add">+ Reward</button>
       <div class="dlgfoot">${!isNew ? '<button class="btn danger" id="qe-del">Delete quest</button>' : ''}<span style="flex:1"></span><button class="btn ghost" id="qe-x2">Cancel</button><button class="btn" id="qe-ok">${isNew ? 'Add card' : 'Save'}</button></div></div>`;
     const keep = () => { q.title = $('#qe-t', el).value.trim(); q.text = $('#qe-x', el).value.trim(); q.from = $('#qe-f', el).value.trim(); $$('[data-rl]', el).forEach(s => q.rewards[+s.dataset.rl].label = s.value); $$('[data-rv]', el).forEach(s => q.rewards[+s.dataset.rv].value = s.value.trim()); };
@@ -3422,99 +3631,24 @@ function questEditor(q) {
   };
   draw(); document.body.appendChild(el); setTimeout(() => $('#qe-t', el)?.focus(), 30);
 }
-// ---- follower editor ----
-function followerEditor(f0) {
-  const isNew = !f0.id; const f = JSON.parse(JSON.stringify({ name: '', ancestry: '', skills: [], languages: ['', ''], char: 'Might', notes: '', ...f0 }));
-  const el = document.createElement('div'); el.className = 'dlg';
-  const rets = retainerList(); const byPack = {}; rets.forEach(m => (byPack[m.pack] = byPack[m.pack] || []).push(m));
-  if (f.type === 'retainer' && !f.gid && rets[0]) f.gid = rets[0].gid;
-  const draw = () => {
-    const grp = f.type === 'artisan' ? 'Crafting' : 'Lore';
-    const skills = D.skills.filter(s => s.group === grp).map(s => s.name);
-    el.innerHTML = `<div class="dlg-b negedit"><h2>${isNew ? 'New' : 'Edit'} ${f.type === 'retainer' ? 'retainer' : f.type} card</h2>
-      ${f.type === 'retainer' ? `<label class="negnotes">Retainer<select id="fe-g">${Object.entries(byPack).map(([p, ms]) => `<optgroup label="${esc(PK[p]?.title || p)}">${ms.map(m => `<option value="${m.gid}" ${f.gid === m.gid ? 'selected' : ''}>${esc(m.name)} (level ${m.level} ${esc(m.role.replace(/ Retainer$/, ''))})</option>`).join('')}</optgroup>`).join('')}</select></label>
-        ${!rets.length ? '<div class="warn">No retainer stat blocks found. Retainers come from the Monsters book.</div>' : ''}
-        <label class="negnotes">Name (optional)<input id="fe-n" value="${esc(f.name)}" placeholder="Leave empty to use the stat block’s name"></label>`
-      : `<div class="mtrow"><label>Name<input id="fe-n" value="${esc(f.name)}"></label><label>Ancestry<input id="fe-a" value="${esc(f.ancestry)}"></label>${f.type === 'artisan' ? `<label>Characteristic at 1<select id="fe-c"><option ${f.char === 'Might' ? 'selected' : ''}>Might</option><option ${f.char === 'Agility' ? 'selected' : ''}>Agility</option></select></label>` : ''}</div>
-        <div class="negnotes">Four ${grp.toLowerCase()} skills (${f.skills.length}/4)</div>
-        <div class="fskills">${skills.map(s => `<label><input type="checkbox" data-sk="${esc(s)}" ${f.skills.includes(s) ? 'checked' : ''}> ${esc(s)}</label>`).join('')}</div>
-        <div class="mtrow"><label>Languages: Caelian +<input id="fe-l1" value="${esc(f.languages[0] || '')}"></label><label>and<input id="fe-l2" value="${esc(f.languages[1] || '')}"></label></div>`}
-      <label class="negnotes">Notes (optional)<input id="fe-x" value="${esc(f.notes)}"></label>
-      <div class="dlgfoot">${!isNew ? '<button class="btn danger" id="fe-del">Delete</button>' : ''}<span style="flex:1"></span><button class="btn ghost" id="fe-q">Cancel</button><button class="btn" id="fe-ok">${isNew ? 'Add card' : 'Save'}</button></div></div>`;
-    const keep = () => { f.name = $('#fe-n', el).value.trim(); f.notes = $('#fe-x', el).value.trim(); if ($('#fe-g', el)) f.gid = $('#fe-g', el).value; if ($('#fe-a', el)) f.ancestry = $('#fe-a', el).value.trim(); if ($('#fe-c', el)) f.char = $('#fe-c', el).value; if ($('#fe-l1', el)) f.languages = [$('#fe-l1', el).value.trim(), $('#fe-l2', el).value.trim()]; };
-    $$('[data-sk]', el).forEach(c => c.onchange = () => { keep(); const s = c.dataset.sk; if (c.checked) { if (f.skills.length >= 4) { toast('A follower knows four skills'); c.checked = false; return; } f.skills.push(s); } else f.skills = f.skills.filter(x => x !== s); draw(); });
-    $('#fe-q', el).onclick = () => el.remove();
-    if ($('#fe-del', el)) $('#fe-del', el).onclick = async () => { if (await confirmSheet('Delete this card?', 'Delete')) { CARDS.followers = CARDS.followers.filter(x => x.id !== f.id); CARDS.deck = CARDS.deck.filter(x => !(x.k === 'follower' && x.id === f.id)); saveCards(); el.remove(); cardsPage(); } };
-    $('#fe-ok', el).onclick = () => { keep(); if (f.type === 'retainer' && !MON[f.gid]) { toast('Pick a retainer'); return; } if (!f.id) { f.id = uid('f'); CARDS.followers.push(f); addToDeck('follower', f.id); } else { const i = CARDS.followers.findIndex(x => x.id === f.id); CARDS.followers[i] = f; } CARDS.tab = 'follower'; saveCards(); el.remove(); cardsPage(); };
-  };
-  draw(); document.body.appendChild(el);
-}
 // ---- quests from an adventure ----
-const NUMWORD = { one: 1, two: 2, three: 3, four: 4, five: 5, a: 1, an: 1 };
-function sectionRewards(blocks) {
-  const R = { vic: 0, treasure: [], title: [], renown: 0, wealth: 0, source: [], retainer: [], other: [] };
-  const add = (arr, v) => { v = v.trim().replace(/\s+/g, ' '); const k = v.toLowerCase().replace(/s$/, ''); if (v && !arr.some(x => x.toLowerCase().replace(/s$/, '') === k)) arr.push(v); };
-  const tnames = D.treasures.map(t => t.name).sort((a, b) => b.length - a.length);
-  for (const b of blocks) {
-    if (b.t === 'h') { const m = b.text.match(/^Title:\s*(.+)$/i); if (m) add(R.title, m[1]); continue; }
-    const txt = strip(b.html || (b.rows ? b.rows.flat().join(' ') : '') || '');
-    let m; const vre = /\b(?:earns?|gains?)\s+(\d+|one|two|three|four|five)\s+(?:additional\s+)?Victor(?:y|ies)\b/gi;
-    while ((m = vre.exec(txt))) R.vic = Math.max(R.vic, +m[1] || NUMWORD[m[1].toLowerCase()] || 0);
-    const tre = /\(see\s+([^)]*?)\s+in\s+Treasures?\s+in\s+Handouts\)|((?:[A-Z][\w’'\-]*\s?){1,5})\s*\(see\s+Treasures?\s+in\s+Handouts\)/g;
-    while ((m = tre.exec(txt))) add(R.treasure, (m[1] || m[2]).replace(/^(?:a|an|the)\s+/i, ''));
-    for (const n of tnames) if (new RegExp('\\b' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(txt) && !R.treasure.some(x => x.includes(n))) add(R.treasure, n);
-    const rre = /\bgains?\s+(\d+|one|two)\s+Renown/gi; while ((m = rre.exec(txt))) R.renown = Math.max(R.renown, +m[1] || NUMWORD[m[1].toLowerCase()]);
-    const wre = /Wealth\s+(?:score\s+)?(?:increases|goes up)\s+by\s+(\d+|one|two)/gi; while ((m = wre.exec(txt))) R.wealth = Math.max(R.wealth, +m[1] || NUMWORD[m[1].toLowerCase()]);
-    const pre = /project source (?:for|of) (?:an? |the )?([A-Z][\w’'\- ]+)/gi; while ((m = pre.exec(txt))) add(R.source, m[1]);
-    const tie = /([A-Z][\w’'\- ]+?)\s+title\s+\(see Titles/g; while ((m = tie.exec(txt))) add(R.title, m[1]);
-    if (/becom\w* a retainer/i.test(txt)) { const who = txt.match(/([A-Z][\w’']+)\s+(?:also\s+)?pledges/); if (who) add(R.retainer, who[1]); }
-  }
-  return R;
-}
-function questsFromChapter(pack, ch, L) {
-  const B = ch.blocks; const out = [];
-  const leadDesc = name => { const li = B.find(b => b.t === 'li' && new RegExp('^\\s*<b>\\s*' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:?\\s*</b>', 'i').test(b.html || '')); return li ? strip(li.html).replace(/^[^:]+:\s*/, '') : ''; };
-  for (let i = 0; i < B.length; i++) {
-    const h = B[i]; if (h.t !== 'h' || h.lvl !== L) continue;
-    let end = B.length; for (let k = i + 1; k < B.length; k++) if (B[k].t === 'h' && B[k].lvl <= L) { end = k; break; }
-    const sec = B.slice(i + 1, end);
-    // scenes one level down are added up; inside a scene, alternative outcomes take the best
-    const subL = Math.min(...sec.filter(b => b.t === 'h').map(b => b.lvl).concat([99]));
-    const isScene = b => b.t === 'h' && b.lvl === subL && subL <= L + 2 && !/^(Total|Partial|Victor|Reward|Ending|Encounter Adjust|Tactics|Terrain|Development)/i.test(b.text);
-    let vic = 0; const R = sectionRewards(sec);
-    if (subL < 99 && sec.some(isScene)) { let cur = []; const parts = []; for (const b of sec) { if (isScene(b)) { parts.push(cur); cur = []; } cur.push(b); } parts.push(cur); vic = parts.reduce((s, p) => s + sectionRewards(p).vic, 0); } else vic = R.vic;
-    let desc = leadDesc(h.text);
-    if (!desc) { const p = sec.find(b => (b.t === 'p') && !/^[“"]/.test(strip(b.html || '')) && strip(b.html || '').length > 40); desc = p ? strip(p.html) : ''; }
-    if (desc.length > 260) { const cut = desc.slice(0, 260); desc = cut.slice(0, Math.max(cut.lastIndexOf('. ') + 1, 180)) || cut; if (!/[.!?]$/.test(desc)) desc += '…'; }
-    const rewards = [];
-    if (vic) rewards.push({ label: 'Victories', value: (sec.some(isScene) ? 'up to ' : '') + vic });
-    R.title.forEach(v => rewards.push({ label: 'Title', value: v }));
-    R.treasure.forEach(v => rewards.push({ label: 'Treasure', value: v }));
-    R.source.forEach(v => rewards.push({ label: 'Project Source', value: v }));
-    if (R.renown) rewards.push({ label: 'Renown', value: '+' + R.renown });
-    if (R.wealth) rewards.push({ label: 'Wealth', value: '+' + R.wealth });
-    R.retainer.forEach(v => rewards.push({ label: 'Retainer', value: v }));
-    out.push({ id: uid('q'), title: h.text, text: desc, rewards, source: `${pack.title} · ${ch.title}`, pg: h.pg });
-  }
-  return out;
-}
 function questsFromAdventureDialog() {
   const packs = PACKS.filter(p => (p.chapters || []).length > 1);
   if (!packs.length) { toast('Import an adventure first'); return; }
   const st = { pack: (packs.find(p => p.kind === 'adventure') || packs[0]).id, ch: '', L: 0, sel: {} };
   const el = document.createElement('div'); el.className = 'dlg';
   const levels = ch => [...new Set(ch.blocks.filter(b => b.t === 'h' && b.lvl >= 1 && b.lvl <= 4).map(b => b.lvl))].sort();
-  const bestLevel = (p, ch) => { let best = levels(ch)[0] || 1, bestN = -1; for (const L of levels(ch)) { const qs = questsFromChapter(p, ch, L); const n = qs.filter(q => q.rewards.length).length; if (n > bestN && qs.length <= 30) { best = L; bestN = n; } if (n >= 3) { best = L; break; } } return best; };
+  const bestLevel = (p, ch) => { let best = levels(ch)[0] || 1, bestN = -1; for (const L of levels(ch)) { const qs = SYS.cards.questsFromChapter(p, ch, L); const n = qs.filter(q => q.rewards.length).length; if (n > bestN && qs.length <= 30) { best = L; bestN = n; } if (n >= 3) { best = L; break; } } return best; };
   let cands = [];
   const draw = () => {
     const p = PK[st.pack]; const chs = p.chapters.filter(c => c.blocks.some(b => b.t === 'h'));
     if (!st.ch || !chs.some(c => c.id === st.ch)) { const c2 = chs.find(c => /chapter\s*2/i.test(c.title)) || chs.find(c => /^chapter/i.test(c.title)) || chs[0]; st.ch = c2.id; st.L = 0; }
     const ch = p.chapters.find(c => c.id === st.ch);
     if (!st.L) st.L = bestLevel(p, ch);
-    cands = questsFromChapter(p, ch, st.L); cands.forEach((q, i) => { if (st.sel[i] == null) st.sel[i] = q.rewards.length > 0 && !/^(Running|Beginning|Complicating|Introduction|Using|How to|Credits|Appendix)/i.test(q.title); });
+    cands = SYS.cards.questsFromChapter(p, ch, st.L); cands.forEach((q, i) => { if (st.sel[i] == null) st.sel[i] = q.rewards.length > 0 && !/^(Running|Beginning|Complicating|Introduction|Using|How to|Credits|Appendix)/i.test(q.title); });
     const nameOf = L => ({ 1: 'Top-level sections', 2: 'Sections', 3: 'Sub-sections', 4: 'Small sections' }[L] || 'Level ' + L);
     el.innerHTML = `<div class="dlg-b negedit"><h2>Quest cards from an adventure</h2>
-      <p>Pick a chapter. Each section becomes a quest card with its rewards: Victories, treasures, titles, Renown and retainers found in the text. You can edit every card afterwards.</p>
+      <p>Pick a chapter. Each section becomes a quest card with its rewards: ${SYS.cards.questRewardsText} found in the text. You can edit every card afterwards.</p>
       <div class="mtrow"><label>Book<select id="qa-p">${packs.map(x => `<option value="${x.id}" ${x.id === st.pack ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select></label>
         <label>Chapter<select id="qa-c">${chs.map(c => `<option value="${c.id}" ${c.id === st.ch ? 'selected' : ''}>${esc(c.title)}</option>`).join('')}</select></label>
         <label>One card per<select id="qa-l">${levels(ch).map(L => `<option value="${L}" ${L === st.L ? 'selected' : ''}>${nameOf(L)} (${ch.blocks.filter(b => b.t === 'h' && b.lvl === L).length})</option>`).join('')}</select></label></div>
@@ -3679,7 +3813,7 @@ async function buildCardsPdf(opt = {}) {
     w.T(lab, cx - w.tw(lab, 10.5, w.FB) / 2, cy - s * 0.68 - 18, 10.5, w.FB, white);
   };
   const crop = (x, y) => { const L = 6, g = 2; const c = rgb(0.6, 0.6, 0.6); [[x, y], [x + cw, y], [x, y + ch], [x + cw, y + ch]].forEach(([px, py]) => { const sx = px === x ? -1 : 1, sy = py === y ? -1 : 1; w.line(px + sx * g, py, px + sx * (g + L), py, 0.3, c); w.line(px, py + sy * g, px, py + sy * (g + L), 0.3, c); }); };
-  const credit = () => w.T('Icons: game-icons.net (CC BY 3.0) · Material Design Icons (Apache 2.0) · Draw Steel © MCDM Productions, LLC, used under the DRAW STEEL Creator License', 20, 10, 5.5, w.F, rgb(0.6, 0.6, 0.6));
+  const credit = () => w.T('Icons: game-icons.net (CC BY 3.0) · Material Design Icons (Apache 2.0) · ' + SYS.pdfNotice, 20, 10, 5.5, w.F, rgb(0.6, 0.6, 0.6));
   for (let p0 = 0; p0 < faces.length; p0 += per) {
     const pageFaces = faces.slice(p0, p0 + per);
     w.newPage(); credit();
@@ -3692,7 +3826,7 @@ async function buildCardsPdf(opt = {}) {
 // ---- QR codes → public card JPGs (uploaded through sync.php, served by card.php) ----
 let qrLoad = null;
 function loadQr() {  // lib/qrcode.js: qrcode-generator 1.4.4 (MIT), defines window.qrcode
-  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=d0ea0eb4d4'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
+  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=fdeb7faca6'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
 }
 // 22-char id from the key's private salt + what the face looks like: stable, but unguessable
 async function cardImageId(salt, content) {

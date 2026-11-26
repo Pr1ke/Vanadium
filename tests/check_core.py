@@ -11,8 +11,8 @@ import glob, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'src')
-CORE = ['app.js', 'print.js', 'sync.js']
-PENDING = ['sess.js', 'cards.js']   # to be moved behind hooks in step 1b
+CORE = ['app.js', 'print.js', 'sync.js', 'sess.js', 'cards.js']
+PENDING = []   # core files not yet behind hooks (none since step 1b)
 
 decl = re.compile(r'^(?:async\s+)?(?:function\s+([A-Za-z_$][\w$]*)|(?:const|let|var)\s+([A-Za-z_$][\w$]*))', re.M)
 

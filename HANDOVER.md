@@ -72,8 +72,8 @@ src/                   ← sources you edit
   app.js               ← CORE (system-neutral): data loading, packs, routing, list pages, book reader, library,
                           importer UI, pins, search, sync page, updates. Talks to the game system only via SYS.* (§5b)
   print.js             ← PDF writer (makeWriter, Times/Helvetica sets), pdf-lib loader, deliverFile, markdown PDFs, mergePdfs
-  sess.js              ← sessions (still Draw Steel-specific: links encounters/montages/negotiations, see §5b "step 1b")
-  cards.js             ← cards, icon libraries/search, customiser, card PDF (card sources still Draw Steel-specific)
+  sess.js              ← sessions: folders, markdown pages, overview, whole-session PDF. Other item types come from the system
+  cards.js             ← card generator: quest cards, styles, icons, customiser, card PDF, QR pictures. Other card kinds come from the system
   sync.js, *.php       ← sync client, sync/update/card servers (system-neutral)
   systems/drawsteel/   ← THE DRAW STEEL SYSTEM MODULE (§5b)
     drawsteel.js       ← data setup, ability/stat-block rendering, list columns/filters, class pages, menu,
@@ -82,6 +82,9 @@ src/                   ← sources you edit
     neg.js             ← negotiation tracker
     mtg.js             ← montage tests, book-encounter picker, matchMonster; exposes window.__mt for tests
     ds-print.js        ← montage and negotiation PDF sheets
+    ds-sessions.js     ← session items: encounters, montages, negotiations; the party (heroes, level, Victories)
+    ds-cards.js        ← card kinds: treasures, followers & retainers; quest rewards; rewards found in adventure text
+    register.js        ← the registerSystem({...}) call (loaded last)
     respite-base.html, respite-vanadium.css ← the Respite tool (built by mkrespite.py)
   sb.js                ← old stat-block PDF fragment (reference only, not in the build)
   mksite.py            ← BUILD: index.html + app.js + data/*.gz.txt (SYSTEM_FILES lists each system's files)
@@ -202,17 +205,14 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
 
 **Roadmap:**
 1. **Step 1 (done):** Draw Steel moved behind the interface with no visible change; see the verification below.
-2. **Step 1b (to do):** make what is still Draw Steel-specific in "core" places go through hooks:
-   - `sess.js` links encounters, montages and negotiations directly.
-   - `cards.js` builds cards from Draw Steel treasures, retainers, followers and characteristics.
-   - `body.html` has the power-roller panel markup (2d10, Might…Presence, edge/bane) and the Draw Steel licence line in the footer.
-   - The Sync page text lists Draw Steel tools.
+2. **Step 1b (done):** sessions and cards are now general engines with system "kinds" (`SYS.session`, `SYS.cards`). The roller panel (`SYS.roller`), the footer licence (`SYS.notice`) and the Sync page wording (`SYS.syncWhat`) also come from the system. `check_core.py` covers all five core files.
+   - **Still Draw Steel-shaped, but generic enough for now:** the card store keeps a `followers` list, and the Encounters-book menu link uses a fixed id. Both get revisited when 5e arrives.
 3. **Step 2:** a system switch in the top bar, plus per-system namespacing of stored data (localStorage keys, imported packs). Existing data must be migrated so nobody loses anything.
 4. **Step 3:** the D&D 5e SRD module. **Step 4:** 5e tools (encounter difficulty, dice, initiative). **Step 5:** 5e stat blocks in the importer.
 
 **Adding a system:**
 1. Create `src/systems/<id>/<id>.js` that calls `registerSystem` with at least `id`, `name`, `data`, `init`, `corePack`, `lists`, `menu`, `home`, `browse`, `renderMonster` and `pdfNotice`.
-2. List its files in `SYSTEM_FILES` in `mksite.py`.
+2. List its files in `SYSTEM_FILES` in `mksite.py`, with the file holding the `registerSystem` call last.
 3. Run `python tests/check_core.py` to make sure the core still doesn't reference system code directly.
 
 **Verifying refactors:**
@@ -229,7 +229,8 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
   - JS errors
 - **`--diff`** compares two snapshots.
 - **`--root`** snapshots another checkout. For example, use `git worktree add ../main-wt main` for a "before" snapshot.
-- **Step 1 result:** IDENTICAL to `main`, apart from the `?v=` asset version (which the diff normalises).
+- **Exported PDFs** are compared by their text (`tests/pdftext.mjs`), so licence lines, party lines and labels count too.
+- **Result:** steps 1 and 1b are IDENTICAL to `main` across 136 pages, every interaction listed above, the session item pickers and PDFs, the merged session export, the card tabs and editors, the roller panel and the footer. The `?v=` asset version is the one difference, and the diff normalises it.
 
 ## 6. The PDF parser (importer/dsparse.mjs)
 

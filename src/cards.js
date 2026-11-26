@@ -1,30 +1,14 @@
 
 // ================= CARDS: items, quests, followers =================
 const CARD_SIZES = { poker: ['Poker (63 × 88 mm)', 63, 88], tarot: ['Tarot (70 × 120 mm)', 70, 120], large: ['Large (89 × 127 mm)', 89, 127] };
-const CARD_COL = { Consumable: '#3d7a4a', Trinket: '#2d5f8a', Leveled: '#6b3fa0', Artifact: '#a8322d', quest: '#a87a1e', follower: '#2a7f7a', retainer: '#7a4a2a' };
-const REWARD_LABELS = ['Victories', 'Title', 'Treasure', 'Project Source', 'Renown', 'Wealth', 'Retainer', 'Other'];
+const CARD_COL = { quest: '#a87a1e' };   // colours per card kind; systems add theirs (SYS.cards.colors)
 let CARDS = store.get('cards', null) || {};
 if (!CARDS.deck) CARDS.deck = (CARDS.items || []).map(x => ({ k: 'item', id: x.id, n: x.n }));
 delete CARDS.items;
 CARDS = { size: 'poker', backs: true, craft: false, tab: 'item', quests: [], followers: [], ...CARDS };
 const saveCards = () => store.set('cards', CARDS);
-const CRAFT_RE = /^(Item Prerequisite|Project Source|Project Roll Characteristic|Project Goal)s?:/i;
-const retainerList = () => MONS.filter(m => /Retainer/i.test(m.role || ''));
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
-function itemCard(t, craft) {
-  const sub = [t.type === 'Leveled' ? 'Leveled ' + (t.sub || 'treasure').toLowerCase() : t.type, t.echelon ? ORD(t.echelon) + ' echelon' : ''].filter(Boolean).join(' · ');
-  const paras = [];
-  for (const b of t.body || []) {
-    const html = (b.html || (b.text ? esc(b.text) : '')).trim(); if (!html) continue;
-    const txt = strip(html);
-    if (/^Keywords?:/i.test(txt)) continue;
-    if (!craft && CRAFT_RE.test(txt)) continue;
-    if (b.t === 'tier') { paras.push(`<b>${['', '≤11', '12–16', '17+'][b.n]}:</b> ${html}`); continue; }
-    html.split(/(?=<b>\s*\d+(?:st|nd|rd|th) Level)/).forEach(h => paras.push((b.t === 'li' ? '• ' : '') + h.trim()));
-  }
-  return { name: t.name, sub, keywords: t.keywords || '', paras, color: CARD_COL[t.type] || '#555555', back: t.type || 'Treasure', foot: 'Draw Steel' + (t.src?.pg ? ' · Heroes p. ' + t.src.pg : '') };
-}
 function questCard(q) {
   const paras = [];
   if (q.text) q.text.split(/\n+/).forEach(p => paras.push(esc(p)));
@@ -32,42 +16,14 @@ function questCard(q) {
   if (rw.length) paras.push('<b>Rewards</b><br>' + rw.map(r => `[] <b>${esc(r.label)}:</b> ${esc(r.value)}`).join('<br>'));
   return { name: q.title || 'Quest', sub: 'Quest' + (q.from ? ' · ' + q.from : ''), keywords: '', paras, color: q.color || CARD_COL.quest, back: 'Quest', check: true, foot: q.source || '' };
 }
-const tierTxt = rows => { const t = rows.filter(r => r.k === 'tier'); return t.length ? t.map(r => `<b>${['', '≤11', '12–16', '17+'][r.n]}</b> ${r.html}`).join('; ') : ''; };
-function followerCard(f) {
-  if (f.type === 'retainer') {
-    const m = MON[f.gid]; if (!m) return { name: f.name || 'Retainer', sub: 'Retainer (stat block not found)', paras: [], color: CARD_COL.retainer, back: 'Retainer' };
-    const st = m.stats || {}, ch = m.chars || {};
-    const stats = [['Stamina', st.Stamina], ['Speed', (st.Speed || '') + (m.movement && m.movement !== '—' ? '*' : '')], ['Size', st.Size], ['Stability', st.Stability], ['Free strike', st['Free Strike']], ['Might', ch.Might], ['Agility', ch.Agility], ['Reason', ch.Reason], ['Intuition', ch.Intuition], ['Presence', ch.Presence]].filter(x => x[1] != null && x[1] !== '');
-    const paras = [];
-    if (f.name) paras.push(`<i>${esc(m.name)}${m.desc ? ' · ' + esc(m.desc) : ''}</i>`);
-    const misc = [m.movement && m.movement !== '—' ? '<b>*Movement:</b> ' + esc(m.movement) : '', m.immunity && m.immunity !== '—' ? '<b>Immunity:</b> ' + esc(m.immunity) : '', m.weakness && m.weakness !== '—' ? '<b>Weakness:</b> ' + esc(m.weakness) : ''].filter(Boolean);
-    if (misc.length) paras.push(misc.join(' · '));
-    for (const a of m.items || []) {
-      const head = `<b>${esc(a.name)}${a.action ? '' : '.'}</b>${a.action ? ` <i>(${esc([a.action, a.distance, a.target].filter(Boolean).join(', '))})</i>` : ''}`;
-      const fields = (a.rows || []).filter(r => r.k === 'field').map(r => r.html).join(' ');
-      const tiers = tierTxt(a.rows || []);
-      paras.push(head + (tiers ? ' ' + tiers + '.' : '') + (fields ? ' ' + fields : ''));
-    }
-    if (f.notes) paras.push(esc(f.notes));
-    paras.push('<b>Mentor:</b> ____________________');
-    return { name: f.name || m.name, sub: `Level ${m.level} ${m.role}`, keywords: '', stats, paras, color: CARD_COL.retainer, back: 'Retainer', foot: (PK[m.pack]?.title || '') + (m.pg ? ' p. ' + m.pg : '') };
-  }
-  const art = f.type === 'artisan';
-  const chars = { Might: 0, Agility: 0, Reason: 1, Intuition: art ? 0 : 1, Presence: 0 }; if (art) chars[f.char === 'Agility' ? 'Agility' : 'Might'] = 1;
-  const stats = Object.entries(chars).map(([k, v]) => [k, (v > 0 ? '+' : '') + v]);
-  const langs = ['Caelian', ...(f.languages || []).filter(Boolean)];
-  const paras = [`<b>Skills:</b> ${esc((f.skills || []).join(', ') || '—')}`, `<b>Languages:</b> ${esc(langs.join(', '))}`,
-    `${art ? 'A crafting expert' : 'A research expert'}. Contributes one project roll per day to a downtime project you choose, whether you spend those days in respite, adventuring, or other activities. Must remain at your stronghold or the project site, with access to the necessary materials.`];
-  if (f.notes) paras.push(esc(f.notes));
-  return { name: f.name || (art ? 'Artisan' : 'Sage'), sub: (art ? 'Artisan' : 'Sage') + ' follower' + (f.ancestry ? ' · ' + f.ancestry : ''), keywords: '', stats, paras, color: CARD_COL.follower, back: 'Follower', foot: 'Draw Steel · Heroes p. 350' };
-}
 // ---- icons (game-icons.net CC BY 3.0, Material Design Icons Apache 2.0) ----
 const ICON_LIBS = { gi: { name: 'Game icons', n: 4134, credit: 'game-icons.net (CC BY 3.0)' }, mdi: { name: 'Material icons', n: 7636, credit: 'Material Design Icons (Apache 2.0)' } };
 const ICONS = {}; const iconLoads = {};
 function loadIcons(pre) { if (ICONS[pre]) return Promise.resolve(ICONS[pre]); return iconLoads[pre] || (iconLoads[pre] = getJSON(`data/icons-${pre}.json`).then(d => { ICONS[pre] = d; d.names = Object.keys(d.icons); return d; })); }
 const iconDef = ref => { if (!ref) return null; const [pre, name] = ref.split(':'); const L = ICONS[pre]; const v = L && L.icons[name]; return v ? { w: L.w, d: v[0], eo: !!v[1] } : null; };
 const iconSvg = (ref, cls = '') => { const d = iconDef(ref); return d ? `<svg class="${cls}" viewBox="0 0 ${d.w} ${d.w}" aria-hidden="true"><path fill="currentColor"${d.eo ? ' fill-rule="evenodd"' : ''} d="${d.d}"/></svg>` : ''; };
-const ICON_DEFAULT = { Consumable: 'gi:potion-ball', Trinket: 'gi:gem-pendant', Artifact: 'gi:crystal-ball', Weapon: 'gi:broadsword', Armor: 'gi:breastplate', Implement: 'gi:wizard-staff', Other: 'gi:gem-chain', Leveled: 'gi:crossed-swords', quest: 'gi:scroll-unfurled', retainer: 'gi:swordman', artisan: 'gi:anvil-impact', sage: 'gi:spell-book' };
+const ICON_DEFAULT = { quest: 'gi:scroll-unfurled' };   // systems add theirs (SYS.cards.icons)
+const cardIconFor = k => (SYS.cards?.icons || {})[k] || ICON_DEFAULT[k];
 const ICON_SYN = { potion: 'potion-ball', elixir: 'potion-ball', draught: 'round-bottom-flask', tonic: 'round-bottom-flask', oil: 'oil-drum', salve: 'round-bottom-flask', ring: 'diamond-ring', amulet: 'gem-pendant', necklace: 'gem-pendant', pendant: 'gem-pendant', cloak: 'cloak', mantle: 'cloak', boots: 'boots', helm: 'visored-helm', helmet: 'visored-helm', crown: 'crown', shield: 'shield', armor: 'breastplate', plate: 'breastplate', mail: 'chain-mail', blade: 'broadsword', sword: 'broadsword', axe: 'battle-axe', hammer: 'war-pick', spear: 'spear-head', bow: 'pocket-bow', dagger: 'bowie-knife', dart: 'dart', staff: 'wizard-staff', wand: 'orb-wand', orb: 'crystal-ball', book: 'spell-book', tome: 'spell-book', scroll: 'scroll-unfurled', map: 'treasure-map', key: 'key', lantern: 'lantern-flame', lamp: 'lantern-flame', bag: 'swap-bag', satchel: 'knapsack', gloves: 'gloves', gauntlet: 'mailed-fist', belt: 'belt', mask: 'mask', coin: 'two-coins', bell: 'ringing-bell', horn: 'hunting-horn', skull: 'skull-crossed-bones', bone: 'bone-knife', eye: 'eye-target', feather: 'feather', heart: 'heart-bottle', egg: 'egg-clutch', seed: 'seedling', flower: 'flower-emblem', fire: 'fire', flame: 'fire', ice: 'ice-cube', snow: 'snowflake-1', storm: 'lightning-storm', lightning: 'lightning-storm', star: 'star-swirl', moon: 'moon', sun: 'sun', chain: 'chain', rope: 'rope-coil', hourglass: 'hourglass', mirror: 'hand-mirror', dust: 'powder', powder: 'powder', bomb: 'unlit-bomb', bead: 'bead', stone: 'stone-pile', gem: 'cut-diamond', crystal: 'crystal-growth', spider: 'spider-alt', dragon: 'dragon-head', wing: 'feathered-wing', blood: 'drop', water: 'water-drop', poison: 'poison-bottle', thorn: 'thorny-vine', smoke: 'smoke-bomb', mead: 'beer-stein', ale: 'beer-stein', wine: 'wine-bottle', food: 'meat', bread: 'sliced-bread' };
 function autoIcon(c) {
   const gi = ICONS.gi;
@@ -76,7 +32,7 @@ function autoIcon(c) {
     for (const w of words) { const sg = w.replace(/s$/, ''); const syn = ICON_SYN[w] || ICON_SYN[sg]; if (syn && gi.icons[syn]) return 'gi:' + syn; }
     for (const w of words.slice().reverse()) { const sg = w.replace(/s$/, ''); if (gi.icons[sg]) return 'gi:' + sg; }
   }
-  return ICON_DEFAULT[c.hint] || ICON_DEFAULT[c.type] || 'gi:sparkles';
+  return cardIconFor(c.hint) || cardIconFor(c.type) || 'gi:sparkles';
 }
 const CARD_STYLES = { modern: ['Modern', 'Coloured header band, clean white body'], classic: ['Classic', 'Parchment, serif type, ornamental frame'], bold: ['Bold', 'Full-colour card with a big icon'], minimal: ['Ink saver', 'White card, thin coloured frame — cheap to print'] };
 const CARD_PALETTE = ['#3d7a4a', '#2d5f8a', '#6b3fa0', '#a8322d', '#a87a1e', '#2a7f7a', '#7a4a2a', '#c2531f', '#b0406f', '#3b4a63', '#5b6b2e', '#1d1d1f'];
@@ -84,9 +40,8 @@ const cardKey = d => d.k + ':' + d.id;
 function custOf(d) { return (CARDS.custom || {})[cardKey(d)] || {}; }
 function deckEntry(d) {
   let e = null;
-  if (d.k === 'item') { const t = D.treasures.find(x => x.id === d.id); e = t && { label: t.name, kind: t.type, c: itemCard(t, CARDS.craft) }; if (e) e.c.hint = t.type === 'Leveled' ? (t.sub || 'Leveled') : t.type; }
   if (d.k === 'quest') { const q = CARDS.quests.find(x => x.id === d.id); e = q && { label: q.title, kind: 'Quest', c: questCard(q), obj: q }; if (e) e.c.hint = 'quest'; }
-  if (d.k === 'follower') { const f = CARDS.followers.find(x => x.id === d.id); e = f && { label: f.name || MON[f.gid]?.name || f.type, kind: f.type === 'retainer' ? 'Retainer' : f.type === 'artisan' ? 'Artisan' : 'Sage', c: followerCard(f), obj: f }; if (e) e.c.hint = f.type; }
+  else { const k = (SYS.cards?.kinds || {})[d.k]; e = k ? k.entry(d) : null; }   // system card kinds (Draw Steel: treasures, followers)
   if (!e) return null;
   const cu = custOf(d), c = e.c;
   if (cu.title) c.name = cu.title; if (cu.sub) c.sub = cu.sub; if (cu.color) c.color = cu.color; if (cu.back) c.back = cu.back;
@@ -103,20 +58,21 @@ function cardHtml(c, n, i) {
     <div class="ic-b">${st === 'classic' ? '<div class="ic-orn"><i></i><span></span><i></i></div>' : ''}${c.keywords ? `<div class="ic-kw">${esc(c.keywords)}</div>` : ''}${body}${CARDS.watermark !== false && ic ? `<span class="ic-wm">${ic}</span>` : ''}</div>
     ${n > 1 ? `<span class="ic-n">×${n}</span>` : ''}</div>`;
 }
+// Card kinds: quest cards are built in; a system adds its own (SYS.cards.kinds: Draw Steel treasures,
+// followers & retainers), each with a tab, an "add" row and how a deck entry becomes a card.
 function cardsPage() {
-  const T = D.treasures; const byType = {}; T.forEach(t => (byType[t.type] = byType[t.type] || []).push(t));
+  const C = SYS.cards || {}, kinds = C.kinds || {};
   if (!ICONS.gi) { $('#main').innerHTML = '<div class="neghub cardsp"><h1>Cards</h1><div class="empty">Loading icons…</div></div>'; loadIcons('gi').then(() => { if (/^#cards/.test(location.hash)) cardsPage(); }).catch(() => { ICONS.gi = { w: 512, icons: {}, names: [] }; cardsPage(); }); return; }
   const rows = CARDS.deck.map((d, i) => ({ d, i, e: deckEntry(d) })).filter(x => x.e);
-  const tab = CARDS.tab; const st = CARDS.style || 'modern';
-  const tabs = `<div class="seg4 ctabs">${[['item', 'Items'], ['quest', 'Quests'], ['follower', 'Followers & retainers']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-ctab="${k}">${l}</button>`).join('')}</div>`;
+  const tabList = C.tabs || [['quest', 'Quests']];
+  const tab = tabList.some(([k]) => k === CARDS.tab) ? CARDS.tab : tabList[0][0]; const st = CARDS.style || 'modern';
+  const tabs = `<div class="seg4 ctabs">${tabList.map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-ctab="${k}">${l}</button>`).join('')}</div>`;
   let adder = '';
-  if (tab === 'item') adder = `<div class="cardadd"><div class="csearch">${ico('search', 16)}<input id="c-q" placeholder="Search ${T.length} treasures…" autocomplete="off"><div id="c-qres" class="cqres"></div></div>
-      <select id="c-addall"><option value="">Add all of a type…</option>${Object.keys(byType).map(ty => `<option>${esc(ty)}</option>`).join('')}</select></div>`;
-  else if (tab === 'quest') adder = `<div class="cardadd"><button class="btn" id="q-new">+ New quest card</button><button class="btn ghost" id="q-adv">Create from adventure…</button>
+  if (tab === 'quest') adder = `<div class="cardadd"><button class="btn" id="q-new">+ New quest card</button>${C.questsFromChapter ? '<button class="btn ghost" id="q-adv">Create from adventure…</button>' : ''}
       ${CARDS.quests.length ? `<select id="q-pick"><option value="">Add one of your quests again…</option>${CARDS.quests.map(q => `<option value="${q.id}">${esc(q.title)}</option>`).join('')}</select>` : ''}</div>`;
-  else adder = `<div class="cardadd"><button class="btn" id="f-ret">+ Retainer</button><button class="btn ghost" id="f-art">+ Artisan</button><button class="btn ghost" id="f-sage">+ Sage</button></div>`;
+  else if (kinds[tab]) adder = kinds[tab].adder();
   $('#main').innerHTML = `<div class="neghub cardsp"><h1>Cards</h1>
-    <p class="note">Print treasures, quests, followers and retainers as cards. Click any card to change its icon, colour or text.</p>
+    <p class="note">Print ${esc(C.intro || 'quests')} as cards. Click any card to change its icon, colour or text.</p>
     ${tabs}${adder}
     <div class="cdesign"><div class="cd-h">Card style</div><div class="cstyles">${Object.entries(CARD_STYLES).map(([k, [l, d]]) => `<button class="cstyle ${st === k ? 'on' : ''}" data-cstyle="${k}"><span class="cs-prev st-${k}"><i></i><em></em><em></em></span><b>${l}</b><small>${d}</small></button>`).join('')}</div>
       <div class="cardopts"><label>Size <select id="c-size">${Object.entries(CARD_SIZES).map(([k, v]) => `<option value="${k}" ${CARDS.size === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></label>
@@ -125,7 +81,7 @@ function cardsPage() {
       <label class="row-c"><input type="checkbox" id="c-backs" ${CARDS.backs ? 'checked' : ''}> Print backs</label>
       <label class="row-c"><input type="checkbox" id="c-iback" ${CARDS.iconBack !== false ? 'checked' : ''}> Card icon on back</label>
       ${(() => { const syncOn = window.VSync && VSync.status().enabled; return `<label class="row-c" title="${syncOn ? 'Each card back gets a QR code. Players scan it to get the card as a JPG. The pictures are uploaded to this site and public to anyone with the code.' : 'Needs sync: the card pictures are uploaded with your sync key.'}"><input type="checkbox" id="c-qr" ${CARDS.qr && syncOn ? 'checked' : ''} ${syncOn ? '' : 'disabled'}> QR code on back (JPG for players)${syncOn ? '' : ' · <a href="#sync">needs sync</a>'}</label>`; })()}
-      <label class="row-c"><input type="checkbox" id="c-craft" ${CARDS.craft ? 'checked' : ''}> Crafting info</label></div></div>
+      ${C.optionsHtml ? C.optionsHtml() : ''}</div></div>
     <div class="negacts"><button class="btn" id="c-pdf" ${rows.length ? '' : 'disabled'}>Export cards PDF (${rows.reduce((s, x) => s + x.d.n, 0)})</button>${rows.length ? '<button class="btn ghost" id="c-clear">Clear deck</button>' : ''}</div>
     ${rows.length ? `<div class="cdeck">${rows.map(({ d, i, e }) => `<div class="cdeck-r"><button class="cd-ic" data-cicon="${i}" style="--cc:${e.c.color}" title="Change icon">${e.c.icon ? iconSvg(e.c.icon) : '—'}</button><b>${esc(e.c.name)}</b><span>${esc(e.kind)}</span><button class="ibtn" data-cust="${i}" title="Customise">✎</button><div class="step"><button data-cdec="${i}">−</button><b>${d.n}</b><button data-cinc="${i}">+</button></div><button class="ibtn" data-crm="${i}" title="Remove from deck">✕</button></div>`).join('')}</div>
       <div class="cgrid">${rows.map(x => cardHtml(x.e.c, x.d.n, x.i)).join('')}</div>` : '<div class="empty">No cards yet.</div>'}
@@ -133,28 +89,17 @@ function cardsPage() {
   const re = () => { saveCards(); cardsPage(); };
   $$('[data-ctab]').forEach(b => b.onclick = () => { CARDS.tab = b.dataset.ctab; re(); });
   $$('[data-cstyle]').forEach(b => b.onclick = () => { CARDS.style = b.dataset.cstyle; re(); });
-  const cq = $('#c-q');
-  if (cq) {
-    const show = () => { const q = cq.value.trim().toLowerCase(); const box = $('#c-qres'); if (!q) { box.innerHTML = ''; box.classList.remove('on'); return; }
-      const hits = T.filter(t => (t.name + ' ' + t.type + ' ' + (t.keywords || '') + ' ' + (t.sub || '')).toLowerCase().includes(q)).sort((a, b) => (b.name.toLowerCase().startsWith(q) - a.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name)).slice(0, 12);
-      box.innerHTML = hits.map(t => { const c = { name: t.name, hint: t.type === 'Leveled' ? (t.sub || 'Leveled') : t.type }; return `<button data-addi="${t.id}"><span class="cd-ic" style="--cc:${CARD_COL[t.type] || '#555'}">${iconSvg(autoIcon(c))}</span><b>${esc(t.name)}</b><small>${esc(t.type)}${t.echelon ? ' · ' + ORD(t.echelon) + ' echelon' : ''}</small>${CARDS.deck.some(x => x.k === 'item' && x.id === t.id) ? '<em>in deck</em>' : ''}</button>`; }).join('') || '<div class="empty">No treasure matches.</div>';
-      box.classList.add('on');
-      $$('[data-addi]', box).forEach(b => b.onmousedown = e => { e.preventDefault(); addToDeck('item', b.dataset.addi); saveCards(); cardsPage(); setTimeout(() => { const n = $('#c-q'); if (n) { n.value = cq.value; n.focus(); n.dispatchEvent(new Event('input')); } }, 0); });
-    };
-    cq.oninput = show; cq.onfocus = show; cq.onblur = () => setTimeout(() => $('#c-qres')?.classList.remove('on'), 150);
-    cq.onkeydown = e => { if (e.key === 'Enter') { const f = $('#c-qres [data-addi]'); if (f) f.dispatchEvent(new MouseEvent('mousedown')); } if (e.key === 'Escape') { cq.value = ''; show(); } };
-    $('#c-addall').onchange = e => { const ty = e.target.value; if (!ty) return; byType[ty].forEach(t => { if (!CARDS.deck.some(x => x.k === 'item' && x.id === t.id)) CARDS.deck.push({ k: 'item', id: t.id, n: 1 }); }); re(); };
-  }
-  if ($('#q-new')) { $('#q-new').onclick = () => questEditor(null); $('#q-adv').onclick = questsFromAdventureDialog; }
+  if ($('#q-new')) $('#q-new').onclick = () => questEditor(null);
+  if ($('#q-adv')) $('#q-adv').onclick = questsFromAdventureDialog;
   if ($('#q-pick')) $('#q-pick').onchange = e => { if (e.target.value) { addToDeck('quest', e.target.value); re(); } };
-  if ($('#f-ret')) { $('#f-ret').onclick = () => followerEditor({ type: 'retainer' }); $('#f-art').onclick = () => followerEditor({ type: 'artisan' }); $('#f-sage').onclick = () => followerEditor({ type: 'sage' }); }
+  if (kinds[tab] && kinds[tab].wire) kinds[tab].wire(re);
   $('#c-size').onchange = e => { CARDS.size = e.target.value; re(); };
   $('#c-text').onchange = e => { CARDS.text = e.target.value; saveCards(); };
   $('#c-wm').onchange = e => { CARDS.watermark = e.target.checked; re(); };
   $('#c-backs').onchange = e => { CARDS.backs = e.target.checked; saveCards(); };
   $('#c-iback').onchange = e => { CARDS.iconBack = e.target.checked; saveCards(); };
   $('#c-qr').onchange = e => { CARDS.qr = e.target.checked; if (CARDS.qr) CARDS.backs = true; re(); };  // QR codes live on the backs
-  $('#c-craft').onchange = e => { CARDS.craft = e.target.checked; re(); };
+  if (C.wireOptions) C.wireOptions(re);
   if ($('#c-clear')) $('#c-clear').onclick = async () => { if (await confirmSheet('Remove all cards from the deck? (Your quests and followers stay saved.)', 'Clear')) { CARDS.deck = []; re(); } };
   $$('[data-cinc]').forEach(b => b.onclick = () => { CARDS.deck[+b.dataset.cinc].n++; re(); });
   $$('[data-cdec]').forEach(b => b.onclick = () => { const x = CARDS.deck[+b.dataset.cdec]; x.n--; if (x.n <= 0) CARDS.deck.splice(+b.dataset.cdec, 1); re(); });
@@ -198,7 +143,7 @@ function cardCustomizer(i) {
 function iconPicker(c, onPick) {
   const el = document.createElement('div'); el.className = 'dlg';
   const st = { lib: 'gi', q: '' };
-  const sugg = () => { const words = String(c.name || '').toLowerCase().split(/[^a-z]+/).filter(w => w.length > 2); const L = ICONS.gi; if (!L) return []; const out = new Set([autoIcon(c)]); for (const w of words) { const sg = w.replace(/s$/, ''); L.names.filter(n => n.split('-').includes(sg) || n.split('-').includes(w)).slice(0, 8).forEach(n => out.add('gi:' + n)); } [ICON_DEFAULT[c.hint], ICON_DEFAULT[c.type]].filter(Boolean).forEach(x => out.add(x)); return [...out].slice(0, 16); };
+  const sugg = () => { const words = String(c.name || '').toLowerCase().split(/[^a-z]+/).filter(w => w.length > 2); const L = ICONS.gi; if (!L) return []; const out = new Set([autoIcon(c)]); for (const w of words) { const sg = w.replace(/s$/, ''); L.names.filter(n => n.split('-').includes(sg) || n.split('-').includes(w)).slice(0, 8).forEach(n => out.add('gi:' + n)); } [cardIconFor(c.hint), cardIconFor(c.type)].filter(Boolean).forEach(x => out.add(x)); return [...out].slice(0, 16); };
   el.innerHTML = `<div class="dlg-b ipick"><h2>Choose an icon</h2>
     <div class="ip-top"><div class="seg4 iplib">${Object.entries(ICON_LIBS).map(([k, v]) => `<button data-lib="${k}" class="${k === st.lib ? 'on' : ''}">${v.name} <small>${v.n.toLocaleString()}</small></button>`).join('')}</div>
     <div class="csearch">${ico('search', 16)}<input id="ip-q" placeholder="Search icons, e.g. potion, sword, skull, castle…" autocomplete="off"></div></div>
@@ -229,7 +174,8 @@ function iconPicker(c, onPick) {
 }
 // ---- quest editor ----
 function questEditor(q) {
-  const isNew = !q; q = q ? JSON.parse(JSON.stringify(q)) : { id: uid('q'), title: '', text: '', rewards: [{ label: 'Victories', value: '' }, { label: 'Treasure', value: '' }] };
+  const RW = SYS.cards?.rewards || { labels: ['Other'], hints: {}, defaults: [] };   // reward types are the system's (Draw Steel: Victories, Renown, …)
+  const isNew = !q; q = q ? JSON.parse(JSON.stringify(q)) : { id: uid('q'), title: '', text: '', rewards: JSON.parse(JSON.stringify(RW.defaults)) };
   const el = document.createElement('div'); el.className = 'dlg';
   const draw = () => {
     el.innerHTML = `<div class="dlg-b negedit"><h2>${isNew ? 'New' : 'Edit'} quest card</h2>
@@ -237,7 +183,7 @@ function questEditor(q) {
       <label class="negnotes">What the heroes were asked to do<textarea id="qe-x" rows="3" placeholder="Brother Aldo asked you to find out who stole the temple bell.">${esc(q.text)}</textarea></label>
       <label class="negnotes">Given by / where (optional, shown under the title)<input id="qe-f" value="${esc(q.from || '')}" placeholder="Brother Aldo · Temple of the Tide"></label>
       <div class="negnotes">Rewards</div>
-      ${q.rewards.map((r, i) => `<div class="qrow"><select data-rl="${i}">${REWARD_LABELS.map(l => `<option ${r.label === l ? 'selected' : ''}>${l}</option>`).join('')}</select><input data-rv="${i}" value="${esc(r.value)}" placeholder="${{ Victories: '2', Title: 'Fey Friend', Treasure: 'Healing Potion', 'Project Source': 'Quantum Satchel', Renown: '+1', Wealth: '+1', Retainer: 'Lamprey', Other: '' }[r.label] || ''}"><button class="ibtn" data-rd="${i}">✕</button></div>`).join('')}
+      ${q.rewards.map((r, i) => `<div class="qrow"><select data-rl="${i}">${RW.labels.map(l => `<option ${r.label === l ? 'selected' : ''}>${l}</option>`).join('')}</select><input data-rv="${i}" value="${esc(r.value)}" placeholder="${RW.hints[r.label] || ''}"><button class="ibtn" data-rd="${i}">✕</button></div>`).join('')}
       <button class="btn ghost sm" id="qe-add">+ Reward</button>
       <div class="dlgfoot">${!isNew ? '<button class="btn danger" id="qe-del">Delete quest</button>' : ''}<span style="flex:1"></span><button class="btn ghost" id="qe-x2">Cancel</button><button class="btn" id="qe-ok">${isNew ? 'Add card' : 'Save'}</button></div></div>`;
     const keep = () => { q.title = $('#qe-t', el).value.trim(); q.text = $('#qe-x', el).value.trim(); q.from = $('#qe-f', el).value.trim(); $$('[data-rl]', el).forEach(s => q.rewards[+s.dataset.rl].label = s.value); $$('[data-rv]', el).forEach(s => q.rewards[+s.dataset.rv].value = s.value.trim()); };
@@ -250,99 +196,24 @@ function questEditor(q) {
   };
   draw(); document.body.appendChild(el); setTimeout(() => $('#qe-t', el)?.focus(), 30);
 }
-// ---- follower editor ----
-function followerEditor(f0) {
-  const isNew = !f0.id; const f = JSON.parse(JSON.stringify({ name: '', ancestry: '', skills: [], languages: ['', ''], char: 'Might', notes: '', ...f0 }));
-  const el = document.createElement('div'); el.className = 'dlg';
-  const rets = retainerList(); const byPack = {}; rets.forEach(m => (byPack[m.pack] = byPack[m.pack] || []).push(m));
-  if (f.type === 'retainer' && !f.gid && rets[0]) f.gid = rets[0].gid;
-  const draw = () => {
-    const grp = f.type === 'artisan' ? 'Crafting' : 'Lore';
-    const skills = D.skills.filter(s => s.group === grp).map(s => s.name);
-    el.innerHTML = `<div class="dlg-b negedit"><h2>${isNew ? 'New' : 'Edit'} ${f.type === 'retainer' ? 'retainer' : f.type} card</h2>
-      ${f.type === 'retainer' ? `<label class="negnotes">Retainer<select id="fe-g">${Object.entries(byPack).map(([p, ms]) => `<optgroup label="${esc(PK[p]?.title || p)}">${ms.map(m => `<option value="${m.gid}" ${f.gid === m.gid ? 'selected' : ''}>${esc(m.name)} (level ${m.level} ${esc(m.role.replace(/ Retainer$/, ''))})</option>`).join('')}</optgroup>`).join('')}</select></label>
-        ${!rets.length ? '<div class="warn">No retainer stat blocks found. Retainers come from the Monsters book.</div>' : ''}
-        <label class="negnotes">Name (optional)<input id="fe-n" value="${esc(f.name)}" placeholder="Leave empty to use the stat block’s name"></label>`
-      : `<div class="mtrow"><label>Name<input id="fe-n" value="${esc(f.name)}"></label><label>Ancestry<input id="fe-a" value="${esc(f.ancestry)}"></label>${f.type === 'artisan' ? `<label>Characteristic at 1<select id="fe-c"><option ${f.char === 'Might' ? 'selected' : ''}>Might</option><option ${f.char === 'Agility' ? 'selected' : ''}>Agility</option></select></label>` : ''}</div>
-        <div class="negnotes">Four ${grp.toLowerCase()} skills (${f.skills.length}/4)</div>
-        <div class="fskills">${skills.map(s => `<label><input type="checkbox" data-sk="${esc(s)}" ${f.skills.includes(s) ? 'checked' : ''}> ${esc(s)}</label>`).join('')}</div>
-        <div class="mtrow"><label>Languages: Caelian +<input id="fe-l1" value="${esc(f.languages[0] || '')}"></label><label>and<input id="fe-l2" value="${esc(f.languages[1] || '')}"></label></div>`}
-      <label class="negnotes">Notes (optional)<input id="fe-x" value="${esc(f.notes)}"></label>
-      <div class="dlgfoot">${!isNew ? '<button class="btn danger" id="fe-del">Delete</button>' : ''}<span style="flex:1"></span><button class="btn ghost" id="fe-q">Cancel</button><button class="btn" id="fe-ok">${isNew ? 'Add card' : 'Save'}</button></div></div>`;
-    const keep = () => { f.name = $('#fe-n', el).value.trim(); f.notes = $('#fe-x', el).value.trim(); if ($('#fe-g', el)) f.gid = $('#fe-g', el).value; if ($('#fe-a', el)) f.ancestry = $('#fe-a', el).value.trim(); if ($('#fe-c', el)) f.char = $('#fe-c', el).value; if ($('#fe-l1', el)) f.languages = [$('#fe-l1', el).value.trim(), $('#fe-l2', el).value.trim()]; };
-    $$('[data-sk]', el).forEach(c => c.onchange = () => { keep(); const s = c.dataset.sk; if (c.checked) { if (f.skills.length >= 4) { toast('A follower knows four skills'); c.checked = false; return; } f.skills.push(s); } else f.skills = f.skills.filter(x => x !== s); draw(); });
-    $('#fe-q', el).onclick = () => el.remove();
-    if ($('#fe-del', el)) $('#fe-del', el).onclick = async () => { if (await confirmSheet('Delete this card?', 'Delete')) { CARDS.followers = CARDS.followers.filter(x => x.id !== f.id); CARDS.deck = CARDS.deck.filter(x => !(x.k === 'follower' && x.id === f.id)); saveCards(); el.remove(); cardsPage(); } };
-    $('#fe-ok', el).onclick = () => { keep(); if (f.type === 'retainer' && !MON[f.gid]) { toast('Pick a retainer'); return; } if (!f.id) { f.id = uid('f'); CARDS.followers.push(f); addToDeck('follower', f.id); } else { const i = CARDS.followers.findIndex(x => x.id === f.id); CARDS.followers[i] = f; } CARDS.tab = 'follower'; saveCards(); el.remove(); cardsPage(); };
-  };
-  draw(); document.body.appendChild(el);
-}
 // ---- quests from an adventure ----
-const NUMWORD = { one: 1, two: 2, three: 3, four: 4, five: 5, a: 1, an: 1 };
-function sectionRewards(blocks) {
-  const R = { vic: 0, treasure: [], title: [], renown: 0, wealth: 0, source: [], retainer: [], other: [] };
-  const add = (arr, v) => { v = v.trim().replace(/\s+/g, ' '); const k = v.toLowerCase().replace(/s$/, ''); if (v && !arr.some(x => x.toLowerCase().replace(/s$/, '') === k)) arr.push(v); };
-  const tnames = D.treasures.map(t => t.name).sort((a, b) => b.length - a.length);
-  for (const b of blocks) {
-    if (b.t === 'h') { const m = b.text.match(/^Title:\s*(.+)$/i); if (m) add(R.title, m[1]); continue; }
-    const txt = strip(b.html || (b.rows ? b.rows.flat().join(' ') : '') || '');
-    let m; const vre = /\b(?:earns?|gains?)\s+(\d+|one|two|three|four|five)\s+(?:additional\s+)?Victor(?:y|ies)\b/gi;
-    while ((m = vre.exec(txt))) R.vic = Math.max(R.vic, +m[1] || NUMWORD[m[1].toLowerCase()] || 0);
-    const tre = /\(see\s+([^)]*?)\s+in\s+Treasures?\s+in\s+Handouts\)|((?:[A-Z][\w’'\-]*\s?){1,5})\s*\(see\s+Treasures?\s+in\s+Handouts\)/g;
-    while ((m = tre.exec(txt))) add(R.treasure, (m[1] || m[2]).replace(/^(?:a|an|the)\s+/i, ''));
-    for (const n of tnames) if (new RegExp('\\b' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(txt) && !R.treasure.some(x => x.includes(n))) add(R.treasure, n);
-    const rre = /\bgains?\s+(\d+|one|two)\s+Renown/gi; while ((m = rre.exec(txt))) R.renown = Math.max(R.renown, +m[1] || NUMWORD[m[1].toLowerCase()]);
-    const wre = /Wealth\s+(?:score\s+)?(?:increases|goes up)\s+by\s+(\d+|one|two)/gi; while ((m = wre.exec(txt))) R.wealth = Math.max(R.wealth, +m[1] || NUMWORD[m[1].toLowerCase()]);
-    const pre = /project source (?:for|of) (?:an? |the )?([A-Z][\w’'\- ]+)/gi; while ((m = pre.exec(txt))) add(R.source, m[1]);
-    const tie = /([A-Z][\w’'\- ]+?)\s+title\s+\(see Titles/g; while ((m = tie.exec(txt))) add(R.title, m[1]);
-    if (/becom\w* a retainer/i.test(txt)) { const who = txt.match(/([A-Z][\w’']+)\s+(?:also\s+)?pledges/); if (who) add(R.retainer, who[1]); }
-  }
-  return R;
-}
-function questsFromChapter(pack, ch, L) {
-  const B = ch.blocks; const out = [];
-  const leadDesc = name => { const li = B.find(b => b.t === 'li' && new RegExp('^\\s*<b>\\s*' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:?\\s*</b>', 'i').test(b.html || '')); return li ? strip(li.html).replace(/^[^:]+:\s*/, '') : ''; };
-  for (let i = 0; i < B.length; i++) {
-    const h = B[i]; if (h.t !== 'h' || h.lvl !== L) continue;
-    let end = B.length; for (let k = i + 1; k < B.length; k++) if (B[k].t === 'h' && B[k].lvl <= L) { end = k; break; }
-    const sec = B.slice(i + 1, end);
-    // scenes one level down are added up; inside a scene, alternative outcomes take the best
-    const subL = Math.min(...sec.filter(b => b.t === 'h').map(b => b.lvl).concat([99]));
-    const isScene = b => b.t === 'h' && b.lvl === subL && subL <= L + 2 && !/^(Total|Partial|Victor|Reward|Ending|Encounter Adjust|Tactics|Terrain|Development)/i.test(b.text);
-    let vic = 0; const R = sectionRewards(sec);
-    if (subL < 99 && sec.some(isScene)) { let cur = []; const parts = []; for (const b of sec) { if (isScene(b)) { parts.push(cur); cur = []; } cur.push(b); } parts.push(cur); vic = parts.reduce((s, p) => s + sectionRewards(p).vic, 0); } else vic = R.vic;
-    let desc = leadDesc(h.text);
-    if (!desc) { const p = sec.find(b => (b.t === 'p') && !/^[“"]/.test(strip(b.html || '')) && strip(b.html || '').length > 40); desc = p ? strip(p.html) : ''; }
-    if (desc.length > 260) { const cut = desc.slice(0, 260); desc = cut.slice(0, Math.max(cut.lastIndexOf('. ') + 1, 180)) || cut; if (!/[.!?]$/.test(desc)) desc += '…'; }
-    const rewards = [];
-    if (vic) rewards.push({ label: 'Victories', value: (sec.some(isScene) ? 'up to ' : '') + vic });
-    R.title.forEach(v => rewards.push({ label: 'Title', value: v }));
-    R.treasure.forEach(v => rewards.push({ label: 'Treasure', value: v }));
-    R.source.forEach(v => rewards.push({ label: 'Project Source', value: v }));
-    if (R.renown) rewards.push({ label: 'Renown', value: '+' + R.renown });
-    if (R.wealth) rewards.push({ label: 'Wealth', value: '+' + R.wealth });
-    R.retainer.forEach(v => rewards.push({ label: 'Retainer', value: v }));
-    out.push({ id: uid('q'), title: h.text, text: desc, rewards, source: `${pack.title} · ${ch.title}`, pg: h.pg });
-  }
-  return out;
-}
 function questsFromAdventureDialog() {
   const packs = PACKS.filter(p => (p.chapters || []).length > 1);
   if (!packs.length) { toast('Import an adventure first'); return; }
   const st = { pack: (packs.find(p => p.kind === 'adventure') || packs[0]).id, ch: '', L: 0, sel: {} };
   const el = document.createElement('div'); el.className = 'dlg';
   const levels = ch => [...new Set(ch.blocks.filter(b => b.t === 'h' && b.lvl >= 1 && b.lvl <= 4).map(b => b.lvl))].sort();
-  const bestLevel = (p, ch) => { let best = levels(ch)[0] || 1, bestN = -1; for (const L of levels(ch)) { const qs = questsFromChapter(p, ch, L); const n = qs.filter(q => q.rewards.length).length; if (n > bestN && qs.length <= 30) { best = L; bestN = n; } if (n >= 3) { best = L; break; } } return best; };
+  const bestLevel = (p, ch) => { let best = levels(ch)[0] || 1, bestN = -1; for (const L of levels(ch)) { const qs = SYS.cards.questsFromChapter(p, ch, L); const n = qs.filter(q => q.rewards.length).length; if (n > bestN && qs.length <= 30) { best = L; bestN = n; } if (n >= 3) { best = L; break; } } return best; };
   let cands = [];
   const draw = () => {
     const p = PK[st.pack]; const chs = p.chapters.filter(c => c.blocks.some(b => b.t === 'h'));
     if (!st.ch || !chs.some(c => c.id === st.ch)) { const c2 = chs.find(c => /chapter\s*2/i.test(c.title)) || chs.find(c => /^chapter/i.test(c.title)) || chs[0]; st.ch = c2.id; st.L = 0; }
     const ch = p.chapters.find(c => c.id === st.ch);
     if (!st.L) st.L = bestLevel(p, ch);
-    cands = questsFromChapter(p, ch, st.L); cands.forEach((q, i) => { if (st.sel[i] == null) st.sel[i] = q.rewards.length > 0 && !/^(Running|Beginning|Complicating|Introduction|Using|How to|Credits|Appendix)/i.test(q.title); });
+    cands = SYS.cards.questsFromChapter(p, ch, st.L); cands.forEach((q, i) => { if (st.sel[i] == null) st.sel[i] = q.rewards.length > 0 && !/^(Running|Beginning|Complicating|Introduction|Using|How to|Credits|Appendix)/i.test(q.title); });
     const nameOf = L => ({ 1: 'Top-level sections', 2: 'Sections', 3: 'Sub-sections', 4: 'Small sections' }[L] || 'Level ' + L);
     el.innerHTML = `<div class="dlg-b negedit"><h2>Quest cards from an adventure</h2>
-      <p>Pick a chapter. Each section becomes a quest card with its rewards: Victories, treasures, titles, Renown and retainers found in the text. You can edit every card afterwards.</p>
+      <p>Pick a chapter. Each section becomes a quest card with its rewards: ${SYS.cards.questRewardsText} found in the text. You can edit every card afterwards.</p>
       <div class="mtrow"><label>Book<select id="qa-p">${packs.map(x => `<option value="${x.id}" ${x.id === st.pack ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select></label>
         <label>Chapter<select id="qa-c">${chs.map(c => `<option value="${c.id}" ${c.id === st.ch ? 'selected' : ''}>${esc(c.title)}</option>`).join('')}</select></label>
         <label>One card per<select id="qa-l">${levels(ch).map(L => `<option value="${L}" ${L === st.L ? 'selected' : ''}>${nameOf(L)} (${ch.blocks.filter(b => b.t === 'h' && b.lvl === L).length})</option>`).join('')}</select></label></div>
@@ -507,7 +378,7 @@ async function buildCardsPdf(opt = {}) {
     w.T(lab, cx - w.tw(lab, 10.5, w.FB) / 2, cy - s * 0.68 - 18, 10.5, w.FB, white);
   };
   const crop = (x, y) => { const L = 6, g = 2; const c = rgb(0.6, 0.6, 0.6); [[x, y], [x + cw, y], [x, y + ch], [x + cw, y + ch]].forEach(([px, py]) => { const sx = px === x ? -1 : 1, sy = py === y ? -1 : 1; w.line(px + sx * g, py, px + sx * (g + L), py, 0.3, c); w.line(px, py + sy * g, px, py + sy * (g + L), 0.3, c); }); };
-  const credit = () => w.T('Icons: game-icons.net (CC BY 3.0) · Material Design Icons (Apache 2.0) · Draw Steel © MCDM Productions, LLC, used under the DRAW STEEL Creator License', 20, 10, 5.5, w.F, rgb(0.6, 0.6, 0.6));
+  const credit = () => w.T('Icons: game-icons.net (CC BY 3.0) · Material Design Icons (Apache 2.0) · ' + SYS.pdfNotice, 20, 10, 5.5, w.F, rgb(0.6, 0.6, 0.6));
   for (let p0 = 0; p0 < faces.length; p0 += per) {
     const pageFaces = faces.slice(p0, p0 + per);
     w.newPage(); credit();

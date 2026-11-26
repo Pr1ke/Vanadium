@@ -1,5 +1,5 @@
 
-// ================= PRINTING: shared PDF writer, montage & negotiation sheets, markdown =================
+// ================= PRINTING: shared PDF writer, file delivery, markdown (system sheets live in systems/*) =================
 // ---------- pdf-lib, WinAnsi text and file delivery (moved from enc.js: used by every PDF) ----------
 let PDFLib = null;
 async function loadPdfLib() { if (!PDFLib) PDFLib = await import('./lib/pdf-lib.esm.min.js'); return PDFLib; }

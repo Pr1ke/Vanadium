@@ -49,6 +49,14 @@ let isMob = false;
 //   importer: {module, stats(p)}  PDF parser module and import-preview stats
 //   onClick(e)                    delegated clicks for system buttons; true if handled
 //   pdfNotice                     licence line on exported PDFs
+//   notice                        licence notice in the page footer
+//   roller: {title, html, mount}  dice roller panel (#roller) and its floating button's tooltip
+//   session: {kinds, party, partyNote, partyLine(S), newParty(), planText, overviewExtra(S)}
+//                                 what Sessions can hold besides pages (sess.js documents each kind)
+//   cards: {tabs, kinds, icons, rewards, intro, questsFromChapter, questRewardsText, optionsHtml, wireOptions}
+//                                 card kinds besides quest cards (cards.js), reward types, adventure quests
+//   syncWhat                      what sync keeps in step, in words (Sync page)
+// A system's registerSystem call runs at load time, so it goes in the system's last file.
 const SYSTEMS = {};
 let SYS = null;
 function registerSystem(s) { SYSTEMS[s.id] = s; if (!SYS) SYS = s; }
@@ -172,6 +180,7 @@ async function initUpdateCheck() {
 }
 
 async function boot() {
+  mountSystemChrome();
   applyTheme(store.get('theme2', 'light'));
   setupMobile();
   try { D = await getJSON(SYS.data.file, (g, t) => { $('#loadmsg').textContent = `${SYS.data.loading} ${(g / 1048576).toFixed(1)}${t ? ' / ' + (t / 1048576).toFixed(1) : ''} MB`; }); }
@@ -621,7 +630,7 @@ function syncPage() {
   const s = V.status(), link = location.hash.match(/^#sync--connect--([A-Za-z0-9_-]{43})$/);
   const ago = t => { if (!t) return 'never'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
   const mb = n => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + ' MB';
-  const what = '<p class="note">Keeps your sessions, encounters, montages, negotiations, cards, pins, characters, Respite heroes, settings and imported books the same on every device and browser you use. Your data is stored on this site’s server under a private sync key. Anyone with the key can see and change everything, so keep it to yourself.</p>';
+  const what = `<p class="note">Keeps your ${esc(SYS.syncWhat || 'sessions, cards, pins, settings')} and imported books the same on every device and browser you use. Your data is stored on this site’s server under a private sync key. Anyone with the key can see and change everything, so keep it to yourself.</p>`;
   const err = s.error ? `<div class="warn">${esc(s.error)}${/Unknown sync key/.test(s.error) ? ' The key may have been replaced on another device. Turn sync off here and connect again with the new key.' : ''}</div>` : '';
   let h;
   if (!s.https) h = what + '<div class="warn">Sync needs a secure (https://) connection, so your key is never sent unencrypted. Open this site with https:// to use it.</div>';
@@ -753,7 +762,12 @@ $('#mres').addEventListener('click', e => { const r = e.target.closest('.sr[data
 const openRoller = () => { $('#roller').classList.add('on'); if (!isMob) $('#fab').style.display = 'none'; };
 const closeRoller = () => { $('#roller').classList.remove('on'); $('#fab').style.display = ''; };
 $('#fab').onclick = openRoller;
-$('#rclose').onclick = closeRoller;
+$('#roller').addEventListener('click', e => { if (e.target.closest('#rclose')) closeRoller(); });   // the panel's content comes from the system
+// the system's dice roller panel and licence notice (called first thing in boot)
+function mountSystemChrome() {
+  if (SYS.roller) { $('#roller').innerHTML = SYS.roller.html; $('#fab').title = SYS.roller.title; if (SYS.roller.mount) SYS.roller.mount(); }
+  $('footer').innerHTML = SYS.notice || '';
+}
 
 // ---------- scrim / sheets / peek ----------
 let scrimCb = null;

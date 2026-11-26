@@ -246,8 +246,27 @@ function dsHome() {
 // ==== moved from app.js: chars ====
 const CH = ['Might', 'Agility', 'Reason', 'Intuition', 'Presence'];
 let chars = store.get('chars', { Might: 0, Agility: 0, Reason: 0, Intuition: 0, Presence: 0 });
-$('#chars').innerHTML = CH.map(c => `<label>${c.slice(0, 3)}<input type="number" inputmode="numeric" data-ch="${c}" value="${chars[c] ?? 0}"></label>`).join('');
-$$('#chars input').forEach(i => i.oninput = () => { chars[i.dataset.ch] = parseInt(i.value) || 0; store.set('chars', chars); });
+// the power roller panel: the core puts SYS.roller.html into #roller, then calls SYS.roller.mount()
+const DS_ROLLER_HTML = `
+  <div class="rh">Power Roll <button id="rclose">×</button></div>
+  <div class="rb">
+    <div class="chars" id="chars"></div>
+    <div class="rrow">
+      <select id="rchar"><option value="">No characteristic</option><option>Might</option><option>Agility</option><option>Reason</option><option>Intuition</option><option>Presence</option></select>
+      <label>Bonus <input id="rbonus" type="number" value="0" style="width:52px"></label>
+    </div>
+    <div class="rrow">
+      <select id="redge"><option value="0">No edge/bane</option><option value="1">Edge (+2)</option><option value="2">Double edge (tier up)</option><option value="-1">Bane (−2)</option><option value="-2">Double bane (tier down)</option></select>
+    </div>
+    <button class="bigroll" id="rgo">Roll 2d10</button>
+    <div id="rlog"></div>
+  </div>
+`;
+function dsMountRoller() {
+  $('#chars').innerHTML = CH.map(c => `<label>${c.slice(0, 3)}<input type="number" inputmode="numeric" data-ch="${c}" value="${chars[c] ?? 0}"></label>`).join('');
+  $$('#chars input').forEach(i => i.oninput = () => { chars[i.dataset.ch] = parseInt(i.value) || 0; store.set('chars', chars); });
+  $('#rgo').onclick = () => powerRoll('', null, null);
+}
 
 // ==== moved from app.js: roll ====
 function powerRoll(label, charList, abKey, fixed) {
@@ -269,7 +288,6 @@ function powerRoll(label, charList, abKey, fixed) {
   if (abKey) { $$(`[data-ab="${CSS.escape(abKey)}"] .tier`).forEach(t => t.classList.toggle('hit', t.classList.contains('n' + tier))); setTimeout(() => $$('.tier.hit').forEach(t => t.classList.remove('hit')), 6000); }
   toast(`${label ? esc(label) + ': ' : ''}<b>${tot}</b> → Tier ${tier}${nat >= 19 ? ' (natural ' + nat + '!)' : ''}`);
 }
-$('#rgo').onclick = () => powerRoll('', null, null);
 
 // ==== moved from app.js: browse ====
 function dsBrowse() {
@@ -358,37 +376,3 @@ function dsOnClick(e) {
   const le = e.target.closest('[data-loadenc]'); if (le) { e.preventDefault(); const [p, c, i] = le.dataset.loadenc.split('|'); loadBookEncounter(p, c, +i); return true; }
   const ae = e.target.closest('[data-addenc]'); if (ae) { e.preventDefault(); addToEncounter(ae.dataset.addenc); return true; }
 }
-
-registerSystem({
-  id: 'drawsteel', name: 'Draw Steel',
-  data: { file: 'data/heroes.json', loading: 'Loading the rules…' },
-  init: initHeroes,
-  corePack: () => ({ id: 'heroes', title: 'Draw Steel: Heroes', kind: 'core', builtin: true, chapters: D.book, monsters: [], abilities: [], heroes: true }),
-  builtin: BUILTIN,
-  lists: DS_LISTS,
-  menu: dsMenu, home: dsHome, browse: dsBrowse,
-  routes: {
-    encounter: () => encounterPage(),
-    respite: () => respitePage(),
-    negotiation: b => b ? negotiationPage(b) : negotiationHub(),
-    montage: b => b ? montagePage(b) : montageHub(),
-    classes: b => b ? classPage(b) : classIndex()
-  },
-  packRoutes: ['monsters', 'negotiation', 'montage', 'encounter'],
-  renderMonster, renderAbility,
-  renderBlock: dsRenderBlock, afterHeading: dsAfterHeading, afterTable: dsAfterTable, chapterExtras: dsChapterExtras,
-  onAddPack: dsOnAddPack,
-  entityMeta: dsEntityMeta, entitySource: dsEntitySource, preview: dsPreview,
-  pinGroups: [
-    { type: 'monsters', title: ms => `Monsters · ${ms.reduce((s, m) => s + (parseInt(m.ev) || 0), 0)} EV total`, render: m => renderMonster(m) },
-    { type: 'abilities', title: () => 'Abilities', render: a => renderAbility(a) }
-  ],
-  linkTypes: ['conditions'],
-  noLink: '.ab-n,.ma-n,.mon-n,.pot,.chr',   // names inside ability cards and stat blocks are never auto-linked
-  searchExtra: dsSearchExtra, searchIndex: dsSearchIndex,
-  searchPriority: { conditions: 0, classes: 0, ancestries: 1, kits: 2, monsters: 2, abilities: 3, glossary: 3 },
-  packSummary: p => p.core ? ' · ' + D.abilities.length + ' abilities' : '',
-  importer: { module: './lib/dsparse.mjs', hint: 'Works best with MCDM-format Draw Steel PDFs that contain selectable text', stats: dsImportStats },
-  onClick: dsOnClick,
-  pdfNotice: 'Draw Steel © MCDM Productions, LLC, used under the DRAW STEEL Creator License'
-});

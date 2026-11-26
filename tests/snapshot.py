@@ -33,14 +33,26 @@ def seed_state():
            'groups': [{'id': 'g1', 'name': 'Group 1', 'entries': [{'gid': foes[0]['id'], 'n': 2}, {'gid': foes[1]['id'], 'n': 1}]},
                       {'id': 'g2', 'name': 'Group 2', 'entries': [{'gid': foes[2]['id'], 'n': 1}]}]}
     pins = ['abilities--' + heroes['abilities'][0]['id'], 'monsters--' + foes[0]['id'], 'conditions--' + heroes['conditions'][0]['id']]
-    return {'st_cards': cards, 'st_enc': enc, 'st_encs': [enc], 'st_pins': pins, 'st_theme2': 'light'}
+    sessions = [{'id': 'stest', 'name': 'Session 1', 'date': '2026-01-02', 'heroes': 4, 'level': 2, 'victories': 1, 'docs': [
+        {'id': 'd1', 'type': 'page', 'title': 'Session plan', 'md': '# Plan\n\n- Fight in the mine\n- [ ] Loose end\n\n> Read-aloud: the shaft is dark.\n\n| A | B |\n|---|---|\n| 1 | 2 |'},
+        {'id': 'd2', 'type': 'enc', 'title': 'Mine ambush', 'enc': enc},
+        {'id': 'd3', 'type': 'mtg', 'ref': 'heroes-fight-fire', 'title': 'Fight Fire'},
+        {'id': 'd4', 'type': 'neg', 'ref': 'heroes-zola-honeycut', 'title': 'Zola Honeycut'}]}]
+    return {'st_cards': cards, 'st_enc': enc, 'st_encs': [enc], 'st_pins': pins, 'st_sessions': sessions, 'st_theme2': 'light'}
 
 
 def norm(html):
     html = re.sub(r'\s+', ' ', html or '')
     html = re.sub(r'\?v=[0-9a-f]{10}', '?v=<v>', html)  # asset version changes with every source edit
-    html = re.sub(r'(e|s|q|f|n|m)[0-9a-z]{8,}', r'\1<id>', html)  # ids made from Date.now()
+    html = re.sub(r'\b([esqfnmd])(?=[0-9a-z]*\d)[0-9a-z]{8,}\b', r'\1<id>', html)  # ids made from Date.now() (always contain a digit; words don't)
     return html.strip()
+
+
+async def pdf_text(dl):
+    """text of a downloaded PDF (tests/pdftext.mjs), so exports are compared by content, not just 'a file came out'"""
+    path = await dl.path()
+    r = subprocess.run(['node', os.path.join(HERE, 'pdftext.mjs'), str(path)], capture_output=True, text=True, encoding='utf-8', cwd=HERE)
+    return norm(r.stdout) if r.returncode == 0 else 'pdftext failed: ' + r.stderr[-300:]
 
 
 async def snapshot(out, root):
@@ -98,7 +110,7 @@ async def snapshot(out, root):
                     key = l.split('--')[0] + ('--' + l.split('--')[1] if l.startswith('#book--') and l.count('--') >= 1 else '')
                     if l.count('--') >= 1:  # entries / chapters: keep the crawl bounded
                         per_prefix[key] = per_prefix.get(key, 0) + 1
-                        if per_prefix[key] > 4: continue
+                        if per_prefix[key] > (10 if key == '#session' else 4): continue
                     queue.append(l)
             for h in entries:  # list entries (stat blocks, abilities, …)
                 if h not in seen: seen.add(h); await visit(h)
@@ -128,6 +140,40 @@ async def snapshot(out, root):
                 if await pg.query_selector('#main [data-addenc]'):
                     await pg.click('#main [data-addenc]'); await pg.wait_for_timeout(300)
                     X['addenc:toast'] = await pg.evaluate("document.querySelector('#toast').innerText"); await visit('#encounter'); X['addenc:encounter'] = res['pages']['#encounter']['html']
+            # cards: every tab, the editors and the quests-from-adventure dialog
+            async def dialog(click, key):
+                if not await pg.query_selector(click): X[key] = 'no ' + click; return
+                await pg.click(click); await pg.wait_for_timeout(400)
+                X[key] = norm(await pg.evaluate("[...document.querySelectorAll('.dlg')].map(d => d.innerHTML).join('|')"))
+                await pg.evaluate("document.querySelectorAll('.dlg').forEach(d => d.remove())")
+            cur['page'] = 'cards'
+            await visit('#cards')
+            for tab in await pg.evaluate("[...document.querySelectorAll('[data-ctab]')].map(b => b.dataset.ctab)"):
+                await pg.click(f'[data-ctab="{tab}"]'); await pg.wait_for_timeout(400); X['cards:tab:' + tab] = await grab('#main')
+                for sel in ['#q-new', '#q-adv', '#f-ret', '#f-art', '#f-sage']:
+                    if await pg.query_selector(sel): await dialog(sel, f'cards:{tab}:{sel}')
+            await pg.click('[data-ctab="item"]'); await pg.wait_for_timeout(300)
+            if await pg.query_selector('#c-q'):
+                await pg.fill('#c-q', 'potion'); await pg.wait_for_timeout(300); X['cards:search'] = await grab('#c-qres'); await pg.fill('#c-q', '')
+            await dialog('[data-cust="0"]', 'cards:customise')
+            # sessions: the add pickers, each item's PDF, and the whole-session export
+            cur['page'] = 'session'
+            await visit('#session--stest')
+            for kind in ['enc', 'mtg', 'neg']: await dialog(f'[data-add="{kind}"]', 'session:add:' + kind)
+            for did in ['d1', 'd2', 'd3', 'd4']:
+                await visit('#session--stest--' + did)
+                try:
+                    async with pg.expect_download(timeout=60000) as dl: await pg.click('#d-pdf')
+                    d0 = await dl.value; X['session:pdf:' + did] = 'ok ' + d0.suggested_filename; X['session:pdf:' + did + ':text'] = await pdf_text(d0)
+                except Exception as e: X['session:pdf:' + did] = 'FAILED ' + type(e).__name__
+            await visit('#session--stest')
+            try:
+                async with pg.expect_download(timeout=90000) as dl: await pg.click('#s-export')
+                d0 = await dl.value; X['session:export'] = 'ok ' + d0.suggested_filename; X['session:export:text'] = await pdf_text(d0)
+            except Exception as e: X['session:export'] = 'FAILED ' + type(e).__name__
+            # roller panel and footer (static markup today, rendered from the system later)
+            X['roller'] = await grab('#roller'); X['footer'] = await pg.evaluate("document.querySelector('footer')?.innerHTML || ''")
+            X['fab'] = await pg.evaluate("document.querySelector('#fab')?.outerHTML || ''")
             # import preview of a generated PDF (parser module + system import stats)
             pdf = os.path.join(os.path.dirname(os.path.abspath(out)), 'snapshot-fixture.pdf')
             subprocess.run(['node', os.path.join(HERE, 'make_fixture_pdf.mjs'), pdf], check=True, stdout=subprocess.DEVNULL)
@@ -158,7 +204,7 @@ async def snapshot(out, root):
                     async with pg.expect_download(timeout=60000) as dl:
                         await pg.click(btn)
                     d = await dl.value
-                    res['extra']['export' + h] = 'ok ' + d.suggested_filename
+                    res['extra']['export' + h] = 'ok ' + d.suggested_filename; res['extra']['export' + h + ':text'] = await pdf_text(d)
                 except Exception as e:
                     toast = await pg.evaluate("document.querySelector('#toast')?.innerText || ''")
                     res['extra']['export' + h] = f'FAILED {type(e).__name__} toast={toast!r}'
@@ -167,7 +213,7 @@ async def snapshot(out, root):
         srv.terminate()
     json.dump(res, open(out, 'w', encoding='utf-8'), indent=0)
     print(f"{len(res['pages'])} pages, {len(res['errors'])} JS errors, exports: "
-          + ', '.join(f"{k}={v}" for k, v in res['extra'].items() if k.startswith('export')))
+          + ', '.join(f"{k}={v}" for k, v in res['extra'].items() if k.startswith('export') and not k.endswith(':text')))
     for e in res['errors'][:20]: print('  ERR', e)
 
 

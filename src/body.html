@@ -14,7 +14,7 @@
   <button class="tbtn" id="themebtn" title="Toggle theme"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
 </header>
 <div id="main"></div>
-<footer>Vanadium is an independent product published under the DRAW STEEL Creator License and is not affiliated with MCDM Productions, LLC. DRAW STEEL © 2024 MCDM Productions, LLC.</footer>
+<footer></footer><!-- the game system's licence notice (SYS.notice), filled in at startup -->
 
 <nav id="tabbar">
   <button data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
@@ -28,22 +28,8 @@
 <div id="peek"></div>
 <div id="msearch"><div class="mh"><input id="mq" placeholder="Search abilities, monsters, rules…" autocomplete="off" spellcheck="false" enterkeyhint="search"><button id="mqclose">Cancel</button></div><div id="mres"><div class="hint">Type to search across every book, monster, ability and rule.</div></div></div>
 
-<button id="fab" title="Power roll (2d10)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M12 2 21 7v10l-9 5-9-5V7z"/><path d="M12 2v20M3 7l9 5 9-5"/></svg></button>
-<div id="roller">
-  <div class="rh">Power Roll <button id="rclose">×</button></div>
-  <div class="rb">
-    <div class="chars" id="chars"></div>
-    <div class="rrow">
-      <select id="rchar"><option value="">No characteristic</option><option>Might</option><option>Agility</option><option>Reason</option><option>Intuition</option><option>Presence</option></select>
-      <label>Bonus <input id="rbonus" type="number" value="0" style="width:52px"></label>
-    </div>
-    <div class="rrow">
-      <select id="redge"><option value="0">No edge/bane</option><option value="1">Edge (+2)</option><option value="2">Double edge (tier up)</option><option value="-1">Bane (−2)</option><option value="-2">Double bane (tier down)</option></select>
-    </div>
-    <button class="bigroll" id="rgo">Roll 2d10</button>
-    <div id="rlog"></div>
-  </div>
-</div>
+<button id="fab"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M12 2 21 7v10l-9 5-9-5V7z"/><path d="M12 2v20M3 7l9 5 9-5"/></svg></button>
+<div id="roller"></div><!-- the game system's dice roller (SYS.roller), mounted at startup -->
 <div id="hov"></div>
 <div id="toast"></div>
 <script src="sync.js"></script><!-- pulls synced data first, then loads app.js -->
