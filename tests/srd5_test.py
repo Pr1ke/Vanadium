@@ -46,7 +46,7 @@ async def main():
 
             check('5e is active: switch, menu, home', await pg.evaluate("document.querySelector('#syssel').value") == 'srd5' and 'Characters' in await pg.evaluate("document.querySelector('#menu').textContent") and '5e rules' in await text())
             check('footer has the SRD 5.2 CC BY attribution', 'System Reference Document 5.2' in await text('footer') and 'Creative Commons Attribution 4.0' in await text('footer'))
-            check('no dice roller yet: button and phone tab hidden', await pg.evaluate("document.querySelector('#fab').hidden && document.querySelector('#tabbar [data-tab=roll]').hidden"))
+            check('dice roller available: button and phone tab shown', await pg.evaluate("!document.querySelector('#fab').hidden && !document.querySelector('#tabbar [data-tab=roll]').hidden"))
             for t, n in [('spells', 339), ('monsters', 341), ('items', 262), ('classes', 12), ('species', 9), ('backgrounds', 4), ('feats', 17), ('conditions', 15), ('equipment', 182)]:
                 await go('#' + t); await pg.wait_for_timeout(350)
                 c = await text('#lcount'); check(f'list {t}: {n} entries', c == f'{n} / {n}', c)
@@ -83,6 +83,62 @@ async def main():
             path = await (await dl.value).path()
             pt = subprocess.run(['node', os.path.join(HERE, 'pdftext.mjs'), str(path)], capture_output=True, text=True, encoding='utf-8', cwd=HERE).stdout
             check('card PDF: quest card and SRD 5.2 licence line', 'Find the lost bell' in pt and 'SRD 5.2 material by Wizards of the Coast LLC, licensed CC BY 4.0' in pt, pt[:200])
+            # ---- step 4: dice ----
+            await go('#monsters--adult-black-dragon'); await pg.wait_for_timeout(500)
+            check('stat block shows the SRD initiative', 'Initiative +12 (22)' in await text('#lview'))
+            await pg.click('#lview button.s5-roll[data-dice="1d20+11"]'); await pg.wait_for_timeout(300)
+            tot = int(await pg.evaluate("document.querySelector('#r5log .tot').textContent")); bd = await text('#r5log .tt')
+            check('attack button rolls d20 + 11', 12 <= tot <= 31 and bd.startswith('1d20 [') and bd.endswith('+ 11'), f'{tot} {bd}')
+            await pg.select_option('#r5adv', '1'); await pg.click('#lview .s5-abs button.s5-save'); await pg.wait_for_timeout(300)
+            check('advantage rolls two d20s and keeps the higher', ' adv' in await text('#r5log .rl .tt'), await text('#r5log .rl .tt'))
+            await pg.select_option('#r5adv', '0')
+            await pg.fill('#r5expr', '2d6 + 3'); await pg.click('#r5go'); await pg.wait_for_timeout(300)
+            tot = int(await pg.evaluate("document.querySelector('#r5log .tot').textContent"))
+            check('typed expression 2d6 + 3 totals 5–15', 5 <= tot <= 15, tot)
+            dmg = await pg.evaluate("[...document.querySelectorAll('#lview button.s5-roll')].map(b => b.dataset.dice)")
+            check('damage dice in actions are clickable', '2d6 + 6' in dmg and '12d8' in dmg, dmg[:12])
+            await pg.click('#rclose')
+            # ---- step 4: encounter difficulty (SRD 5.2 XP Budget per Character) ----
+            await go('#encounter'); await pg.wait_for_timeout(500)
+            budget = lambda: pg.evaluate("document.querySelector('.s5budl').innerText.replace(/\\s+/g, ' ')")
+            check('4 level-1 characters: budgets 200 / 300 / 400 XP (SRD example)', await budget() == 'Low 200 XP Moderate 300 XP High 400 XP', await budget())
+            await go('#monsters--bugbear-warrior'); await pg.wait_for_timeout(300); await pg.click('#lview [data-addenc5]')
+            await go('#encounter'); await pg.wait_for_timeout(500)
+            check('1 Bugbear Warrior (200 XP) is a Low encounter for them (SRD example 1)', (await text('.s5diff')).startswith('Low') and '200 XP' in await text('.s5diff'), await text('.s5diff'))
+            for k in ('2', '3'):
+                await pg.fill(f'[data-pl="{k}"]', '5'); await pg.press(f'[data-pl="{k}"]', 'Tab'); await pg.wait_for_timeout(300)
+            check('mixed levels add up per character: 1,1,5,5 -> 1,100 / 1,650 / 2,400', await budget() == 'Low 1,100 XP Moderate 1,650 XP High 2,400 XP', await budget())
+            await pg.fill('#s5-pall', '1'); await pg.press('#s5-pall', 'Tab'); await pg.wait_for_timeout(300)
+            for _ in range(2): await pg.click('[data-einc="0"]'); await pg.wait_for_timeout(200)
+            check('3 Bugbear Warriors (600 XP) are beyond High for 4 level-1 characters', (await text('.s5diff')).startswith('Beyond High'), await text('.s5diff'))
+            async with pg.expect_download(timeout=60000) as dl: await pg.click('#s5-pdf')
+            pt = subprocess.run(['node', os.path.join(HERE, 'pdftext.mjs'), str(await (await dl.value).path())], capture_output=True, text=True, encoding='utf-8', cwd=HERE).stdout
+            check('encounter PDF: budgets, creatures, stat block, licence line', all(x in pt for x in ['XP budget', '3 × Bugbear Warrior', 'Initiative', 'SRD 5.2 material']), pt[:200])
+            # ---- step 4: initiative ----
+            await pg.click('#s5-init'); await pg.wait_for_timeout(600)
+            rows = await pg.evaluate("[...document.querySelectorAll('.s5irow')].map(r => [r.querySelector('.s5iname').firstElementChild.textContent, r.querySelector('.s5iinit').value])")
+            mons = [r for r in rows if r[0].startswith('Bugbear')]
+            check('initiative: 4 characters + 3 bugbears, monsters rolled d20 + 2', len(rows) == 7 and len(mons) == 3 and all(3 <= int(v) <= 22 for _, v in mons), rows)
+            first = rows[0][0]
+            for _ in range(7): await pg.click('#i5-next'); await pg.wait_for_timeout(120)
+            check('turns cycle and the round advances', 'Round 2' in await text('.s5round') and first in await text('.s5round'), await text('.s5round'))
+            i = [k for k, r in enumerate(rows) if r[0].startswith('Bugbear')][0]
+            await pg.fill(f'[data-ihp="{i}"]', '−9'); await pg.press(f'[data-ihp="{i}"]', 'Enter'); await pg.wait_for_timeout(300)
+            hp = await pg.evaluate(f"document.querySelectorAll('.s5irow')[{i}].querySelector('.s5ihp b').textContent")
+            await pg.select_option(f'[data-icond="{i}"]', 'Prone'); await pg.wait_for_timeout(300)
+            check('damage lowers HP (33 − 9 = 24) and conditions stick', hp == '24' and 'Prone' in await pg.evaluate(f"document.querySelectorAll('.s5irow')[{i}].innerText"), hp)
+            await pg.reload(); await pg.wait_for_function("document.querySelector('#loading')?.style.display === 'none'", timeout=60000); await pg.wait_for_timeout(1200)
+            check('the tracker survives a reload', 'Round 2' in await text('.s5round') and await pg.evaluate("localStorage.getItem('st_srd5_init')") is not None)
+            # ---- step 4: sessions hold 5e encounters ----
+            await go('#sessions'); await pg.wait_for_timeout(400); await pg.click('#snew'); await pg.wait_for_timeout(500)
+            await pg.click('[data-add="enc"]'); await pg.wait_for_timeout(300); await pg.click('[data-pk="cur"]'); await pg.wait_for_timeout(600)
+            t = await text('#bmain')
+            check('a session can hold a 5e encounter (difficulty shown)', 'Beyond High' in t and 'Bugbear Warrior' in t, t[:200])
+            sess = (await pg.evaluate("location.hash")).split('--d')[0]
+            await go(sess); await pg.wait_for_timeout(500)
+            async with pg.expect_download(timeout=90000) as dl: await pg.click('#s-export')
+            pt = subprocess.run(['node', os.path.join(HERE, 'pdftext.mjs'), str(await (await dl.value).path())], capture_output=True, text=True, encoding='utf-8', cwd=HERE).stdout
+            check('session export: cover with party line, the encounter sheet', '4 characters, level' in pt and 'Bugbear Warrior' in pt, pt[:200])
             mob = await ctx.new_page(); await mob.set_viewport_size({'width': 390, 'height': 844})
             await mob.goto(f'http://127.0.0.1:{port}/index.html'); await mob.wait_for_function("document.querySelector('#loading')?.style.display === 'none'", timeout=60000); await mob.wait_for_timeout(1200)
             await mob.click('#tabbar button[data-tab="browse"]'); await mob.wait_for_timeout(300)

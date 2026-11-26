@@ -79,7 +79,7 @@ function registerSystem(s) { SYSTEMS[s.id] = s; if (s.id === ACTIVE_SYSTEM) SYS 
 const packBelongs = p => (p.system || LEGACY_SYSTEM) === SYS.id;
 
 // ---------- data loading ----------
-const DATA_V = 'cc7d761ce5';
+const DATA_V = 'b8e0291b8f';
 async function readBody(r, onProg) {
   const total = +r.headers.get('content-length') || 0;
   if (!r.body || !onProg) return new Uint8Array(await r.arrayBuffer());
@@ -1104,7 +1104,7 @@ function classIndex() {
 window.__stSave = (name, blob) => deliverFile(name, blob);
 window.__stGotoPage = pg => gotoPage(String(pg));
 function respitePage() {
-  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=3dc9fc5c4f" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
+  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=b64899a680" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
   document.title = 'Respite — Vanadium';
 }
 
@@ -3165,7 +3165,7 @@ function s5SpellCard(s, opts = {}) {
   const pinned = isPinned('spells', s.id);
   return `<div class="s5spell" data-spell="${esc(s.id)}">${opts.nohead ? '' : `<div class="s5-h"><div><div class="s5-n"><a data-go="spells--${esc(s.id)}">${esc(s.name)}</a></div><div class="s5-t">${esc(s5SpellLine(s))}</div></div>${opts.nopin ? '' : `<button class="ab-pin ${pinned ? 'on' : ''}" data-pin="spells--${esc(s.id)}" title="Pin">★</button>`}</div>`}
     <div class="s5-meta"><div><b>Casting Time</b>${esc(s.time)}${s.ritual ? ' or Ritual' : ''}</div><div><b>Range</b>${esc(s.range)}</div><div><b>Components</b>${esc(s.components)}</div><div><b>Duration</b>${esc(s.duration)}</div></div>
-    <div class="rd s5-body">${renderBlocks(s.body)}</div></div>`;
+    <div class="rd s5-body">${s5Dicify(renderBlocks(s.body), s.name)}</div></div>`;
 }
 
 // ---- monsters (2024-style stat block) ----
@@ -3176,10 +3176,10 @@ function s5RenderMonster(m, opts = {}) {
   if (!m) return '';
   const pinned = isPinned('monsters', m.gid);
   const line = (l, v) => v ? `<div><b>${l}</b> ${esc(v)}</div>` : '';
-  const sec = (title, list) => list && list.length ? `<div class="s5-sec">${title ? `<h4>${title}</h4>` : ''}${list.map(a => `<p><b><i>${esc(a.name)}.</i></b> ${a.html}${a.spells ? a.spells.map(x => `<span class="s5-spl">${x}</span>`).join('') : ''}</p>`).join('')}</div>` : '';
+  const sec = (title, list) => list && list.length ? `<div class="s5-sec">${title ? `<h4>${title}</h4>` : ''}${list.map(a => `<p><b><i>${esc(a.name)}.</i></b> ${s5Dicify(a.html, m.name + ': ' + a.name.replace(/\s*\(.*\)$/, ''))}${a.spells ? a.spells.map(x => `<span class="s5-spl">${x}</span>`).join('') : ''}</p>`).join('')}</div>` : '';
   let h = `<div class="s5mon" data-mon="${m.gid}"><div class="s5-h"><div><div class="s5-n"><a data-go="monsters--${m.gid}">${esc(m.name)}</a></div><div class="s5-t">${esc(m.size)} ${esc(m.type)}, ${esc(m.alignment)}</div></div><button class="ab-pin ${pinned ? 'on' : ''}" data-pin="monsters--${m.gid}" title="Pin">★</button></div>
-    <div class="s5-core"><div><b>AC</b> ${esc(m.ac)}${m.acNote ? ` (${esc(m.acNote)})` : ''}</div><div><b>HP</b> ${esc(m.hp)}${m.hpRoll ? ` (${esc(m.hpRoll)})` : ''}</div><div><b>Speed</b> ${esc(m.speed)}</div></div>
-    <div class="s5-abs">${S5_AB.map(([k, l]) => `<div><span>${l}</span><b>${m.ab[k]}</b><em>${s5Mod(m.ab[k])}</em><i>save ${esc(m.saves[k])}</i></div>`).join('')}</div>
+    <div class="s5-core"><div><b>AC</b> ${esc(m.ac)}${m.acNote ? ` (${esc(m.acNote)})` : ''}</div><div><b>Initiative</b> <button class="s5-roll" data-dice="1d20${s5Signed(m.init)}" data-lab="${esc(m.name)}: initiative">${esc(m.init)} (${10 + s5Int(m.init)})</button></div><div><b>HP</b> ${esc(m.hp)}${m.hpRoll ? ` (${esc(m.hpRoll)})` : ''}</div><div><b>Speed</b> ${esc(m.speed)}</div></div>
+    <div class="s5-abs">${S5_AB.map(([k, l]) => `<div><span>${l}</span><b>${m.ab[k]}</b><button class="s5-roll" data-dice="1d20${s5Signed(s5Mod(m.ab[k]))}" data-lab="${esc(m.name)}: ${l} check" title="Roll a ${l} check">${s5Mod(m.ab[k])}</button><button class="s5-roll s5-save" data-dice="1d20${s5Signed(m.saves[k])}" data-lab="${esc(m.name)}: ${l} save" title="Roll a ${l} saving throw">save ${esc(m.saves[k])}</button></div>`).join('')}</div>
     <div class="s5-lines">${line('Skills', m.skills)}${line('Vulnerabilities', m.vuln)}${line('Resistances', m.resist)}${line('Immunities', m.immune)}${line('Gear', m.gear)}${line('Senses', m.senses)}${line('Languages', m.languages)}<div><b>CR</b> ${esc(m.cr)} (XP ${esc(m.xp)}; PB ${esc(m.pb)})</div></div>
     ${sec('Traits', m.traits)}${sec('Actions', m.actions)}${sec('Bonus Actions', m.bonus)}${sec('Reactions', m.reactions)}${sec('Legendary Actions', m.legendary)}`;
   if (!opts.nosrc) h += `<div class="mon-src"><span>${esc(m.group || '')}</span><a data-gobook="${esc(m.pack)}--${esc(m.ch || '')}">${esc(PK[m.pack]?.title || '')}</a></div>`;
@@ -3206,7 +3206,7 @@ const S5_LISTS = {
     filters: [['Source', m => PK[m.pack]?.title], ['CR', m => 'CR ' + m.cr, (x, y) => s5CrNum(x.slice(3)) - s5CrNum(y.slice(3))], ['Type', m => m.type], ['Size', m => m.size, (x, y) => S5_SIZES.indexOf(x) - S5_SIZES.indexOf(y)],
       ['Has legendary actions', m => m.legendary.length ? 'Yes' : 'No']],
     text: m => m.name + ' ' + m.type + ' ' + [...m.traits, ...m.actions, ...m.bonus, ...m.reactions, ...m.legendary].map(a => a.name + ' ' + strip(a.html)).join(' '),
-    view: m => `<div class="ent-h"><div style="flex:1"><h2>${esc(m.name)}</h2><div class="meta">CR ${esc(m.cr)} ${esc(m.type)} · ${esc(m.size)}</div></div><div class="ent-tools"><button class="ibtn ${isPinned('monsters', m.gid) ? 'on' : ''}" data-pin="monsters--${m.gid}">★</button><button class="ibtn" data-gobook="${esc(m.pack)}--${esc(m.ch || '')}">Book</button></div></div>${s5RenderMonster(m)}`
+    view: m => `<div class="ent-h"><div style="flex:1"><h2>${esc(m.name)}</h2><div class="meta">CR ${esc(m.cr)} ${esc(m.type)} · ${esc(m.size)}</div></div><div class="ent-tools"><button class="ibtn ${isPinned('monsters', m.gid) ? 'on' : ''}" data-pin="monsters--${m.gid}">★</button><button class="ibtn" data-addenc5="${m.gid}" title="Add to encounter">+ Encounter</button><button class="ibtn" data-gobook="${esc(m.pack)}--${esc(m.ch || '')}">Book</button></div></div>${s5RenderMonster(m)}`
   },
   items: {
     cols: [['Name', i => i.name, 'nm'], ['Type', i => i.type, 'mu'], ['Rarity', s5Rarity, 'mu', i => S5_RARITY.indexOf(s5Rarity(i))], ['Attunement', i => i.attune ? 'Yes' : '', 'mu']],
@@ -3244,8 +3244,8 @@ function s5Menu() {
   return [
     ['Rules', [['library', 'Library'], ['book--srd52', 'SRD 5.2 Reference'], ['-'], ['conditions'], ['equipment']]],
     ['Characters', [['classes'], ['species'], ['backgrounds'], ['feats'], ['-'], ['spells']]],
-    ['Game Master', [['sessions', 'Sessions'], ['monsters'], ['book--srd5-monsters', 'Monsters A–Z'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title]), ['-'], ['items'], ['cards', 'Cards: quests']]],
-    ['Utilities', [['import', 'Import a PDF'], ['pinned', 'Pinned Items'], ['-'], ['sync', 'Sync across devices'], ['!update', 'Check for updates']]]
+    ['Game Master', [['sessions', 'Sessions'], ['encounter', 'Encounter Builder'], ['initiative', 'Initiative Tracker'], ['-'], ['monsters'], ['book--srd5-monsters', 'Monsters A–Z'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title]), ['-'], ['items'], ['cards', 'Cards: quests']]],
+    ['Utilities', [['import', 'Import a PDF'], ['roller', 'Dice Roller'], ['pinned', 'Pinned Items'], ['-'], ['sync', 'Sync across devices'], ['!update', 'Check for updates']]]
   ];
 }
 const S5_BLURB = { spells: 'Every SRD spell with level, school, classes and full text', monsters: 'Stat blocks for every SRD creature, filter by CR, type and size', items: 'Magic items by type, rarity and attunement',
@@ -3257,7 +3257,8 @@ function s5Home() {
   const tiles = [
     ['Rules', [['book--srd52', 'SRD 5.2 Reference', 'Abilities and skills, conditions, weapons, armor and more'], ['conditions'], ['equipment']]],
     ['Characters', [['classes'], ['species'], ['backgrounds'], ['feats'], ['spells']]],
-    ['Game master', [['monsters'], ['book--srd5-monsters', 'Monsters A–Z', 'Read the bestiary like a book'], ['items'], ['sessions', 'Sessions', 'Prep folders for your game night'], ...adv.map(p => ['book--' + p.id, p.title, 'Adventure · imported']), ['library', 'Library', 'All books, including your imports'], ['import', 'Import a PDF', 'Add your own books'], ['pinned', 'Pinned items', 'Your starred spells, monsters and rules']]]
+    ['Run the game', [['encounter', 'Encounter Builder', 'Pick monsters, see Low / Moderate / High difficulty'], ['initiative', 'Initiative Tracker', 'Turn order, HP and conditions'], ['sessions', 'Sessions', 'Prep folders for your game night'], ['roller', 'Dice Roller', 'Any dice, d20 with advantage']]],
+    ['Game master', [['monsters'], ['book--srd5-monsters', 'Monsters A–Z', 'Read the bestiary like a book'], ['items'], ...adv.map(p => ['book--' + p.id, p.title, 'Adventure · imported']), ['library', 'Library', 'All books, including your imports'], ['import', 'Import a PDF', 'Add your own books'], ['pinned', 'Pinned items', 'Your starred spells, monsters and rules']]]
   ];
   $('#main').innerHTML = `<div class="home"><div class="hero"><h1>5e rules, at your fingertips</h1><p>A fast, searchable reference for the fifth edition System Reference Document 5.2.</p>
     <div class="hsearch">${ico('search', 20)}<input id="hq" placeholder="Search spells, monsters, items, rules…" ${isMob ? 'readonly' : ''}><kbd>/</kbd></div>
@@ -3272,7 +3273,7 @@ function s5Browse() {
   const sec = (t, ks) => `<h3>${t}</h3><div class="sgrid">${ks.map(([k, l, d]) => `<a href="#${k}"><b>${esc(l || TYPES[k].label)}</b><span>${esc(d || (TYPES[k] ? itemsOf(k).length + ' entries' : ''))}</span></a>`).join('')}</div>`;
   $('#sheet').innerHTML = `<div class="grab"></div>` +
     sec('Characters', [['classes'], ['species'], ['backgrounds'], ['feats'], ['spells']]) +
-    sec('Game master', [['monsters'], ['items'], ['sessions', 'Sessions', 'Prep & print a game night'], ['cards', 'Cards', 'Print quest cards'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title, 'Adventure']), ['import', 'Import a PDF', 'Add your own books']]) +
+    sec('Game master', [['encounter', 'Encounter Builder', 'Difficulty & PDF'], ['initiative', 'Initiative', 'Turns, HP & conditions'], ['monsters'], ['items'], ['sessions', 'Sessions', 'Prep & print a game night'], ['cards', 'Cards', 'Print quest cards'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title, 'Adventure']), ['import', 'Import a PDF', 'Add your own books']]) +
     sec('Rules', [['book--srd52', 'SRD 5.2 Reference', 'Reference chapters'], ['conditions'], ['equipment']]) +
     `<p style="font-size:10.5px;color:var(--ink3);margin-top:16px">${esc(S5_ATTRIB)}</p>`;
   $('#sheet').classList.add('on'); showScrim();
@@ -3289,8 +3290,259 @@ function s5SearchExtra(t, e) {
   return '';
 }
 
+// ---- dice (SYS.roller): d20 with advantage/disadvantage, any NdM+K expression ----
+const s5Int = s => parseInt(String(s).replace(/[−–]/g, '-').replace(/\s+/g, '')) || 0;
+const s5Signed = s => { const n = s5Int(s); return n >= 0 ? '+' + n : String(n); };
+function s5ParseDice(expr) {   // "2d6 + 3", "d20+5", "1d8 − 1" -> [{n, d}|{k}] (null if not dice)
+  const e = String(expr).replace(/[−–]/g, '-').replace(/\s+/g, '').toLowerCase();
+  if (!/^[+-]?(\d*d\d+|\d+)([+-](\d*d\d+|\d+))*$/.test(e)) return null;
+  return e.match(/[+-]?(\d*d\d+|\d+)/g).map(t => { const sg = t[0] === '-' ? -1 : 1, b = t.replace(/^[+-]/, ''); if (b.includes('d')) { const [n, d] = b.split('d'); return { s: sg, n: +(n || 1), d: +d }; } return { s: sg, k: +b }; });
+}
+const s5Die = d => 1 + Math.floor(Math.random() * d);
+const S5_DICE_HTML = `
+  <div class="rh">Dice <button id="rclose">×</button></div>
+  <div class="rb">
+    <div class="r5dice">${[4, 6, 8, 10, 12, 20, 100].map(d => `<button data-dice="1d${d}" data-lab="d${d}">d${d}</button>`).join('')}</div>
+    <div class="rrow"><input id="r5expr" placeholder="2d6+3, d20+5 …" autocomplete="off" spellcheck="false"><button class="bigroll" id="r5go">Roll</button></div>
+    <div class="rrow"><select id="r5adv" title="Applies to d20 rolls"><option value="0">Normal d20</option><option value="1">Advantage</option><option value="-1">Disadvantage</option></select></div>
+    <div id="r5log"></div>
+  </div>`;
+function s5Roll(expr, label) {
+  const terms = s5ParseDice(expr); if (!terms) { toast('Not a dice roll: ' + esc(expr)); return; }
+  const adv = +($('#r5adv') || {}).value || 0, parts = []; let tot = 0, nat = null;
+  const d20 = terms.filter(t => t.d === 20 && t.n === 1).length === 1;   // advantage applies to a single d20
+  for (const t of terms) {
+    if (t.k != null) { tot += t.s * t.k; parts.push((t.s < 0 ? '− ' : '+ ') + t.k); continue; }
+    let rolls = Array.from({ length: t.n }, () => s5Die(t.d)), note = '';
+    if (t.d === 20 && t.n === 1 && d20 && adv) { const a = rolls[0], b = s5Die(20); rolls = [adv > 0 ? Math.max(a, b) : Math.min(a, b)]; note = ` [${a}, ${b}] ${adv > 0 ? 'adv' : 'dis'}`; nat = rolls[0]; }
+    else if (t.d === 20 && t.n === 1) nat = rolls[0];
+    const sum = rolls.reduce((a, b) => a + b, 0); tot += t.s * sum;
+    parts.push((parts.length ? (t.s < 0 ? '− ' : '+ ') : (t.s < 0 ? '−' : '')) + `${t.n}d${t.d}` + (note || ` [${rolls.join(', ')}]`));
+  }
+  const tag = nat === 20 ? '<span class="tl" style="background:var(--ok)">Natural 20</span>' : nat === 1 ? '<span class="tl" style="background:var(--bad)">Natural 1</span>' : '';
+  $('#r5log').insertAdjacentHTML('afterbegin', `<div class="rl"><div class="tot">${tot}</div><div><div class="lab">${esc(label || expr)}</div><div class="tt">${esc(parts.join(' '))}</div>${tag}</div></div>`);
+  toast(`${label ? esc(label) + ': ' : ''}<b>${tot}</b>${nat === 20 ? ' (natural 20!)' : nat === 1 ? ' (natural 1)' : ''}`);
+  return tot;
+}
+function s5MountRoller() {
+  const go = () => { const v = $('#r5expr').value.trim(); if (v) s5Roll(v, v); };
+  $('#r5go').onclick = go; $('#r5expr').onkeydown = e => { if (e.key === 'Enter') go(); };
+}
+// make dice in rules text clickable: "Attack Roll: +11", "13 (2d6 + 6)", "8d6", "1d4 + 2"
+function s5Dicify(html, label) {
+  return String(html).split(/(<[^>]+>)/).map(seg => seg.startsWith('<') ? seg : seg
+    .replace(/(Attack Roll:)\s*([+−-]\d+)/g, (m, a, b) => `${a} <button class="s5-roll" data-dice="1d20${s5Signed(b)}" data-lab="${esc(label)}: attack">${b}</button>`)
+    .replace(/\b(\d+d\d+(?:\s*[+−-]\s*\d+)?)(?![^<]*<\/button>)/g, (m, d) => `<button class="s5-roll" data-dice="${esc(d)}" data-lab="${esc(label)}">${d}</button>`)).join('');
+}
+
+// ================= 5e tools: encounter builder, initiative tracker, session items =================
+// Encounter difficulty follows the SRD 5.2 "Combat Encounters" rules: each character gets an XP
+// budget for Low / Moderate / High difficulty by level (XP Budget per Character table); the party's
+// budget is the sum. The SRD only covers parties of one level; summing per character is the
+// natural extension for mixed levels. Creature XP is simply added up (no multipliers in 2024).
+// State (per system, see store): enc (the builder), encs (saved), init (the initiative tracker).
+
+const S5_BUDGET = [null, [50, 75, 100], [100, 150, 200], [150, 225, 400], [250, 375, 500], [500, 750, 1100], [600, 1000, 1400], [750, 1300, 1700],
+  [1000, 1700, 2100], [1300, 2000, 2600], [1600, 2300, 3100], [1900, 2900, 4100], [2200, 3700, 4700], [2600, 4200, 5400], [2900, 4900, 6200],
+  [3300, 5400, 7800], [3800, 6100, 9800], [4500, 7200, 11700], [5000, 8700, 14200], [5500, 10700, 17200], [6400, 13200, 22000]];
+const S5_DIFF = ['Low', 'Moderate', 'High'];
+const S5_CONDS = ['Blinded', 'Charmed', 'Deafened', 'Exhaustion', 'Frightened', 'Grappled', 'Incapacitated', 'Invisible', 'Paralyzed', 'Petrified', 'Poisoned', 'Prone', 'Restrained', 'Stunned', 'Unconscious'];
+const s5Uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+const s5Xp = m => s5Num(String(m.xp).split(', or')[0]);   // "11,500, or 13,000 in lair" -> 11500
+
+function s5NewEnc(party) {
+  return { id: s5Uid('e'), name: 'New encounter', party: party || Array.from({ length: 4 }, (_, i) => ({ name: 'Character ' + (i + 1), level: 1 })), entries: [] };
+}
+let S5ENC = store.get('enc', null) || s5NewEnc();
+let S5ENCS = store.get('encs', []);
+const s5SaveEnc = () => { store.set('enc', S5ENC); if (S5ENC.sessionRef) s5SyncEncToSession(); };
+function s5EncMath(E = S5ENC) {
+  const budget = [0, 0, 0];
+  for (const c of E.party) { const b = S5_BUDGET[Math.min(20, Math.max(1, +c.level || 1))]; budget.forEach((_, i) => budget[i] += b[i]); }
+  let xp = 0, count = 0;
+  for (const e of E.entries) { const m = MON[e.gid]; if (m) { xp += s5Xp(m) * e.n; count += e.n; } }
+  const di = xp === 0 ? -1 : xp <= budget[0] ? 0 : xp <= budget[1] ? 1 : xp <= budget[2] ? 2 : 3;
+  const label = di < 0 ? 'Empty' : di < 3 ? S5_DIFF[di] : 'Beyond High';
+  return { budget, xp, count, di, label };
+}
+const S5_DCOL = ['var(--ok)', 'var(--gold)', 'var(--accent)', 'var(--bad)'];
+
+// ---- encounter builder (#encounter) ----
+let s5EncQ = '';
+function s5EncounterPage() {
+  if (!MONS.length) { $('#main').innerHTML = '<div class="empty">Loading monsters…</div>'; return; }
+  const E = S5ENC, M = s5EncMath(E);
+  const lv = [...new Set(E.party.map(c => +c.level))];
+  const picks = s5EncQ.trim() ? MONS.filter(m => m.name.toLowerCase().includes(s5EncQ.trim().toLowerCase())).slice(0, 40) : [];
+  const bar = M.budget[2] ? Math.min(100, M.xp / M.budget[2] * 100) : 0;
+  $('#main').innerHTML = `<div class="neghub s5enc"><h1>Encounter Builder</h1>
+    <p class="note">Pick creatures for your party. The difficulty uses the SRD 5.2 XP budget per character (Low, Moderate, High), added up for every character in the party.</p>
+    <div class="s5enc-g"><div class="s5enc-l">
+      <div class="s5card"><h2>Party <span class="s5-sub">${E.party.length} character${E.party.length === 1 ? '' : 's'}${lv.length === 1 ? ', level ' + lv[0] : ''}</span></h2>
+        ${E.party.map((c, i) => `<div class="s5row"><input data-pn="${i}" value="${esc(c.name)}" aria-label="Name"><label>Level <input type="number" data-pl="${i}" min="1" max="20" value="${c.level}"></label><button class="ibtn" data-pdel="${i}" title="Remove">✕</button></div>`).join('')}
+        <div class="s5row"><button class="btn ghost sm" id="s5-padd">+ Character</button><label>All at level <input type="number" id="s5-pall" min="1" max="20" value="${lv.length === 1 ? lv[0] : ''}" placeholder="–"></label></div></div>
+      <div class="s5card"><h2>Add creatures</h2><input id="s5-q" type="search" placeholder="Search ${MONS.length} monsters…" value="${esc(s5EncQ)}" autocomplete="off">
+        <div class="s5picks">${picks.map(m => `<button data-add5="${esc(m.gid)}"><b>${esc(m.name)}</b><span>CR ${esc(m.cr)} · ${s5Xp(m).toLocaleString('en')} XP</span></button>`).join('') || (s5EncQ ? '<div class="empty">No monster matches.</div>' : '<div class="note">Type a name, or use “+ Encounter” on any monster page.</div>')}</div></div>
+    </div><div class="s5enc-r">
+      <div class="s5card"><div class="s5row"><input id="s5-ename" class="encname" value="${esc(E.name)}" aria-label="Encounter name"></div>
+        <div class="s5diff" style="--dc:${S5_DCOL[Math.max(0, M.di)]}"><b>${M.label}</b><span>${M.xp.toLocaleString('en')} XP · ${M.count} creature${M.count === 1 ? '' : 's'}</span></div>
+        <div class="s5bud"><div class="s5bar"><i style="width:${bar}%;background:${S5_DCOL[Math.max(0, M.di)]}"></i>${M.budget.map((b, i) => `<em style="left:${b / M.budget[2] * 100}%"></em>`).join('')}</div>
+          <div class="s5budl">${M.budget.map((b, i) => `<span><b>${S5_DIFF[i]}</b> ${b.toLocaleString('en')} XP</span>`).join('')}</div></div>
+        ${E.entries.length ? `<div class="s5ents">${E.entries.map((e, i) => { const m = MON[e.gid]; return m ? `<div class="s5ent"><a class="lnk" data-go="monsters--${esc(m.gid)}">${esc(m.name)}</a><span>CR ${esc(m.cr)} · ${(s5Xp(m) * e.n).toLocaleString('en')} XP</span><div class="step"><button data-edec="${i}">−</button><b>${e.n}</b><button data-einc="${i}">+</button></div></div>` : ''; }).join('')}</div>` : '<div class="empty">No creatures yet.</div>'}
+        <div class="negacts"><button class="btn" id="s5-init" ${E.entries.length ? '' : 'disabled'}>⚔ Run initiative</button><button class="btn ghost" id="s5-save">Save</button><button class="btn ghost" id="s5-new">New</button><button class="btn ghost" id="s5-pdf" ${E.entries.length ? '' : 'disabled'}>PDF</button></div>
+        ${E.sessionRef ? '<p class="note">This encounter is part of a session; changes are saved there too.</p>' : ''}</div>
+      ${S5ENCS.length ? `<div class="s5card"><h2>Saved encounters</h2>${S5ENCS.map((s, i) => { const sm = s5EncMath(s); return `<div class="s5ent"><a data-eload="${i}">${esc(s.name)}</a><span>${sm.label} · ${sm.xp.toLocaleString('en')} XP</span><button class="ibtn" data-erm="${i}" title="Delete">✕</button></div>`; }).join('')}</div>` : ''}
+    </div></div></div>`;
+  const re = () => { s5SaveEnc(); s5EncounterPage(); };
+  $$('[data-pn]').forEach(i => i.onchange = () => { E.party[+i.dataset.pn].name = i.value.trim() || 'Character'; s5SaveEnc(); });
+  $$('[data-pl]').forEach(i => i.onchange = () => { E.party[+i.dataset.pl].level = Math.min(20, Math.max(1, +i.value || 1)); re(); });
+  $$('[data-pdel]').forEach(b => b.onclick = () => { E.party.splice(+b.dataset.pdel, 1); if (!E.party.length) E.party.push({ name: 'Character 1', level: 1 }); re(); });
+  $('#s5-padd').onclick = () => { E.party.push({ name: 'Character ' + (E.party.length + 1), level: E.party[E.party.length - 1]?.level || 1 }); re(); };
+  $('#s5-pall').onchange = e => { const l = Math.min(20, Math.max(1, +e.target.value || 1)); E.party.forEach(c => c.level = l); re(); };
+  const q = $('#s5-q'); q.oninput = () => { s5EncQ = q.value; const pos = q.selectionStart; s5EncounterPage(); const n = $('#s5-q'); n.focus(); n.setSelectionRange(pos, pos); };
+  $$('[data-add5]').forEach(b => b.onclick = () => { s5AddToEnc(b.dataset.add5, true); });
+  $$('[data-einc]').forEach(b => b.onclick = () => { E.entries[+b.dataset.einc].n++; re(); });
+  $$('[data-edec]').forEach(b => b.onclick = () => { const e = E.entries[+b.dataset.edec]; e.n--; if (e.n <= 0) E.entries.splice(+b.dataset.edec, 1); re(); });
+  $('#s5-ename').onchange = e => { E.name = e.target.value.trim() || 'Encounter'; s5SaveEnc(); };
+  $('#s5-save').onclick = () => { const c = JSON.parse(JSON.stringify(E)); delete c.sessionRef; const i = S5ENCS.findIndex(x => x.id === c.id); if (i >= 0) S5ENCS[i] = c; else S5ENCS.unshift(c); store.set('encs', S5ENCS); toast('Saved “' + esc(c.name) + '”'); s5EncounterPage(); };
+  $('#s5-new').onclick = () => { S5ENC = s5NewEnc(JSON.parse(JSON.stringify(E.party))); re(); };
+  $$('[data-eload]').forEach(a => a.onclick = () => { S5ENC = JSON.parse(JSON.stringify(S5ENCS[+a.dataset.eload])); re(); });
+  $$('[data-erm]').forEach(b => b.onclick = async () => { if (await confirmSheet(`Delete the saved encounter “${S5ENCS[+b.dataset.erm].name}”?`, 'Delete')) { S5ENCS.splice(+b.dataset.erm, 1); store.set('encs', S5ENCS); s5EncounterPage(); } });
+  $('#s5-init').onclick = () => { s5StartInitiative(E); go('initiative'); };
+  $('#s5-pdf').onclick = () => runPdfJob($('#s5-pdf'), 'PDF', async () => { const b = await s5EncounterPdf(E); await deliverFile(pdfFileName(E.name), new Blob([b], { type: 'application/pdf' })); });
+  enhance($('#main'));
+  document.title = 'Encounter Builder — Vanadium';
+}
+function s5AddToEnc(gid, stay) {
+  const m = MON[gid]; if (!m) return;
+  const ex = S5ENC.entries.find(e => e.gid === gid); if (ex) ex.n++; else S5ENC.entries.push({ gid, n: 1 });
+  s5SaveEnc();
+  const M = s5EncMath(); toast(`Added ${esc(m.name)} · ${M.xp.toLocaleString('en')} XP (${M.label.toLowerCase()})`);
+  if (stay) s5EncounterPage();
+}
+
+// ---- initiative tracker (#initiative) ----
+let S5INIT = store.get('init', null) || { round: 1, turn: 0, list: [] };
+const s5SaveInit = () => store.set('init', S5INIT);
+const s5InitSort = () => S5INIT.list.sort((a, b) => (b.init ?? -99) - (a.init ?? -99) || (b.mod ?? 0) - (a.mod ?? 0) || a.name.localeCompare(b.name));
+function s5StartInitiative(E) {
+  const list = E.party.map(c => ({ id: s5Uid('c'), name: c.name, pc: true, init: null, mod: 0, conds: [] }));
+  for (const e of E.entries) {
+    const m = MON[e.gid]; if (!m) continue;
+    for (let k = 1; k <= e.n; k++) {
+      const mod = s5Int(m.init);
+      list.push({ id: s5Uid('c'), name: m.name + (e.n > 1 ? ' ' + k : ''), gid: m.gid, init: s5Die(20) + mod, mod, ac: m.ac, hp: m.hp, maxHp: m.hp, conds: [] });
+    }
+  }
+  S5INIT = { round: 1, turn: 0, name: E.name, list }; s5InitSort(); s5SaveInit();
+}
+function s5InitiativePage() {
+  const T = S5INIT, cur = T.list[T.turn];
+  $('#main').innerHTML = `<div class="neghub s5ini"><h1>Initiative${T.name ? ` <span class="s5-sub">${esc(T.name)}</span>` : ''}</h1>
+    <div class="negacts"><span class="s5round">Round <b>${T.round}</b>${cur ? ` · <b>${esc(cur.name)}</b>’s turn` : ''}</span><span style="flex:1"></span>
+      <button class="btn ghost" id="i5-prev" ${T.list.length ? '' : 'disabled'}>← Back</button><button class="btn" id="i5-next" ${T.list.length ? '' : 'disabled'}>Next turn →</button></div>
+    ${T.list.length ? `<div class="s5itable">${T.list.map((c, i) => `<div class="s5irow ${i === T.turn ? 'cur' : ''} ${c.hp === 0 ? 'down' : ''}">
+      <input class="s5iinit" type="number" data-iinit="${i}" value="${c.init ?? ''}" placeholder="–" aria-label="Initiative">
+      <div class="s5iname">${c.gid ? `<a class="lnk" data-go="monsters--${esc(c.gid)}">${esc(c.name)}</a>` : `<b>${esc(c.name)}</b>`}<span>${c.pc ? 'Character' : `AC ${esc(c.ac)} · init ${c.mod >= 0 ? '+' : '−'}${Math.abs(c.mod)}`}</span>
+        <div class="s5conds">${(c.conds || []).map(k => `<button class="chip inc" data-iuncond="${i}|${esc(k)}" title="Remove">${esc(k)} ×</button>`).join('')}<select data-icond="${i}" aria-label="Add a condition"><option value="">+ condition</option>${S5_CONDS.filter(k => !(c.conds || []).includes(k)).map(k => `<option>${k}</option>`).join('')}</select></div></div>
+      ${c.maxHp != null ? `<div class="s5ihp"><b>${c.hp}</b><span>/ ${c.maxHp} HP</span><input data-ihp="${i}" placeholder="−7 or +5" aria-label="Damage or healing"></div>` : '<div class="s5ihp"></div>'}
+      <button class="ibtn" data-idel="${i}" title="Remove">✕</button></div>`).join('')}</div>` : '<div class="empty">No one in the fight yet. Start from the <a href="#encounter">Encounter Builder</a>, or add combatants below.</div>'}
+    <div class="s5card"><div class="s5row"><input id="i5-name" placeholder="Name"><input id="i5-init" type="number" placeholder="Initiative" style="width:110px"><input id="i5-hp" type="number" placeholder="HP (optional)" style="width:130px"><button class="btn ghost" id="i5-add">Add</button></div>
+      <div class="s5row"><button class="btn ghost sm" id="i5-reroll">Re-roll monster initiative</button><button class="btn ghost sm danger" id="i5-clear">Clear</button></div>
+      <p class="note">Monster initiative is d20 + the creature’s Initiative from its SRD 5.2 stat block. Type the characters’ rolls into the boxes; the order updates when you leave a box.</p></div></div>`;
+  const re = () => { s5SaveInit(); s5InitiativePage(); };
+  const step = d => { const n = T.list.length; if (!n) return; T.turn += d; if (T.turn >= n) { T.turn = 0; T.round++; } if (T.turn < 0) { if (T.round > 1) { T.turn = n - 1; T.round--; } else T.turn = 0; } re(); };
+  if ($('#i5-next')) { $('#i5-next').onclick = () => step(1); $('#i5-prev').onclick = () => step(-1); }
+  $$('[data-iinit]').forEach(i => i.onchange = () => { const c = T.list[+i.dataset.iinit], curId = T.list[T.turn]?.id; c.init = i.value === '' ? null : +i.value; s5InitSort(); T.turn = Math.max(0, T.list.findIndex(x => x.id === curId)); re(); });
+  $$('[data-ihp]').forEach(i => i.onkeydown = e => { if (e.key !== 'Enter') return; const c = T.list[+i.dataset.ihp], v = s5Int(i.value); if (!v) return; c.hp = Math.max(0, Math.min(c.maxHp, c.hp + (/^\s*\+/.test(i.value) ? Math.abs(v) : -Math.abs(v)))); re(); });
+  $$('[data-icond]').forEach(s => s.onchange = () => { if (!s.value) return; const c = T.list[+s.dataset.icond]; (c.conds = c.conds || []).push(s.value); re(); });
+  $$('[data-iuncond]').forEach(b => b.onclick = () => { const [i, k] = b.dataset.iuncond.split('|'); const c = T.list[+i]; c.conds = c.conds.filter(x => x !== k); re(); });
+  $$('[data-idel]').forEach(b => b.onclick = () => { const i = +b.dataset.idel; T.list.splice(i, 1); if (T.turn >= T.list.length) T.turn = 0; else if (i < T.turn) T.turn--; re(); });
+  $('#i5-add').onclick = () => { const name = $('#i5-name').value.trim(); if (!name) { toast('Give the combatant a name'); return; } const hp = +$('#i5-hp').value || null; const curId = T.list[T.turn]?.id; T.list.push({ id: s5Uid('c'), name, pc: !hp, init: $('#i5-init').value === '' ? null : +$('#i5-init').value, mod: 0, hp, maxHp: hp, conds: [] }); s5InitSort(); T.turn = Math.max(0, T.list.findIndex(x => x.id === curId)); re(); };
+  $('#i5-reroll').onclick = () => { const curId = T.list[T.turn]?.id; T.list.forEach(c => { if (c.gid) c.init = s5Die(20) + c.mod; }); s5InitSort(); T.turn = Math.max(0, T.list.findIndex(x => x.id === curId)); re(); };
+  $('#i5-clear').onclick = async () => { if (await confirmSheet('Clear the initiative tracker?', 'Clear')) { S5INIT = { round: 1, turn: 0, list: [] }; re(); } };
+  document.title = 'Initiative — Vanadium';
+}
+
+// ---- printable encounter sheet ----
+async function s5EncounterPdf(E) {
+  const M = s5EncMath(E), w = await makeWriter(E.name); w.newPage();
+  w.header(E.name, `${E.party.length} characters (${[...new Set(E.party.map(c => 'level ' + c.level))].join(', ')}) · ${M.xp.toLocaleString('en')} XP · ${M.label}`, 'Encounter');
+  w.table(['Difficulty', 'XP budget', 'This encounter'], M.budget.map((b, i) => [`<b>${S5_DIFF[i]}</b>`, b.toLocaleString('en') + ' XP', M.di === i ? '<b>◀</b>' : '']), [1, 1, 1]);
+  w.h('Creatures', 2);
+  w.table(['Creature', 'CR', 'AC', 'HP', 'Initiative', 'XP'], E.entries.filter(e => MON[e.gid]).map(e => { const m = MON[e.gid]; return [`${e.n} × <b>${esc(m.name)}</b>`, m.cr, String(m.ac), `${m.hp} (${m.hpRoll})`, m.init, (s5Xp(m) * e.n).toLocaleString('en')]; }), [2.4, 0.6, 0.6, 1.4, 0.9, 0.9]);
+  for (const e of E.entries) {
+    const m = MON[e.gid]; if (!m) continue;
+    w.h(m.name, 3, `${m.size} ${m.type}, ${m.alignment}`);
+    w.para(`<b>AC</b> ${m.ac} · <b>Initiative</b> ${esc(m.init)} · <b>HP</b> ${m.hp} (${esc(m.hpRoll)}) · <b>Speed</b> ${esc(m.speed)}`, { size: 9 });
+    w.para(S5_AB.map(([k, l]) => `<b>${l}</b> ${m.ab[k]} (${s5Mod(m.ab[k])}, save ${esc(m.saves[k])})`).join(' · '), { size: 8.5 });
+    const lines = [['Skills', m.skills], ['Vulnerabilities', m.vuln], ['Resistances', m.resist], ['Immunities', m.immune], ['Senses', m.senses], ['Languages', m.languages]].filter(x => x[1]);
+    if (lines.length) w.para(lines.map(([l, v]) => `<b>${l}</b> ${esc(v)}`).join(' · '), { size: 8.5 });
+    for (const [title, list] of [['Traits', m.traits], ['Actions', m.actions], ['Bonus Actions', m.bonus], ['Reactions', m.reactions], ['Legendary Actions', m.legendary]]) {
+      if (!list.length) continue;
+      w.para(`<b>${title.toUpperCase()}</b>`, { size: 8.5 });
+      for (const a of list) w.para(`<b><i>${esc(a.name)}.</i></b> ${a.html}${a.spells ? ' ' + a.spells.join('; ') : ''}`, { size: 8.5 });
+    }
+  }
+  return w.bytes();
+}
+
+// ---- sessions: 5e encounters as session items ----
+function s5SyncEncToSession() {
+  const r = S5ENC.sessionRef; const S = sessById(r.sid); const d = S && S.docs.find(x => x.id === r.did);
+  if (!d) { delete S5ENC.sessionRef; return; }
+  const c = JSON.parse(JSON.stringify(S5ENC)); delete c.sessionRef; d.enc = c; d.title = c.name || d.title; saveSessions();
+}
+const S5_SESSION = {
+  planText: 'combat encounters',
+  party: [{ id: 'h', key: 'heroes', label: 'Characters', min: 1, max: 12 }, { id: 'l', key: 'level', label: 'Level', min: 1, max: 20 }],
+  partyNote: 'The party here is used for encounters you add to this session.',
+  newParty: () => ({ heroes: S5ENC.party.length || 4, level: S5ENC.party[0]?.level || 1 }),
+  partyLine: S => `${S.heroes} characters, level ${S.level}`,
+  overviewExtra: S => { const encs = S.docs.filter(x => x.type === 'enc'); return encs.length ? `<p class="note">Combat this session: ${encs.map(x => esc(x.title)).join(', ')}.</p>` : ''; },
+  kinds: {
+    enc: {
+      icon: '⚔', label: 'Combat encounter', noun: 'encounter', addLabel: '⚔ Encounter',
+      summary: x => x.enc ? (() => { const m = s5EncMath(x.enc); return ` · ${m.label}, ${m.xp.toLocaleString('en')} XP`; })() : '',
+      html(S, d, top) {
+        const E = d.enc; if (!E) return top + '<div class="empty">Missing encounter.</div>';
+        const M = s5EncMath(E);
+        return top + `<div class="s5diff" style="--dc:${S5_DCOL[Math.max(0, M.di)]}"><b>${M.label}</b><span>${M.xp.toLocaleString('en')} XP · budgets ${M.budget.map((b, i) => S5_DIFF[i] + ' ' + b.toLocaleString('en')).join(', ')} · ${E.party.length} characters</span></div>
+          <div class="actrow"><button class="btn" id="d-open">Open in Encounter Builder</button><button class="btn ghost" id="d-run">⚔ Run initiative</button><button class="btn ghost" id="d-repl">Replace with the builder’s current encounter</button></div>
+          ${E.entries.map(e => { const m = MON[e.gid]; return m ? `<div class="s5ent"><a class="lnk" data-go="monsters--${esc(m.gid)}">${e.n} × ${esc(m.name)}</a><span>CR ${esc(m.cr)} · AC ${m.ac} · HP ${m.hp} · ${(s5Xp(m) * e.n).toLocaleString('en')} XP</span></div>` : ''; }).join('')}`;
+      },
+      onRename: d => { if (d.enc) d.enc.name = d.title; },
+      wire(S, d) {
+        if ($('#d-open')) $('#d-open').onclick = () => { S5ENC = JSON.parse(JSON.stringify(d.enc)); S5ENC.sessionRef = { sid: S.id, did: d.id }; store.set('enc', S5ENC); go('encounter'); };
+        if ($('#d-run')) $('#d-run').onclick = () => { s5StartInitiative(d.enc); go('initiative'); };
+        if ($('#d-repl')) $('#d-repl').onclick = async () => { if (!S5ENC.entries.length) { toast('The encounter builder is empty'); return; } if (await confirmSheet(`Replace “${d.title}” with “${S5ENC.name}” from the builder?`, 'Replace')) { const c = JSON.parse(JSON.stringify(S5ENC)); delete c.sessionRef; d.enc = c; d.title = c.name; saveSessions(); sessionPage(S.id, d.id); } };
+      },
+      add(S, add) {
+        const party = Array.from({ length: S.heroes || 4 }, (_, i) => ({ name: 'Character ' + (i + 1), level: S.level || 1 }));
+        const items = [];
+        if (S5ENC.entries.length) items.push({ id: 'cur', name: S5ENC.name, sub: (() => { const m = s5EncMath(); return m.label + ' · ' + m.xp.toLocaleString('en') + ' XP'; })(), group: 'In the Encounter Builder now' });
+        S5ENCS.forEach(e => items.push({ id: 'saved:' + e.id, name: e.name, sub: e.entries.length + ' kinds of creature', group: 'Saved encounters' }));
+        items.push({ id: 'new', name: 'Empty encounter', sub: 'Build it in the Encounter Builder', group: 'New' });
+        return pickerSheet('Add a combat encounter', items, id => {
+          let e = id === 'cur' ? JSON.parse(JSON.stringify(S5ENC)) : id.startsWith('saved:') ? JSON.parse(JSON.stringify(S5ENCS.find(x => 'saved:' + x.id === id))) : s5NewEnc(party);
+          delete e.sessionRef; e.id = s5Uid('e');
+          if (id === 'new') e.name = 'Encounter ' + (S.docs.filter(x => x.type === 'enc').length + 1);
+          add({ type: 'enc', title: e.name, enc: e });
+        });
+      },
+      async pdf(S, d) { return d.enc && d.enc.entries.some(e => MON[e.gid]) ? s5EncounterPdf(d.enc) : null; }
+    }
+  }
+};
+
+// dice buttons, "+ Encounter" on monster pages
+function s5OnClick(e) {
+  const r = e.target.closest('[data-dice]'); if (r) { e.preventDefault(); openRoller(); s5Roll(r.dataset.dice, r.dataset.lab || r.dataset.dice); return true; }
+  const a = e.target.closest('[data-addenc5]'); if (a) { e.preventDefault(); s5AddToEnc(a.dataset.addenc5); return true; }
+}
+
 // Registers 5e (SRD 5.2) with the core. Loaded last of the srd5 files (SYSTEM_FILES in mksite.py).
-// Encounter difficulty, dice and initiative come in step 4; 5e stat blocks in the importer in step 5.
+// Tools (encounter builder, initiative, dice, session items) live in s5-tools.js; 5e stat blocks in the importer come in step 5.
 registerSystem({
   id: 'srd5', name: '5e (SRD 5.2)', short: '5e',
   data: { file: 'data/srd5.json', loading: 'Loading the SRD 5.2 rules…' },
@@ -3299,8 +3551,11 @@ registerSystem({
   builtin: [{ id: 'srd5-monsters', file: 'data/srd5-monsters.json', title: 'SRD 5.2 Monsters', kind: 'bestiary' }],
   lists: S5_LISTS,
   menu: s5Menu, home: s5Home, browse: s5Browse,
-  routes: {},
-  packRoutes: ['monsters'],
+  routes: { encounter: () => s5EncounterPage(), initiative: () => s5InitiativePage() },
+  packRoutes: ['monsters', 'encounter', 'initiative'],
+  roller: { title: 'Dice', html: S5_DICE_HTML, mount: s5MountRoller },
+  session: S5_SESSION,
+  onClick: s5OnClick,
   renderMonster: s5RenderMonster,
   entityMeta: s5EntityMeta, entitySource: s5EntitySource, preview: s5Preview,
   pinGroups: [
@@ -3308,13 +3563,13 @@ registerSystem({
     { type: 'spells', title: () => 'Spells', render: s => s5SpellCard(s) }
   ],
   linkTypes: ['conditions'],
-  noLink: '.s5-n,.s5-spl',
+  noLink: '.s5-n,.s5-spl,.s5iname',
   searchExtra: s5SearchExtra,
   searchPriority: { conditions: 0, classes: 0, spells: 1, species: 1, monsters: 2, items: 2, feats: 2, backgrounds: 2, equipment: 3 },
   importer: { module: './lib/dsparse.mjs', hint: 'PDFs with selectable text. Text, headings and tables are imported; 5e stat blocks are not recognised yet.' },
   pdfNotice: 'Includes SRD 5.2 material by Wizards of the Coast LLC, licensed CC BY 4.0 (creativecommons.org/licenses/by/4.0)',
   notice: S5_ATTRIB,
-  syncWhat: 'sessions, cards, pins, settings'
+  syncWhat: 'sessions, encounters, initiative, cards, pins, settings'
 });
 
 
@@ -4024,7 +4279,7 @@ async function buildCardsPdf(opt = {}) {
 // ---- QR codes → public card JPGs (uploaded through sync.php, served by card.php) ----
 let qrLoad = null;
 function loadQr() {  // lib/qrcode.js: qrcode-generator 1.4.4 (MIT), defines window.qrcode
-  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=3dc9fc5c4f'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
+  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=b64899a680'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
 }
 // 22-char id from the key's private salt + what the face looks like: stable, but unguessable
 async function cardImageId(salt, content) {

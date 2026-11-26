@@ -296,6 +296,8 @@ def ability(a):
     return d
 def monsters():
     out = []
+    ip = os.path.join(SRC, 'initiative.json')   # from extract_initiative.py (the SRD PDF); the dataset leaves it out
+    INIT = json.load(open(ip, encoding='utf-8')) if os.path.exists(ip) else {}
     for m in ld('Monsters'):
         ac = (m.get('armor_class') or [{}])[0]
         prof = {p['proficiency']['index']: p['value'] for p in m.get('proficiencies', [])}
@@ -311,7 +313,8 @@ def monsters():
         imm = '; '.join(x for x in [', '.join(title(d) for d in m.get('damage_immunities', [])), cond] if x)
         xp = f"{m.get('xp', 0):,}" + (f", or {m['xp_in_lair']:,} in lair" if m.get('xp_in_lair') else '')
         out.append({'id': m['index'], 'name': m['name'], 'size': m['size'], 'type': title(m['type']), 'alignment': title(m.get('alignment', '')),
-                    'ac': ac.get('value'), 'acNote': names(ac.get('armor', [])) if ac.get('armor') else '', 'init': mod(ab['dex']),
+                    'ac': ac.get('value'), 'acNote': names(ac.get('armor', [])) if ac.get('armor') else '',
+                    'init': INIT.get(m['index'], mod(ab['dex'])), 'initSrd': m['index'] in INIT,   # else the Dex modifier (1 monster)
                     'hp': m['hit_points'], 'hpRoll': hp_roll, 'speed': speed, 'ab': ab, 'saves': saves, 'skills': skills,
                     'vuln': ', '.join(title(d) for d in m.get('damage_vulnerabilities', [])), 'resist': ', '.join(title(d) for d in m.get('damage_resistances', [])),
                     'immune': imm, 'senses': sense, 'languages': m.get('languages') or '—', 'gear': names(m.get('gear', []), 'name') if m.get('gear') and isinstance(m['gear'][0], dict) and 'name' in m['gear'][0] else '',

@@ -94,7 +94,9 @@ src/                   ← sources you edit
   systems/srd5/        ← THE 5e (SRD 5.2) SYSTEM MODULE
     srd/               ← pinned 2024 data from 5e-bits/5e-database (MIT; content CC BY 4.0), see srd/README.md
     mkdata.py          ← BUILD: srd/ → site/data/srd5.json (rules, reference book) + srd5-monsters.json (monsters book)
+    extract_initiative.py ← one-off: monster Initiative from the official SRD 5.2 PDF text → srd/initiative.json (the dataset lacks it)
     srd5.js            ← stat blocks, spell cards, list columns/filters, menu, home, browse, search hooks
+    s5-tools.js        ← dice roller, encounter builder (SRD 5.2 XP budgets), initiative tracker, session items, encounter PDF
     srd5.css           ← 5e stat block / spell card styles (SYSTEM_CSS in mksite.py)
     register.js        ← the registerSystem({...}) call (loaded last)
   sb.js                ← old stat-block PDF fragment (reference only, not in the build)
@@ -236,7 +238,13 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
    - **Hooks:** conditions are auto-linked with hover previews; search, pins (monster XP totals), previews and the mobile Browse sheet all work for 5e.
    - **Not yet:** the SRD's running rules text (Playing the Game, Rules Glossary) isn't in the dataset. The 5e system has no dice roller, encounter builder or initiative yet (step 4), and the importer doesn't recognise 5e stat blocks yet (step 5).
    - **Tests:** `tests/srd5_test.py` runs 31 checks.
-5. **Step 4:** 5e tools (encounter difficulty, dice, initiative). **Step 5:** 5e stat blocks in the importer.
+5. **Step 4 (done): 5e tools** (`s5-tools.js`).
+   - **Dice (`SYS.roller`):** quick dice, typed expressions such as `2d6+3`, and d20 rolls with advantage or disadvantage. In stat blocks and spells, attack bonuses, damage dice, initiative, ability checks and saves are clickable (`s5Dicify`, `data-dice`).
+   - **Encounter builder (`#encounter`):** a party with per-character levels and the SRD 5.2 "XP Budget per Character" table (Low, Moderate, High). The table was checked against the official SRD PDF; mixed levels add up per character, since the SRD only covers single-level parties. Over High shows "Beyond High". It has saved encounters, "+ Encounter" on monster pages, and a PDF sheet with budgets, creatures and stat blocks.
+   - **Initiative tracker (`#initiative`):** monsters roll d20 plus their SRD Initiative. 340 of 341 come from the PDF; the Knight falls back to its Dex modifier. It tracks turns and rounds, HP damage and healing, and conditions, and keeps its state per system (`st_srd5_init`).
+   - **Sessions:** 5e sessions can hold encounters (`S5_SESSION`), with the party as characters and level.
+   - **Tests:** `tests/srd5_test.py` now runs 47 checks, including the SRD's own worked example.
+6. **Step 5:** 5e stat blocks in the importer.
 
 **Adding a system:**
 1. Create `src/systems/<id>/<id>.js` that calls `registerSystem` with at least `id`, `name`, `data`, `init`, `corePack`, `lists`, `menu`, `home`, `browse`, `renderMonster` and `pdfNotice`.
