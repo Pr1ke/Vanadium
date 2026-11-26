@@ -1217,6 +1217,11 @@ body.mob .rd figure.bkimg.side{float:none;width:auto;margin:12px 0}
 .syncp .syprog progress{width:100%;height:8px;accent-color:var(--accent)}
 .syncp .sychk{display:flex;gap:8px;align-items:center;font-size:13.5px;cursor:pointer}
 .syncp .warn{padding:10px 14px;margin:0 0 12px;font-size:13.5px}
+
+/* game system switch in the top bar (app.js mountSystemChrome; hidden with a single system) */
+#syssel{margin:0 6px 0 2px;padding:5px 26px 5px 10px;border:1px solid var(--line2);border-radius:999px;background:var(--field);color:var(--ink);font:600 12.5px var(--ui);cursor:pointer;max-width:150px}
+#syssel[hidden]{display:none}
+body.mob #syssel{max-width:90px;padding:4px 20px 4px 8px;font-size:12px;margin:0 2px}
 </style>
 </head>
 <body>
@@ -1224,6 +1229,7 @@ body.mob .rd figure.bkimg.side{float:none;width:auto;margin:12px 0}
 <header id="top">
   <button class="tbtn" id="burger" aria-label="Menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
   <a id="brand" href="#"><svg width="26" height="26" viewBox="0 0 32 32"><path d="M16 2 L19 18 L16 22 L13 18Z" fill="#cfd6de"/><path d="M9 20h14v3H9z" fill="#e0703a"/><path d="M15 23h2v6h-2z" fill="#8a6a46"/><circle cx="16" cy="30" r="1.6" fill="#e0703a"/></svg><span>Vanadium</span></a>
+  <select id="syssel" aria-label="Game system" title="Game system" hidden></select><!-- filled when the build has more than one system -->
   <nav class="menu" id="menu"></nav>
   <div id="searchwrap">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
@@ -1253,6 +1259,6 @@ body.mob .rd figure.bkimg.side{float:none;width:auto;margin:12px 0}
 <div id="roller"></div><!-- the game system's dice roller (SYS.roller), mounted at startup -->
 <div id="hov"></div>
 <div id="toast"></div>
-<script src="sync.js?v=fdeb7faca6" data-v="fdeb7faca6"></script><!-- pulls synced data first, then loads app.js -->
+<script src="sync.js?v=4842b5b9d6" data-v="4842b5b9d6"></script><!-- pulls synced data first, then loads app.js -->
 </body>
 </html>

@@ -3,10 +3,25 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const strip = h => String(h || '').replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-const store = {
-  get(k, d) { try { const v = localStorage.getItem('st_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem('st_' + k, JSON.stringify(v)); } catch (e) { } }
-};
+// ---- which game system is active (chosen per device; switching reloads the app) ----
+// The build fills in the systems it contains and the "legacy" system: the one that owns data
+// saved before multi-system support (unprefixed localStorage keys, imports without a system tag).
+const SYSTEM_IDS = JSON.parse('["drawsteel"]');
+const LEGACY_SYSTEM = 'drawsteel';
+const ACTIVE_SYSTEM = (() => { let s = null; try { s = localStorage.getItem('vanadium_system'); } catch (e) { } return SYSTEM_IDS.includes(s) ? s : LEGACY_SYSTEM; })();
+// Each system's data has its own key prefix: st_<key> for the legacy system (unchanged, so nothing
+// had to move), st_<system>_<key> for the others. gstore holds settings shared by all systems.
+const STORE_PREFIX = ACTIVE_SYSTEM === LEGACY_SYSTEM ? 'st_' : 'st_' + ACTIVE_SYSTEM + '_';
+const mkStore = prefix => ({
+  get(k, d) { try { const v = localStorage.getItem(prefix + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(prefix + k, JSON.stringify(v)); } catch (e) { } }
+});
+const store = mkStore(STORE_PREFIX);   // the active system's data
+const gstore = mkStore('st_');         // shared: theme, update check
+function switchSystem(id) {
+  try { localStorage.setItem('vanadium_system', id); } catch (e) { }
+  location.replace(location.pathname + location.search);   // routes are per system, so start at home
+}
 const ORD = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
 const slug = s => String(s).toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 const uniq = a => [...new Set(a.filter(x => x !== null && x !== undefined && x !== ''))];
@@ -27,7 +42,7 @@ let isMob = false;
 // ---------- game systems ----------
 // The core knows nothing about a particular game. A system module (src/systems/<id>/) calls
 // registerSystem({...}) with:
-//   id, name                      'drawsteel', 'Draw Steel'
+//   id, name, short               'drawsteel', 'Draw Steel', 'DS' (short: system switch on phones)
 //   data: {file, loading}         core rules JSON → D; loading message
 //   init()                        fill TYPES and BYID (and the system's own lookups) from D
 //   corePack()                    the core rulebook as a pack (rendered by the book reader)
@@ -59,7 +74,9 @@ let isMob = false;
 // A system's registerSystem call runs at load time, so it goes in the system's last file.
 const SYSTEMS = {};
 let SYS = null;
-function registerSystem(s) { SYSTEMS[s.id] = s; if (!SYS) SYS = s; }
+function registerSystem(s) { SYSTEMS[s.id] = s; if (s.id === ACTIVE_SYSTEM) SYS = s; }
+// imported books carry the system they were imported under; untagged ones predate that and are the legacy system's
+const packBelongs = p => (p.system || LEGACY_SYSTEM) === SYS.id;
 
 // ---------- data loading ----------
 const DATA_V = '1aac3576be';
@@ -127,8 +144,8 @@ async function fetchBuild() {
   try { const r = await fetch('version.json', { cache: 'no-store' }); return r.ok ? ((await r.json()).build || null) : null; } catch (e) { return null; }
 }
 async function checkForUpdate() {
-  if (!bootBuild || document.hidden || Date.now() - store.get('updchk', 0) < UPD_COOLDOWN) return;
-  store.set('updchk', Date.now());
+  if (!bootBuild || document.hidden || Date.now() - gstore.get('updchk', 0) < UPD_COOLDOWN) return;
+  gstore.set('updchk', Date.now());
   await callUpdater();
   const b = await fetchBuild();
   if (b && b !== bootBuild && b !== updSeen) showUpdateBar(b);
@@ -144,7 +161,7 @@ async function manualUpdate() {  // Utilities → Check for updates
   updRunning = true; toast('Checking for updates…', 300000);  // stays up until the result replaces it
   const say = h => toast(h, 6000);
   try {
-    store.set('updchk', Date.now());
+    gstore.set('updchk', Date.now());
     const r = await callUpdater();
     const b = await fetchBuild();
     const newer = b && bootBuild && b !== bootBuild;
@@ -180,9 +197,9 @@ async function initUpdateCheck() {
 }
 
 async function boot() {
-  mountSystemChrome();
-  applyTheme(store.get('theme2', 'light'));
+  applyTheme(gstore.get('theme2', 'light'));
   setupMobile();
+  mountSystemChrome();
   try { D = await getJSON(SYS.data.file, (g, t) => { $('#loadmsg').textContent = `${SYS.data.loading} ${(g / 1048576).toFixed(1)}${t ? ' / ' + (t / 1048576).toFixed(1) : ''} MB`; }); }
   catch (e) { $('#loadmsg').textContent = 'Could not load the rules data (' + e.message + ').'; return; }
   SYS.init(); LIST = SYS.lists;
@@ -195,7 +212,7 @@ async function boot() {
   initUpdateCheck();
   // packs in the background
   const loads = (SYS.builtin || []).map(b => getJSON(b.file).then(p => { p.builtin = true; p.title = b.title; p.kind = b.kind; p.id = b.id; addPack(p); }).catch(e => console.warn('pack', b.id, e)));
-  const user = IDB.all().then(list => list.forEach(p => { p.builtin = false; addPack(p); }));
+  const user = IDB.all().then(list => list.filter(packBelongs).forEach(p => { p.builtin = false; addPack(p); }));
   await Promise.all([...loads, user]);
   buildIndex(); buildMenu();
   const h = location.hash.slice(1);
@@ -203,7 +220,7 @@ async function boot() {
   // sync (sync.js): books arriving from / removed on other devices
   const onBooks = /^(library|book|monsters|sync)/;
   if (window.VSync) VSync.appReady({
-    added(p) { p.builtin = false; addPack(p); buildIndex(); buildMenu(); toast('Synced “' + esc(p.title) + '” from another device'); if (onBooks.test(location.hash.slice(1))) route(); },
+    added(p) { if (!packBelongs(p)) return; p.builtin = false; addPack(p); buildIndex(); buildMenu(); toast('Synced “' + esc(p.title) + '” from another device'); if (onBooks.test(location.hash.slice(1))) route(); },
     removed(id) { if (!PK[id]) return; removePack(id); buildIndex(); buildMenu(); if (onBooks.test(location.hash.slice(1))) route(); }
   });
 }
@@ -576,6 +593,7 @@ function showPreview() {
     p.title = $('#pvtitle').value.trim() || p.title; p.kind = $('#pvkind').value;
     const btn = $('#pvsave'); btn.disabled = true; btn.textContent = 'Saving…';
     const clean = JSON.parse(JSON.stringify(p, (k, v) => (k === 'monMap' || k === 'gid' || k === 'pack' || k === '_t') ? undefined : v));
+    clean.system = SYS.id;   // the book belongs to the system it was imported under
     let persisted = true;
     try { await IDB.put(clean); } catch (e) { persisted = false; memPacks.push(clean); }
     addPack(clean); buildIndex(); buildMenu(); pending = null;
@@ -765,6 +783,8 @@ $('#fab').onclick = openRoller;
 $('#roller').addEventListener('click', e => { if (e.target.closest('#rclose')) closeRoller(); });   // the panel's content comes from the system
 // the system's dice roller panel and licence notice (called first thing in boot)
 function mountSystemChrome() {
+  const ids = Object.keys(SYSTEMS), sel = $('#syssel');   // the system switch, only when there is a choice
+  if (sel && ids.length > 1) { sel.innerHTML = ids.map(id => `<option value="${id}" ${id === SYS.id ? 'selected' : ''}>${esc(isMob ? SYSTEMS[id].short || SYSTEMS[id].name : SYSTEMS[id].name)}</option>`).join(''); sel.hidden = false; sel.onchange = () => switchSystem(sel.value); }
   if (SYS.roller) { $('#roller').innerHTML = SYS.roller.html; $('#fab').title = SYS.roller.title; if (SYS.roller.mount) SYS.roller.mount(); }
   $('footer').innerHTML = SYS.notice || '';
 }
@@ -826,7 +846,7 @@ let toastT;
 function toast(h, ms = 2200) { const t = $('#toast'); t.innerHTML = h; t.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(() => t.style.display = 'none', ms); }
 
 // theme & mobile
-function applyTheme(th) { document.documentElement.dataset.theme = th; store.set('theme2', th); const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = th === 'dark' ? '#18191c' : '#ffffff'; try { document.querySelectorAll('iframe').forEach(f => f.contentWindow && f.contentWindow.__stTheme && f.contentWindow.__stTheme()); } catch (e) {} }
+function applyTheme(th) { document.documentElement.dataset.theme = th; gstore.set('theme2', th); const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = th === 'dark' ? '#18191c' : '#ffffff'; try { document.querySelectorAll('iframe').forEach(f => f.contentWindow && f.contentWindow.__stTheme && f.contentWindow.__stTheme()); } catch (e) {} }
 $('#themebtn').onclick = () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 $('#pinsbtn').onclick = () => go('pinned');
 function setupMobile() {
@@ -1083,7 +1103,7 @@ function classIndex() {
 window.__stSave = (name, blob) => deliverFile(name, blob);
 window.__stGotoPage = pg => gotoPage(String(pg));
 function respitePage() {
-  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=fdeb7faca6" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
+  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=4842b5b9d6" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
   document.title = 'Respite — Vanadium';
 }
 
@@ -3081,7 +3101,7 @@ const DS_CARDS = {
 // mksite.py): the object below is built at load time, so everything it names must already exist.
 // Hook contract: see registerSystem in app.js.
 registerSystem({
-  id: 'drawsteel', name: 'Draw Steel',
+  id: 'drawsteel', name: 'Draw Steel', short: 'DS',
   data: { file: 'data/heroes.json', loading: 'Loading the rules…' },
   init: initHeroes,
   corePack: () => ({ id: 'heroes', title: 'Draw Steel: Heroes', kind: 'core', builtin: true, chapters: D.book, monsters: [], abilities: [], heroes: true }),
@@ -3826,7 +3846,7 @@ async function buildCardsPdf(opt = {}) {
 // ---- QR codes → public card JPGs (uploaded through sync.php, served by card.php) ----
 let qrLoad = null;
 function loadQr() {  // lib/qrcode.js: qrcode-generator 1.4.4 (MIT), defines window.qrcode
-  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=fdeb7faca6'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
+  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=4842b5b9d6'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
 }
 // 22-char id from the key's private salt + what the face looks like: stable, but unguessable
 async function cardImageId(salt, content) {

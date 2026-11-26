@@ -153,8 +153,13 @@ VS Code: **Terminal → Run Build Task** (Ctrl/Cmd+Shift+B) builds. Run the "Ser
   - Blocks look like `{t:'h'|'p'|'li'|'table'|'box'|'read'|'monster'|'img', …, pg}`.
   - A monster looks like `{name, level, role, keywords, ev, stats, chars, immunity, weakness, movement, extra, items, pg, org, id, ch, group, img?}`.
   - `addPack`/`removePack` maintain the `PACKS` and `PK` maps, plus the merged monster index `MONS`/`MON`.
-- **Imported packs** live in IndexedDB database `steeltools`, store `packs` (keyPath `id`, ids look like `imp-<slug>-<rand>`), with an in-memory fallback. Their images are stored inline as `data:image/webp` URLs in `pack.images[]`. Blocks reference them as `{t:'img', i}` and monsters as `m.img`.
-- **User state** is in localStorage, `st_` prefix: `cards`, `chars`, `enc`, `encs`, `mtg`, `mtgsess`, `negs`, `negsess`, `pins`, `sessions`, `stones`, `stoneson`, `theme2`.
+- **Imported packs** live in IndexedDB database `steeltools`, store `packs` (keyPath `id`, ids look like `imp-<slug>-<rand>`), with an in-memory fallback. Their images are stored inline as `data:image/webp` URLs in `pack.images[]`. Blocks reference them as `{t:'img', i}` and monsters as `m.img`. Each import is tagged with `system` (the active system when it was imported); untagged ones are the legacy system's. Only the active system's books are loaded (`packBelongs`).
+- **User state** is in localStorage, **per game system**:
+  - **Draw Steel** (the legacy system, `LEGACY_SYSTEM` in `mksite.py`) uses the original `st_` prefix: `cards`, `chars`, `enc`, `encs`, `mtg`, `mtgsess`, `negs`, `negsess`, `pins`, `sessions`, `stones`, `stoneson`. This is why no data had to be migrated.
+  - **Other systems** use `st_<system>_<key>`, for example `st_dnd5e_cards`.
+  - **Shared settings** go through `gstore` (`st_theme2`, `st_updchk`).
+  - **The active system** is `vanadium_system`. It is per device and deliberately not synced; switching calls `switchSystem(id)` and reloads.
+  - **Rules:** never change `LEGACY_SYSTEM`, and never give a system the id `sync`, because `st_sync_*` is sync's own bookkeeping. Sync covers every `st_` key, so new systems are synced automatically.
 - **PDF output** uses pdf-lib's StandardFonts, Helvetica and Times sets, chosen with `base.times`. The standard fonts are WinAnsi only, so text goes through a sanitiser that replaces ≤ ≥ − etc. Icons are drawn with `drawSvgPath`.
 - **Respite** is a separate page (`respite.html`) shown in an iframe. `applyTheme()` calls the iframe's `__stTheme` to keep themes in sync.
 
@@ -207,7 +212,12 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
 1. **Step 1 (done):** Draw Steel moved behind the interface with no visible change; see the verification below.
 2. **Step 1b (done):** sessions and cards are now general engines with system "kinds" (`SYS.session`, `SYS.cards`). The roller panel (`SYS.roller`), the footer licence (`SYS.notice`) and the Sync page wording (`SYS.syncWhat`) also come from the system. `check_core.py` covers all five core files.
    - **Still Draw Steel-shaped, but generic enough for now:** the card store keeps a `followers` list, and the Encounters-book menu link uses a fixed id. Both get revisited when 5e arrives.
-3. **Step 2:** a system switch in the top bar, plus per-system namespacing of stored data (localStorage keys, imported packs). Existing data must be migrated so nobody loses anything.
+3. **Step 2 (done):** the system switch and per-system data.
+   - **The switch** is `#syssel` in the top bar. It appears only when the build has more than one system, and uses `short` names on phones.
+   - **The build** lists its systems in `SYSTEM_FILES` and injects `SYSTEM_IDS` and `LEGACY_SYSTEM` into app.js.
+   - **Loading:** every system's code is in app.js, which is small, but only the active system's data file and books are loaded.
+   - **Data** is separated per system as described in §5 (localStorage prefixes, tagged imports).
+   - **Tests:** `tests/systems_test.py` runs 24 checks. It uses a throw-away build with `tests/fixtures/sample-system`, which is also the smallest example of a system.
 4. **Step 3:** the D&D 5e SRD module. **Step 4:** 5e tools (encounter difficulty, dice, initiative). **Step 5:** 5e stat blocks in the importer.
 
 **Adding a system:**
@@ -258,6 +268,8 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
   - `python tests/snapshot.py out.json`, then `--diff a.json b.json`: a whole-app before/after comparison (§5b).
   - `python tests/check_core.py`: checks the core is system-neutral.
   - `node tests/sync_client.mjs site/sync.js`: the sync client simulation.
+  - `python tests/systems_test.py`: the system switch and per-system data, using the sample system fixture (needs a build).
+  - **`serve.py --site DIR`** serves another folder (used by tests; it never auto-updates).
 - **Older scripts:** serve `site/` on port 8765 first, then `python tests/<name>.py`. Scripts print `errs []` when there are no page errors.
 - Many tests point at the original sandbox paths (`/mnt/user-data/uploads/*.pdf`, `/home/claude/shots/`). Change those to your local PDF and output paths.
 - Still valid:

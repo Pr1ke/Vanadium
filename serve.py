@@ -169,11 +169,15 @@ def make_handler(updater):
 def main():
     ap = argparse.ArgumentParser(description='Serve Vanadium with auto-update from GitHub.')
     ap.add_argument('--port', type=int, default=8765)
+    ap.add_argument('--site', help='serve this folder instead of site/ (tests); implies --no-update')
     ap.add_argument('--host', default='127.0.0.1')
     ap.add_argument('--no-update', action='store_true', help='never update')
     ap.add_argument('--update', action='store_true', help='auto-update even inside a git checkout')
     ap.add_argument('--check', action='store_true', help='check/update once now and exit')
     args = ap.parse_args()
+    global SITE
+    if args.site:
+        SITE = os.path.abspath(args.site); args.no_update = True   # never update a test copy
 
     if args.check:
         sys.exit(0 if Updater().check_now() else 1)

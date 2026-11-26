@@ -1,0 +1,14 @@
+{
+  "book": [
+    { "id": "intro", "title": "Introduction", "blocks": [
+      { "t": "h", "lvl": 1, "text": "Introduction", "id": "intro", "pg": 1 },
+      { "t": "p", "style": "body", "html": "Welcome to the sample rules. Spells are listed under Rules.", "pg": 1 },
+      { "t": "h", "lvl": 2, "text": "Casting", "id": "casting", "pg": 2 },
+      { "t": "p", "style": "body", "html": "Say the words and wave your hands.", "pg": 2 }
+    ] }
+  ],
+  "spells": [
+    { "id": "light", "name": "Light", "level": 0, "body": [{ "t": "p", "style": "body", "html": "A small light shines from an object you touch." }] },
+    { "id": "spark", "name": "Spark", "level": 1, "body": [{ "t": "p", "style": "body", "html": "A spark jumps to a creature you can see." }] }
+  ]
+}

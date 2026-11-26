@@ -19,6 +19,10 @@ open(SITE+'/index.html','w').write(html)
 # registerSystem) + core modules + boot(). One global script, so order only matters for code that
 # runs at load time: systems come after the core helpers they use.
 SYSTEM_FILES={'drawsteel':['drawsteel.js','enc.js','neg.js','mtg.js','ds-print.js','ds-sessions.js','ds-cards.js','register.js']}  # register.js last
+# The legacy system owns everything saved before multi-system support (unprefixed localStorage
+# keys, imported books without a system tag) and is the default. Never change it, or that data
+# would appear to belong to another system.
+LEGACY_SYSTEM='drawsteel'
 CORE_MODULES=['print.js','sess.js','cards.js']
 js=open(SRC+'/app.js').read(); i=js.rindex('boot();')
 parts=[open(SRC+'/systems/%s/%s'%(s,f)).read() for s,fs in SYSTEM_FILES.items() for f in fs]+[open(SRC+'/'+f).read() for f in CORE_MODULES]
@@ -32,7 +36,8 @@ for f in glob.glob(SITE+'/data/*.json'):
 av=hashlib.md5(b''.join(open(f,'rb').read().replace(b'\r\n',b'\n') for f in sorted(glob.glob(SRC+'/**/*',recursive=True))+[ROOT+'/importer/dsparse.mjs'] if os.path.isfile(f))).hexdigest()[:10]
 html=html.replace('<script src="sync.js">','<script src="sync.js?v=%s" data-v="%s">'%(av,av))
 open(SITE+'/index.html','w').write(html)
-open(SITE+'/app.js','w').write((js[:i]+'\n'.join(parts)+'\n'+js[i:]).replace('__DATAV__',h).replace('__ASSETV__',av))
+open(SITE+'/app.js','w').write((js[:i]+'\n'.join(parts)+'\n'+js[i:]).replace('__DATAV__',h).replace('__ASSETV__',av)
+    .replace('__SYSTEM_IDS__',__import__('json').dumps(list(SYSTEM_FILES))).replace('__LEGACY_SYSTEM__',LEGACY_SYSTEM))
 for p in (ROOT+'/node_modules/pdf-lib/dist/pdf-lib.esm.min.js','/opt/npm-tools/node_modules/pdf-lib/dist/pdf-lib.esm.min.js'):
     if os.path.exists(p): shutil.copy(p,SITE+'/lib/pdf-lib.esm.min.js'); break
 shutil.copy(ROOT+'/importer/dsparse.mjs',SITE+'/lib/dsparse.mjs')

@@ -2,7 +2,7 @@
 // mksite.py): the object below is built at load time, so everything it names must already exist.
 // Hook contract: see registerSystem in app.js.
 registerSystem({
-  id: 'drawsteel', name: 'Draw Steel',
+  id: 'drawsteel', name: 'Draw Steel', short: 'DS',
   data: { file: 'data/heroes.json', loading: 'Loading the rules…' },
   init: initHeroes,
   corePack: () => ({ id: 'heroes', title: 'Draw Steel: Heroes', kind: 'core', builtin: true, chapters: D.book, monsters: [], abilities: [], heroes: true }),
