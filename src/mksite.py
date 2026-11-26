@@ -15,8 +15,13 @@ head=head.replace('<title>','<link rel="icon" href="data:image/svg+xml,%3Csvg xm
 head=head.replace('family=Inter:wght@400;500;600','family=Inter:wght@400;500;600;700').replace('<title>Vanadium','<title>Vanadium')
 html=head+extra+open(SRC+'/vanadium.css').read()+'</style>\n</head>\n'+body
 open(SITE+'/index.html','w').write(html)
-js=open(SRC+'/app.js').read(); enc=open(SRC+'/enc.js').read()
-i=js.rindex('boot();'); neg=open(SRC+'/neg.js').read()+'\n'+open(SRC+'/mtg.js').read()+'\n'+open(SRC+'/print.js').read()+'\n'+open(SRC+'/sess.js').read()+'\n'+open(SRC+'/cards.js').read()
+# app.js = core (src/app.js up to its trailing boot();) + each game system's files (they call
+# registerSystem) + core modules + boot(). One global script, so order only matters for code that
+# runs at load time: systems come after the core helpers they use.
+SYSTEM_FILES={'drawsteel':['drawsteel.js','enc.js','neg.js','mtg.js','ds-print.js']}
+CORE_MODULES=['print.js','sess.js','cards.js']
+js=open(SRC+'/app.js').read(); i=js.rindex('boot();')
+parts=[open(SRC+'/systems/%s/%s'%(s,f)).read() for s,fs in SYSTEM_FILES.items() for f in fs]+[open(SRC+'/'+f).read() for f in CORE_MODULES]
 import hashlib,glob,gzip
 rj=lambda f: open(f,'rb').read().replace(b'\r\n',b'\n')  # a Windows checkout has CRLF; build the same bytes everywhere
 h=hashlib.md5(b''.join(rj(f) for f in sorted(glob.glob(SITE+'/data/*.json')))).hexdigest()[:10]
@@ -24,10 +29,10 @@ for f in glob.glob(SITE+'/data/*.json'):
     open(f[:-5]+'.gz.txt','wb').write(__import__('base64').b64encode(gzip.compress(rj(f),9,mtime=0)))
 # asset version: changes whenever any source changes; added as ?v= to sync.js, app.js and respite.html
 # so browsers never keep running an old copy after an update (hosts often let them cache heuristically)
-av=hashlib.md5(b''.join(open(f,'rb').read().replace(b'\r\n',b'\n') for f in sorted(glob.glob(SRC+'/*'))+[ROOT+'/importer/dsparse.mjs'] if os.path.isfile(f))).hexdigest()[:10]
+av=hashlib.md5(b''.join(open(f,'rb').read().replace(b'\r\n',b'\n') for f in sorted(glob.glob(SRC+'/**/*',recursive=True))+[ROOT+'/importer/dsparse.mjs'] if os.path.isfile(f))).hexdigest()[:10]
 html=html.replace('<script src="sync.js">','<script src="sync.js?v=%s" data-v="%s">'%(av,av))
 open(SITE+'/index.html','w').write(html)
-open(SITE+'/app.js','w').write((js[:i]+enc+'\n'+neg+'\n'+js[i:]).replace('__DATAV__',h).replace('__ASSETV__',av))
+open(SITE+'/app.js','w').write((js[:i]+'\n'.join(parts)+'\n'+js[i:]).replace('__DATAV__',h).replace('__ASSETV__',av))
 for p in (ROOT+'/node_modules/pdf-lib/dist/pdf-lib.esm.min.js','/opt/npm-tools/node_modules/pdf-lib/dist/pdf-lib.esm.min.js'):
     if os.path.exists(p): shutil.copy(p,SITE+'/lib/pdf-lib.esm.min.js'); break
 shutil.copy(ROOT+'/importer/dsparse.mjs',SITE+'/lib/dsparse.mjs')

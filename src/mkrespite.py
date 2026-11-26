@@ -6,12 +6,13 @@ def open(p,m='r',*a,**k):
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC=ROOT+'/src'; SITE=ROOT+'/site'
 import re
-src=open(SRC+'/respite-base.html').read()
+DS=SRC+'/systems/drawsteel'   # the Respite tool belongs to the Draw Steel system
+src=open(DS+'/respite-base.html').read()
 m=re.search(r'(<style[^>]*>)(.*?)(</style>)',src,re.S)
 css=m.group(2).split('\n')
 # keep structural base (1-214) + phones (378-end); drop the two ornate theme layers
 keep='\n'.join(css[:214]+css[377:])
-new=keep+'\n'+open(SRC+'/respite-vanadium.css').read()
+new=keep+'\n'+open(DS+'/respite-vanadium.css').read()
 out=src[:m.start()]+m.group(1)+new+m.group(3)+src[m.end():]
 out=re.sub(r'<link href="https://fonts.googleapis.com/css2\?family=Cormorant[^>]*>','<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;1,400&display=swap" rel="stylesheet">',out)
 # theme sync + let the parent's sync.js see this iframe's localStorage writes

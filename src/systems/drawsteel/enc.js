@@ -341,9 +341,6 @@ function setupDialog() {
 }
 
 // ---------- PDF export ----------
-let PDFLib = null;
-async function loadPdfLib() { if (!PDFLib) PDFLib = await import('./lib/pdf-lib.esm.min.js'); return PDFLib; }
-const WINANSI_OK = /[ -~ -ÿ’‘“”–—•…×€™]/;
 const pdfText = s => [...strip(String(s ?? '').replace(/<\/span>/g, '</span> ')).replace(/ ([,;.])/g, '$1').replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/−/g, '-').replace(/\s+/g, ' ')].map(c => WINANSI_OK.test(c) ? c : '?').join('').trim();
 async function exportEncounterPdf() {
   const live = ENC.groups.filter(g => g.entries.some(e => MON[e.gid]));
@@ -692,18 +689,4 @@ async function buildEncounterPdf(E) {
     }
     return await doc.save();
   } finally { ENC = SAVED; }
-}
-async function deliverFile(filename, blob) {
-  let dl = null;
-  try { dl = window.claude && window.claude.use ? await Promise.race([window.claude.use('downloads'), new Promise(r => setTimeout(() => r(null), 4000))]) : null; } catch (e) { dl = null; }
-  if (dl) {
-    try { const r = await dl.save({ filename, data: blob }); toast(r.status === 'delivered' ? 'Sent' : 'PDF saved'); return; }
-    catch (e) { if (e && e.code === 'declined') { toast('Download cancelled'); return; } if (e && e.code === 'rate_limited') { toast('A save prompt is already open'); return; } }
-  }
-  // outside claude.ai: plain browser download
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 30000);
-  toast('PDF ready');
-  window.__lastPdf = blob;
 }

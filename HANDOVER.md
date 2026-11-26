@@ -69,16 +69,23 @@ src/                   ← sources you edit
   app.html             ← only its <head> CSS is used by the build
   extra.css, vanadium.css   ← extra + theme styles (vanadium.css = current design, light-first, html[data-theme=dark])
   body.html            ← page markup
-  app.js               ← core: data loading, routing, search, book reader, stat blocks, importer UI, library, pins, home
-  enc.js               ← encounter builder, stones, scaling, encounter PDF + damage tracker
-  neg.js               ← negotiation tracker
-  mtg.js               ← montage tests, book-encounter picker, matchMonster; exposes window.__mt for tests
-  print.js             ← PDF writer helpers (makeWriter, Times/Helvetica sets), montage/negotiation/markdown PDFs, mergePdfs
-  sess.js              ← sessions
-  cards.js             ← cards, icon libraries/search, customiser, card PDF
+  app.js               ← CORE (system-neutral): data loading, packs, routing, list pages, book reader, library,
+                          importer UI, pins, search, sync page, updates. Talks to the game system only via SYS.* (§5b)
+  print.js             ← PDF writer (makeWriter, Times/Helvetica sets), pdf-lib loader, deliverFile, markdown PDFs, mergePdfs
+  sess.js              ← sessions (still Draw Steel-specific: links encounters/montages/negotiations, see §5b "step 1b")
+  cards.js             ← cards, icon libraries/search, customiser, card PDF (card sources still Draw Steel-specific)
+  sync.js, *.php       ← sync client, sync/update/card servers (system-neutral)
+  systems/drawsteel/   ← THE DRAW STEEL SYSTEM MODULE (§5b)
+    drawsteel.js       ← data setup, ability/stat-block rendering, list columns/filters, class pages, menu,
+                          home, power roller, hooks, and the registerSystem({...}) call
+    enc.js             ← encounter builder, stones, scaling, encounter PDF + damage tracker
+    neg.js             ← negotiation tracker
+    mtg.js             ← montage tests, book-encounter picker, matchMonster; exposes window.__mt for tests
+    ds-print.js        ← montage and negotiation PDF sheets
+    respite-base.html, respite-vanadium.css ← the Respite tool (built by mkrespite.py)
   sb.js                ← old stat-block PDF fragment (reference only, not in the build)
-  mksite.py            ← BUILD: index.html + app.js + data/*.gz.txt
-  mkrespite.py, respite-base.html, respite-vanadium.css ← BUILD for respite.html
+  mksite.py            ← BUILD: index.html + app.js + data/*.gz.txt (SYSTEM_FILES lists each system's files)
+  mkrespite.py         ← BUILD for respite.html
   parse.py, build.py, pg.py, assemble.py ← one-off pipeline that produced heroes.json from `pdftohtml -xml` output
 importer/
   dsparse.mjs          ← THE PDF parser (browser + node). Edit here, then copy to site/lib/
@@ -102,7 +109,13 @@ VS Code: **Terminal → Run Build Task** (Ctrl/Cmd+Shift+B) builds. Run the "Ser
 
 **Important rules:**
 - `site/index.html`, `site/app.js`, `site/respite.html` and `site/data/*.gz.txt` are **generated**. Edit `src/`, then rebuild.
-- `mksite.py` inserts `boot()` at the end of the concatenated JS. Its order is: app.js (minus its trailing `boot();`) + enc.js + neg.js + mtg.js + print.js + sess.js + cards.js, then `boot();`.
+- `mksite.py` concatenates one global script, in this order:
+  1. core `src/app.js`, minus its trailing `boot();`
+  2. each system's files from `SYSTEM_FILES` (for Draw Steel: `drawsteel.js`, `enc.js`, `neg.js`, `mtg.js`, `ds-print.js`), which call `registerSystem`
+  3. the core modules `print.js`, `sess.js` and `cards.js`
+  4. `boot();`
+  
+  Order only matters for code that runs at load time.
 - `mksite.py` replaces `__DATAV__` in app.js with an md5 hash of `site/data/*.json`. That hash busts the browser's Cache API copy, so changing any data JSON automatically invalidates caches.
 - The site must be served over HTTP. `file://` breaks module imports and fetch.
 - `importer/dsparse.mjs` is loaded by the browser from `site/lib/dsparse.mjs`, so copy it there after editing: `cp importer/dsparse.mjs site/lib/`.
@@ -180,6 +193,44 @@ VS Code: **Terminal → Run Build Task** (Ctrl/Cmd+Shift+B) builds. Run the "Ser
 - **Updaters:** neither updater touches `.vanadium-*` files. `update.php` only deletes files from its own manifest, and `serve.py` skips them. `serve.py` can't run PHP, so sync is unavailable locally and the Sync page says so.
 - **Tests:** `node tests/sync_client.mjs site/sync.js` runs a simulation of several devices against an in-memory JS copy of the `sync.php` API. It covers merging, conflicts, removal, books (multi-chunk), loading data before the app starts, rotating the key and owner permissions. If you change the API, keep that copy in step with `sync.php`. The PHP itself is only tested on the real host.
 
+## 5b. Game systems (multi-system support, branch `systems`)
+
+Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD later).
+- **Core:** `src/app.js` and the other core files are system-neutral.
+- **Systems:** each game lives in `src/systems/<id>/` and registers itself with `registerSystem({...})`.
+- **Access:** the core reaches the active system only through the global `SYS`. The full hook contract is documented next to `registerSystem` at the top of `app.js`, and `drawsteel.js` is the reference implementation.
+
+**Roadmap:**
+1. **Step 1 (done):** Draw Steel moved behind the interface with no visible change; see the verification below.
+2. **Step 1b (to do):** make what is still Draw Steel-specific in "core" places go through hooks:
+   - `sess.js` links encounters, montages and negotiations directly.
+   - `cards.js` builds cards from Draw Steel treasures, retainers, followers and characteristics.
+   - `body.html` has the power-roller panel markup (2d10, Might…Presence, edge/bane) and the Draw Steel licence line in the footer.
+   - The Sync page text lists Draw Steel tools.
+3. **Step 2:** a system switch in the top bar, plus per-system namespacing of stored data (localStorage keys, imported packs). Existing data must be migrated so nobody loses anything.
+4. **Step 3:** the D&D 5e SRD module. **Step 4:** 5e tools (encounter difficulty, dice, initiative). **Step 5:** 5e stat blocks in the importer.
+
+**Adding a system:**
+1. Create `src/systems/<id>/<id>.js` that calls `registerSystem` with at least `id`, `name`, `data`, `init`, `corePack`, `lists`, `menu`, `home`, `browse`, `renderMonster` and `pdfNotice`.
+2. List its files in `SYSTEM_FILES` in `mksite.py`.
+3. Run `python tests/check_core.py` to make sure the core still doesn't reference system code directly.
+
+**Verifying refactors:**
+- **`tests/snapshot.py`** crawls the whole app with fixed test data and records:
+  - the HTML of 131 pages
+  - the menu
+  - searches
+  - the result of a roll
+  - a hover preview
+  - "+ Encounter"
+  - the import preview of a generated PDF (`tests/make_fixture_pdf.mjs`)
+  - the mobile Browse sheet and peek
+  - the cards and encounter PDF exports
+  - JS errors
+- **`--diff`** compares two snapshots.
+- **`--root`** snapshots another checkout. For example, use `git worktree add ../main-wt main` for a "before" snapshot.
+- **Step 1 result:** IDENTICAL to `main`, apart from the `?v=` asset version (which the diff normalises).
+
 ## 6. The PDF parser (importer/dsparse.mjs)
 
 - `extractPages(doc, onProgress, {images:{OPS, encode}})` uses pdf.js text content plus the operator list.
@@ -202,7 +253,11 @@ VS Code: **Terminal → Run Build Task** (Ctrl/Cmd+Shift+B) builds. Run the "Ser
 
 ## 8. Tests
 
-- Serve `site/` on port 8765 first, then `python3 tests/<name>.py`. Scripts print `errs []` when there are no page errors.
+- **Current, self-contained tests** (no server needed):
+  - `python tests/snapshot.py out.json`, then `--diff a.json b.json`: a whole-app before/after comparison (§5b).
+  - `python tests/check_core.py`: checks the core is system-neutral.
+  - `node tests/sync_client.mjs site/sync.js`: the sync client simulation.
+- **Older scripts:** serve `site/` on port 8765 first, then `python tests/<name>.py`. Scripts print `errs []` when there are no page errors.
 - Many tests point at the original sandbox paths (`/mnt/user-data/uploads/*.pdf`, `/home/claude/shots/`). Change those to your local PDF and output paths.
 - Still valid:
   - `t20` cards styles

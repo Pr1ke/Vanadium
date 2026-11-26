@@ -11,19 +11,47 @@ const ORD = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 's
 const slug = s => String(s).toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 const uniq = a => [...new Set(a.filter(x => x !== null && x !== undefined && x !== ''))];
 
-const BUILTIN = [
-  { id: 'monsters', file: 'data/monsters.json', title: 'Draw Steel: Monsters', kind: 'bestiary' }
-];
 const KIND = { core: 'Core rules', bestiary: 'Bestiary', adventure: 'Adventure', supplement: 'Supplement', book: 'Book' };
 
-let D;                    // heroes data
+let D;                    // the game system's core rules data (SYS.data)
 let PACKS = [];           // [{id,title,kind,chapters,monsters,abilities,builtin}]
 const PK = {};            // id -> pack
 let MONS = [];            // all monsters (global ids)
 const MON = {};           // gid -> monster
 const PAB = {};           // packId:localId -> ability
-let AB = {}, TYPES, BYID, CHAP, PAGE, condNames;
+let TYPES, BYID;          // entity types and id lookups, filled by SYS.init
+let LIST = {};            // list-page config per type (SYS.lists)
+let CHAP = {}, PAGE = {}; // core rulebook: chapter id -> chapter, page number -> {ch, i}
 let isMob = false;
+
+// ---------- game systems ----------
+// The core knows nothing about a particular game. A system module (src/systems/<id>/) calls
+// registerSystem({...}) with:
+//   id, name                      'drawsteel', 'Draw Steel'
+//   data: {file, loading}         core rules JSON → D; loading message
+//   init()                        fill TYPES and BYID (and the system's own lookups) from D
+//   corePack()                    the core rulebook as a pack (rendered by the book reader)
+//   builtin: [{id,file,title,kind}]  further built-in books, loaded in the background
+//   lists: {type: {cols, filters, text?, view?, idOf?}}  list pages (see listPage)
+//   menu(), home(), browse()      top menu entries, home page, mobile "Browse" sheet
+//   routes: {name: (b,c,d) => …}  pages of the system's own tools (#name--b--c--d)
+//   packRoutes: [names]           routes to re-render once all books have loaded
+//   renderMonster(m,o), renderAbility(a,o)  stat blocks and ability cards
+//   renderBlock(b, ctx)           html for system block types in books (or undefined)
+//   afterHeading(b, o), afterTable(b, bi, o), chapterExtras(pack, c)  extra buttons in books
+//   onAddPack(p)                  enrich a book when it is added (e.g. Draw Steel dastards)
+//   entityMeta(type, e), entitySource(type, e)  subtitle and source line of an entry
+//   preview(type, e)              hover / peek html for an entry (or undefined)
+//   pinGroups: [{type, title(list), render(e)}]  grouped sections on the Pinned page
+//   linkTypes: [type]             entry names auto-linked in rules text (e.g. conditions)
+//   searchExtra(type, e), searchIndex(push), searchPriority  search index details
+//   packSummary(p)                extra text on a Library card
+//   importer: {module, stats(p)}  PDF parser module and import-preview stats
+//   onClick(e)                    delegated clicks for system buttons; true if handled
+//   pdfNotice                     licence line on exported PDFs
+const SYSTEMS = {};
+let SYS = null;
+function registerSystem(s) { SYSTEMS[s.id] = s; if (!SYS) SYS = s; }
 
 // ---------- data loading ----------
 const DATA_V = '__DATAV__';
@@ -72,20 +100,7 @@ function addPack(p) {
     m.gid = gid; m.pack = p.id; MON[gid] = m; MONS.push(m); p.monMap[m.id] = gid;
   }
   for (const a of p.abilities || []) { PAB[p.id + ':' + a.id] = a; a.pack = p.id; }
-  // dastards: monsters in a 'Dastards' part, with lore from "<b>Name:</b> …" bullets
-  const dch = (p.chapters || []).filter(c => /dastard/i.test(c.part || '') || /^dastards?$/i.test(c.title));
-  for (const c of dch) {
-    const lore = {}; let cur = null;
-    for (const b of c.blocks) {
-      if (b.t === 'h') { cur = null; continue; }
-      const mm = b.t === 'li' && (b.html || '').match(/^\s*<b>([^<]{1,60}?):?\s*<\/b>\s*:?\s*(.*)$/s);
-      if (mm) { cur = mm[1].replace(/:\s*$/, '').trim().toLowerCase(); lore[cur] = mm[2]; continue; }
-      if (cur && b.t === 'p') lore[cur] += ' ' + b.html; else cur = null;
-    }
-    const norm = x => x.toLowerCase().replace(/[“”"]/g, '').replace(/[’']/g, '’').trim();
-    const L = {}; for (const k in lore) L[norm(k)] = lore[k];
-    for (const m of p.monsters || []) if (m.ch === c.id) { m.dastard = c.title; const l = L[norm(m.name)]; if (l) m.lore = l; }
-  }
+  if (SYS.onAddPack) SYS.onAddPack(p);
 }
 function removePack(id) {
   const p = PK[id]; if (!p) return;
@@ -159,21 +174,23 @@ async function initUpdateCheck() {
 async function boot() {
   applyTheme(store.get('theme2', 'light'));
   setupMobile();
-  try { D = await getJSON('data/heroes.json', (g, t) => { $('#loadmsg').textContent = `Loading the rules… ${(g / 1048576).toFixed(1)}${t ? ' / ' + (t / 1048576).toFixed(1) : ''} MB`; }); }
+  try { D = await getJSON(SYS.data.file, (g, t) => { $('#loadmsg').textContent = `${SYS.data.loading} ${(g / 1048576).toFixed(1)}${t ? ' / ' + (t / 1048576).toFixed(1) : ''} MB`; }); }
   catch (e) { $('#loadmsg').textContent = 'Could not load the rules data (' + e.message + ').'; return; }
-  initHeroes();
-  const heroesPack = { id: 'heroes', title: 'Draw Steel: Heroes', kind: 'core', builtin: true, chapters: D.book, monsters: [], abilities: [], heroes: true };
-  addPack(heroesPack);
+  SYS.init(); LIST = SYS.lists;
+  const core = SYS.corePack(); core.core = true;   // the core rulebook: page references (p. 12) point into it
+  CHAP = {}; core.chapters.forEach(c => CHAP[c.id] = c);
+  PAGE = {}; core.chapters.forEach(c => c.blocks.forEach((b, i) => { if (b.pg && !PAGE[b.pg]) PAGE[b.pg] = { ch: c.id, i }; }));
+  addPack(core);
   buildMenu(); updatePins(); route();
   $('#loading').style.display = 'none';
   initUpdateCheck();
   // packs in the background
-  const loads = BUILTIN.map(b => getJSON(b.file).then(p => { p.builtin = true; p.title = b.title; p.kind = b.kind; p.id = b.id; addPack(p); }).catch(e => console.warn('pack', b.id, e)));
+  const loads = (SYS.builtin || []).map(b => getJSON(b.file).then(p => { p.builtin = true; p.title = b.title; p.kind = b.kind; p.id = b.id; addPack(p); }).catch(e => console.warn('pack', b.id, e)));
   const user = IDB.all().then(list => list.forEach(p => { p.builtin = false; addPack(p); }));
   await Promise.all([...loads, user]);
   buildIndex(); buildMenu();
   const h = location.hash.slice(1);
-  if (/^(monsters|book|library|import|pinned|negotiation|montage|encounter|session)/.test(h) || !h) route();
+  if (new RegExp('^(' + ['book', 'library', 'import', 'pinned', 'session', ...(SYS.packRoutes || [])].join('|') + ')').test(h) || !h) route();
   // sync (sync.js): books arriving from / removed on other devices
   const onBooks = /^(library|book|monsters|sync)/;
   if (window.VSync) VSync.appReady({
@@ -182,22 +199,6 @@ async function boot() {
   });
 }
 
-function initHeroes() {
-  AB = {}; D.abilities.forEach(a => AB[a.id] = a);
-  TYPES = {
-    abilities: { label: 'Abilities', one: 'Ability' }, classes: { label: 'Classes', one: 'Class' }, ancestries: { label: 'Ancestries', one: 'Ancestry' },
-    cultures: { label: 'Culture Aspects', one: 'Culture Aspect' }, careers: { label: 'Careers', one: 'Career' }, kits: { label: 'Kits', one: 'Kit' },
-    perks: { label: 'Perks', one: 'Perk' }, complications: { label: 'Complications', one: 'Complication' }, conditions: { label: 'Conditions', one: 'Condition' },
-    skills: { label: 'Skills', one: 'Skill' }, treasures: { label: 'Treasures', one: 'Treasure' }, titles: { label: 'Titles', one: 'Title' },
-    gods: { label: 'Gods & Saints', one: 'Deity' }, glossary: { label: 'Glossary', one: 'Term' }, monsters: { label: 'Monsters', one: 'Monster' }
-  };
-  BYID = {}; Object.keys(TYPES).forEach(t => { BYID[t] = {}; (D[t] || []).forEach(e => BYID[t][e.id] = e); });
-  BYID.monsters = MON;
-  CHAP = {}; D.book.forEach(c => CHAP[c.id] = c);
-  PAGE = {};
-  D.book.forEach(c => c.blocks.forEach((b, i) => { if (b.pg && !PAGE[b.pg]) PAGE[b.pg] = { ch: c.id, i }; }));
-  condNames = D.conditions.map(c => c.name.toLowerCase());
-}
 const itemsOf = t => t === 'monsters' ? MONS : (D[t] || []);
 
 // ---------- routing ----------
@@ -206,95 +207,8 @@ window.addEventListener('hashchange', route);
 
 // ---------- icons ----------
 const ICON = {
-  dist: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12h18M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-4 4"/></svg>',
-  tgt: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
-  die: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2 21 7v10l-9 5-9-5V7z"/></svg>',
-  melee: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg>',
-  ranged: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 20 20 4M14 4h6v6M4 14v6h6"/></svg>',
-  area: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>',
-  trig: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>',
-  trait: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5L12 16.5 5.5 21l2-7.5L2 9h7z"/></svg>',
-  vil: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C7 2 4 5.5 4 10c0 3 1.5 5 3 6v3h2v-2h2v2h2v-2h2v2h2v-3c1.5-1 3-3 3-6 0-4.5-3-8-8-8zm-3 11a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm6 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg>',
   back: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m15 18-6-6 6-6"/></svg>'
 };
-
-// ---------- ability rendering ----------
-function renderAbility(a, opts = {}) {
-  if (!a) return '';
-  if (a.pack && !a.group) return renderPackAbility(a, opts);
-  const pinned = isPinned('abilities', a.id);
-  const costTxt = a.cost ? esc(a.cost) : (a.kind === 'Signature' ? 'Signature' : '');
-  let h = `<div class="ab" data-ab="${a.id}"><div class="ab-h"><div class="ab-n"><a data-go="abilities--${a.id}">${esc(a.name)}</a></div>`;
-  if (costTxt) h += `<span class="ab-c ${!a.cost ? 'sig' : ''}">${costTxt}</span>`;
-  h += `<button class="ab-pin ${pinned ? 'on' : ''}" data-pin="abilities--${a.id}" title="Pin">★</button></div><div class="ab-b">`;
-  if (a.flavor) h += `<div class="ab-fl">${a.flavor}</div>`;
-  h += `<div class="ab-kw"><span>${esc(a.keywords.join(', ') || '—')}</span><span class="act">${esc(a.action)}</span></div>`;
-  if (a.distance || a.target) h += `<div class="ab-dt"><span>${ICON.dist}${a.distance}</span><span>${ICON.tgt}${a.target}</span></div>`;
-  h += rowsHtml(a.rows, a.id, a.name);
-  h += `</div>`;
-  if (!opts.nosrc) h += `<div class="ab-src"><span>${esc(a.group === 'Class' ? a.source + (a.sub ? ' · ' + a.sub : '') + (a.level ? ' · ' + ORD(a.level) + ' level' : '') : (a.group ? a.group + ': ' : '') + a.source)}</span><a data-page="${a.src.pg}">p. ${esc(a.src.pg)}</a></div>`;
-  return h + `</div>`;
-}
-function rowsHtml(rows, key, label) {
-  let h = '';
-  for (const r of rows || []) {
-    if (r.k === 'roll') h += `<div class="ab-roll">${esc(strip(r.html))}: <button class="rollbtn" data-roll="${esc(strip(r.html))}" data-ab="${esc(key)}" data-lab="${esc(label)}">${ICON.die} Roll</button></div>`;
-    else if (r.k === 'tier') h += `<div class="tier n${r.n}"><span class="tb">${['', '≤11', '12–16', '17+'][r.n]}</span><span>${r.html}</span></div>`;
-    else h += `<div class="ab-f">${r.html}</div>`;
-  }
-  return h;
-}
-function abKind(a) {
-  const kw = (a.keywords || []).join(' ');
-  if (/villain/i.test(a.action + ' ' + a.cost)) return 'vil';
-  if (a.trait && !a.action) return 'trait';
-  if (/trigger/i.test(a.action)) return 'trig';
-  if (/Area/.test(kw)) return 'area';
-  if (/Ranged/.test(kw) && !/Melee/.test(kw)) return 'ranged';
-  if (/Melee/.test(kw)) return 'melee';
-  return a.action ? 'melee' : 'trait';
-}
-function monAbility(a, key) {
-  const k = abKind(a);
-  const costCls = /malice/i.test(a.cost) ? 'mal' : /villain/i.test(a.cost) ? 'vil' : '';
-  const rows = (a.rows || []).filter(r => r.k !== 'roll');
-  let h = `<div class="ma" data-ab="${esc(key)}"><div class="ma-h"><span class="ma-i ${k}">${ICON[k] || ICON.melee}</span><span class="ma-n">${esc(a.name)}</span>`;
-  if (a.roll) h += `<span class="ma-roll">${esc(a.roll)}</span><button class="rollbtn" data-roll="${esc(a.roll)}" data-ab="${esc(key)}" data-lab="${esc(a.name)}">${ICON.die} Roll</button>`;
-  if (a.cost) h += `<span class="ma-c ${costCls}">${esc(a.cost)}</span>`;
-  h += `</div>`;
-  if (a.keywords.length || a.action) h += `<div class="ma-kw"><span>${esc(a.keywords.join(', ') || '—')}</span><span class="act">${esc(a.action)}</span></div>`;
-  if (a.distance || a.target) h += `<div class="ma-dt"><span>${ICON.dist}${a.distance}</span><span>${ICON.tgt}${a.target}</span></div>`;
-  h += `<div class="ma-b">${rowsHtml(rows, key, a.name)}</div></div>`;
-  return h;
-}
-function renderPackAbility(a, opts = {}) {
-  const key = a.pack + ':' + a.id;
-  return `<div class="mon" style="max-width:640px"><div class="mon-items" style="padding-top:2px">${monAbility(a, key).replace('class="ma"', 'class="ma" style="border-top:0"')}</div>${opts.nosrc ? '' : `<div class="mon-src"><span>${esc(a.source || '')}</span><a data-gobook="${esc(a.pack)}--${esc(a.ch || '')}">${esc(PK[a.pack]?.title || '')} · p. ${esc(a.pg)}</a></div>`}</div>`;
-}
-function renderMonster(m, opts = {}) {
-  if (!m) return '';
-  const st = m.stats || {};
-  const order = ['Size', 'Speed', 'Stamina', 'Stability', 'Free Strike'];
-  const keys = uniq([...order.filter(k => k in st), ...Object.keys(st)]);
-  const pinned = isPinned('monsters', m.gid);
-  const art = !opts.nosrc && m.img != null ? PK[m.pack]?.images?.[m.img] : null;
-  let h = `${art ? `<figure class="mon-art"><img src="${esc(art)}" alt="" data-zoom="1"></figure>` : ''}<div class="mon" data-mon="${m.gid}"><div class="mon-h"><div><div class="mon-n"><a data-go="monsters--${m.gid}">${esc(m.name)}</a></div><div class="mon-k">${esc((m.keywords || []).join(', ') || '—')}</div></div>
-    <div class="mon-r"><div>${m.dastard ? '<span class="dastb" title="Dastard: a named villain you can drop into a combat">Dastard</span> ' : ''}Level ${m.level} ${esc(m.role)}</div>${m.ev ? `<span class="ev">EV ${esc(m.ev)}</span>` : ''} <button class="ab-pin ${pinned ? 'on' : ''}" data-pin="monsters--${m.gid}" title="Pin">★</button></div></div>`;
-  if (keys.length) h += `<div class="mon-stats" style="grid-template-columns:repeat(${keys.length},1fr)">${keys.map(k => `<div><b>${esc(st[k] || '—')}</b><span>${esc(k)}</span></div>`).join('')}</div>`;
-  const def = [];
-  if (m.immunity) def.push(`<span><b>Immunity:</b> ${esc(m.immunity)}</span>`);
-  if (m.weakness) def.push(`<span><b>Weakness:</b> ${esc(m.weakness)}</span>`);
-  if (m.movement) def.push(`<span><b>Movement:</b> ${esc(m.movement)}</span>`);
-  for (const x of m.extra || []) def.push(`<span><b>${esc(x.k)}:</b> ${esc(x.v)}</span>`);
-  if (def.length) h += `<div class="mon-def">${def.join('')}</div>`;
-  const ch = m.chars || {};
-  if (Object.keys(ch).length) h += `<div class="mon-chars">${['Might', 'Agility', 'Reason', 'Intuition', 'Presence'].map(c => `<div><b>${esc(ch[c] ?? '—')}</b>${c}</div>`).join('')}</div>`;
-  if (m.desc) h += `<div class="mon-desc">${m.desc}</div>`;
-  if (m.lore) h += `<div class="mon-lore"><b>${esc(m.dastard || 'Dastard')} dastard.</b> ${m.lore}</div>`;
-  h += `<div class="mon-items">${(m.items || []).map((a, i) => monAbility(a, m.gid + ':' + i)).join('')}</div>`;
-  if (!opts.nosrc) h += `<div class="mon-src"><span>${esc(m.group || '')}</span><a data-gobook="${esc(m.pack)}--${esc(m.ch || '')}">${esc(PK[m.pack]?.title || '')} · p. ${esc(m.pg)}</a></div>`;
-  return h + `</div>`;
-}
 
 // ---------- block rendering ----------
 function renderBlocks(blocks, opts = {}) {
@@ -319,54 +233,62 @@ function renderBlocks(blocks, opts = {}) {
       const rel = opts.book ? (pack ? b.lvl - 2 : b.lvl - 2) : b.lvl - minL;
       const tag = 'h' + Math.min(6, Math.max(3, 3 + rel));
       emit(`<${tag} id="h-${b.id || ''}"${idx}>${pm}${esc(b.text)}</${tag}>`);
-      const nid = opts.book && NEGBYHEAD[(opts.packId || 'heroes') + ':' + opts.ch + ':' + b.id]; if (nid) emit(`<a class="btn negrunbtn" href="#negotiation--${nid}">▶ Run this negotiation</a>`);
-      const mid = opts.book && MTBYHEAD[(opts.packId || 'heroes') + ':' + opts.ch + ':' + b.id]; if (mid) emit(`<a class="btn negrunbtn" href="#montage--${mid}">▶ Run this montage test</a>`);
+      if (opts.book && SYS.afterHeading) emit(SYS.afterHeading(b, opts) || '');
     } else if (b.t === 'p') {
       emit(`<p class="${b.style === 'body' ? '' : 'small'}"${idx}>${pm}${b.html}</p>`);
     } else if (b.t === 'quote') {
       emit(`<blockquote${idx}>${pm}${esc(b.text)}${b.attr ? `<cite>— ${esc(b.attr)}</cite>` : ''}</blockquote>`);
-    } else if (b.t === 'tier') {
-      emit(`<div class="tierp n${b.n}"${idx}>${pm}<span class="tb">${['', '≤11', '12–16', '17+'][b.n]}</span><span>${b.html}</span></div>`);
     } else if (b.t === 'table') {
       let t = `<div class="tblw"${idx}>${pm}<table class="dt"><thead><tr>${b.head.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>`;
       const n = Math.max(b.head.length, ...b.rows.map(r => r.length));
       for (const r of b.rows) t += '<tr>' + Array.from({ length: n }, (_, k) => `<td>${r[k] || ''}</td>`).join('') + '</tr>';
       emit(t + '</tbody></table></div>');
-      if (opts.book && b.head.length >= 2 && /^Group/i.test(b.head[0]) && /Creature/i.test(b.head[1])) emit(`<button class="btn ghost sm loadencbtn" data-loadenc="${esc(opts.packId || 'heroes')}|${esc(opts.ch)}|${bi}">⚔ Load into Encounter Builder</button>`);
-    } else if (b.t === 'ability') {
-      const a = pack ? PAB[pack + ':' + b.ref] : AB[b.ref];
-      emit(`<div${idx}>${pm}</div>` + (pack ? renderPackAbility(a, { nosrc: true }) : renderAbility(a)));
+      if (opts.book && SYS.afterTable) emit(SYS.afterTable(b, bi, opts) || '');
     } else if (b.t === 'img') {
       const src = (PK[opts.packId || pack] || {}).images?.[b.i];
       if (src) emit(`<figure class="bkimg ${b.w > 330 ? 'wide' : 'side'}" data-pg="${esc(b.pg || '')}"><img loading="lazy" src="${esc(src)}" alt="" data-zoom="1"></figure>`);
     } else if (b.t === 'monster') {
       const m = MON[PK[pack]?.monMap[b.ref]];
-      emit(`<div${idx}>${pm}</div>` + renderMonster(m, { nosrc: true }));
+      emit(`<div${idx}>${pm}</div>` + SYS.renderMonster(m, { nosrc: true }));
+    } else if (SYS.renderBlock) {   // system block types (Draw Steel: power-roll tiers, abilities)
+      const h = SYS.renderBlock(b, { pack, pm, idx }); if (h) emit(h);
     }
   });
   closeList(); closeAside();
   return out;
 }
 
+// Links page references ("p. 12", into the core rulebook) and the names of SYS.linkTypes entries
+// (Draw Steel: conditions) inside rules text.
+let LINKS = null;   // {names: lowercased names in data order, go: name -> 'type--id', esc: regex-safe names}
+function linkTerms() {
+  if (LINKS) return LINKS;
+  LINKS = { names: [], go: {} };
+  for (const t of SYS.linkTypes || []) for (const e of itemsOf(t)) { const n = e.name.toLowerCase(); if (!(n in LINKS.go)) { LINKS.names.push(n); LINKS.go[n] = t + '--' + e.id; } }
+  LINKS.esc = LINKS.names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return LINKS;
+}
 function enhance(root) {
+  const L = linkTerms();
+  const pre = new RegExp('p\\.\\s*\\d' + L.esc.map(n => '|' + n).join(''), 'i');
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(n) {
-      const p = n.parentElement; if (!p || p.closest('a,button,.lnk,.pref,th,h2,h3,h4,h5,h6,.ab-n,.ma-n,.mon-n,.pot,.chr,.pgmark,input,select')) return NodeFilter.FILTER_REJECT;
-      return /p\.\s*\d|bleed|daz|fright|grab|prone|restrain|slow|taunt|weaken/i.test(n.data) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      const p = n.parentElement; if (!p || p.closest('a,button,.lnk,.pref,th,h2,h3,h4,h5,h6,.pgmark,input,select' + (SYS.noLink ? ',' + SYS.noLink : ''))) return NodeFilter.FILTER_REJECT;
+      return pre.test(n.data) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     }
   });
   const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
-  const inHeroes = !root.closest || !root.closest('[data-pack]') || root.closest('[data-pack]').dataset.pack === 'heroes';
-  const re = new RegExp('(\\bpp?\\.\\s*\\d+(?:[–-]\\d+)?)|\\b(' + condNames.join('|') + ')\\b', 'gi');
+  const inCore = !root.closest || !root.closest('[data-pack]') || PK[root.closest('[data-pack]').dataset.pack]?.core;
+  const re = new RegExp('(\\bpp?\\.\\s*\\d+(?:[–-]\\d+)?)' + (L.esc.length ? '|\\b(' + L.esc.join('|') + ')\\b' : ''), 'gi');
   for (const n of nodes) {
     const s = n.data; let m, last = 0, frag = null; re.lastIndex = 0;
     while ((m = re.exec(s))) {
-      if (m[1] && !inHeroes) continue;
+      if (m[1] && !inCore) continue;
       frag = frag || document.createDocumentFragment();
       frag.appendChild(document.createTextNode(s.slice(last, m.index)));
       const el = document.createElement('span');
       if (m[1]) { el.className = 'pref'; el.dataset.page = (m[1].match(/\d+/) || [''])[0]; }
-      else { el.className = 'lnk'; el.dataset.go = 'conditions--' + m[2].toLowerCase(); }
+      else { el.className = 'lnk'; el.dataset.go = L.go[m[2].toLowerCase()]; }
       el.textContent = m[0]; frag.appendChild(el); last = m.index + m[0].length;
     }
     if (frag) { frag.appendChild(document.createTextNode(s.slice(last))); n.replaceWith(frag); }
@@ -385,17 +307,8 @@ function togglePin(key) {
 function updatePins() { $('#pincount').textContent = pins.length; }
 
 // ---------- nav ----------
-function MENU() {
-  return [
-    ['Rules', [['library', 'Library'], ['book--heroes', 'Heroes Rulebook'], ['-'], ['conditions'], ['glossary'], ['skills']]],
-    ['Heroes', [['classes'], ['ancestries'], ['cultures'], ['careers'], ['complications'], ['-'], ['kits'], ['perks'], ['abilities'], ['-'], ['respite', 'Respite & Downtime']]],
-    ['Director', [['sessions', 'Sessions'], ['encounter', 'Encounter Builder'], ['negotiation', 'Negotiation Tracker'], ['montage', 'Montage Tests'], ['monsters'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title]), ['book--monsters', 'Monsters Book'], ['book--encounters', 'Encounters Book'], ['-'], ['book--heroes--for-the-director', 'For the Director'], ['gods']]],
-    ['Rewards', [['treasures'], ['cards', 'Cards: items, quests, followers'], ['titles']]],
-    ['Utilities', [['import', 'Import a PDF'], ['roller', 'Power Roller'], ['pinned', 'Pinned Items'], ['-'], ['sync', 'Sync across devices'], ['!update', 'Check for updates']]]
-  ];
-}
 function buildMenu() {
-  $('#menu').innerHTML = MENU().map(([lab, items]) => `<div class="mi"><button>${lab}</button><div class="dd">${items.filter(([k]) => k === '-' || TYPES[k] || !k.startsWith('book--') || PK[k.split('--')[1]]).map(([k, l]) => k === '-' ? '<hr>' : `<a href="#${k}">${esc(l || TYPES[k].label)}${TYPES[k] ? `<span>${itemsOf(k).length}</span>` : ''}</a>`).join('')}</div></div>`).join('');
+  $('#menu').innerHTML = SYS.menu().map(([lab, items]) => `<div class="mi"><button>${lab}</button><div class="dd">${items.filter(([k]) => k === '-' || TYPES[k] || !k.startsWith('book--') || PK[k.split('--')[1]]).map(([k, l]) => k === '-' ? '<hr>' : `<a href="#${k}">${esc(l || TYPES[k].label)}${TYPES[k] ? `<span>${itemsOf(k).length}</span>` : ''}</a>`).join('')}</div></div>`).join('');
   $$('.mi>button').forEach(b => b.onclick = e => { e.stopPropagation(); const m = b.parentElement; const was = m.classList.contains('open'); $$('.mi').forEach(x => x.classList.remove('open')); if (!was) m.classList.add('open'); });
   $$('#menu a').forEach(a => a.addEventListener('click', () => { $$('.mi').forEach(x => x.classList.remove('open')); $('#menu').classList.remove('on'); }));
   const upd = $('#menu a[href="#!update"]'); if (upd) upd.addEventListener('click', e => { e.preventDefault(); manualUpdate(); });
@@ -404,60 +317,12 @@ document.addEventListener('click', e => { if (!e.target.closest('.mi')) $$('.mi'
 $('#burger').onclick = () => $('#menu').classList.toggle('on');
 
 // ---------- list pages ----------
-const roleOf = m => (m.role || '').replace(/^(Minion|Horde|Platoon|Elite|Leader|Solo|Retainer)\s*/, '') || m.org;
-const LIST = {
-  abilities: {
-    cols: [['Name', a => a.name, 'nm'], ['Source', a => a.group === 'Class' ? a.source : a.group + (a.source && a.group !== a.source ? ': ' + a.source : '')], ['Cost', a => a.cost || (a.kind || '—'), 'mu', a => a.costN ?? -1], ['Action', a => a.action, 'mu'], ['Distance', a => strip(a.distance), 'mu']],
-    filters: [
-      ['Group', a => a.group], ['Class', a => a.group === 'Class' ? a.source : null], ['Subclass', a => a.sub || null],
-      ['Cost', a => a.costN != null ? a.costN + ' ' + (a.group === 'Class' ? 'Resource' : 'Heroic Resource') : (a.kind || 'No cost'), (x, y) => (parseInt(x) || 0) - (parseInt(y) || 0)],
-      ['Resource', a => a.group === 'Class' ? a.resource : null],
-      ['Level', a => a.level ? ORD(a.level) : null, (x, y) => parseInt(x) - parseInt(y)],
-      ['Action', a => a.action], ['Keywords', a => a.keywords, null, true], ['Characteristic', a => a.chars, null, true]
-    ],
-    text: a => a.name + ' ' + a.keywords.join(' ') + ' ' + strip(a.flavor) + ' ' + a.rows.map(r => strip(r.html)).join(' '),
-    view: a => `<div class="ent-h"><div style="flex:1"><h2>${esc(a.name)}</h2><div class="meta">${esc(a.group === 'Class' ? a.source + ' ability' : a.group + ' ability · ' + a.source)}</div></div>${tools('abilities', a)}</div>${renderAbility(a, {})}`
-  },
-  monsters: {
-    idOf: m => m.gid,
-    cols: [['Name', m => m.name, 'nm'], ['Level', m => 'Lv ' + m.level, 'mu', m => m.level], ['Role', m => m.role, 'mu'], ['EV', m => m.ev, 'mu', m => parseInt(m.ev) || 0], ['Group', m => m.group, 'mu']],
-    filters: [
-      ['Source', m => PK[m.pack]?.title], ['Level', m => 'Level ' + m.level, (x, y) => parseInt(x.slice(6)) - parseInt(y.slice(6))],
-      ['Organization', m => m.org], ['Role', m => roleOf(m)], ['Keywords', m => m.keywords, null, true],
-      ['Group', m => m.group], ['Dastard', m => m.dastard ? 'Dastards' : null], ['Has villain actions', m => (m.items || []).some(a => /villain/i.test(a.cost + a.action)) ? 'Yes' : 'No']
-    ],
-    text: m => m.name + ' ' + (m.keywords || []).join(' ') + ' ' + m.role + ' ' + (m.items || []).map(a => a.name + ' ' + a.rows.map(r => strip(r.html)).join(' ')).join(' '),
-    view: m => `<div class="ent-h"><div style="flex:1"><h2>${esc(m.name)}</h2><div class="meta">Level ${m.level} ${esc(m.role)} · ${esc(m.group || '')}</div></div><div class="ent-tools"><button class="ibtn ${isPinned('monsters', m.gid) ? 'on' : ''}" data-pin="monsters--${m.gid}">★</button><button class="ibtn" data-addenc="${m.gid}" title="Add to encounter">+ Encounter</button><button class="ibtn" data-gobook="${esc(m.pack)}--${esc(m.ch || '')}">p. ${esc(m.pg)}</button></div></div>${renderMonster(m)}`
-  },
-  ancestries: { cols: [['Name', a => a.name, 'nm'], ['Signature Trait', a => a.signature || '', 'mu'], ['Points', a => a.points ?? '', 'mu']], filters: [['Trait cost', a => a.traits.map(t => t.cost + ' pt')]], text: a => a.name + ' ' + a.traits.map(t => t.name).join(' ') },
-  cultures: { cols: [['Name', a => a.name, 'nm'], ['Aspect', a => a.aspect, 'mu'], ['Skills', a => a.skills, 'mu']], filters: [['Aspect', a => a.aspect]] },
-  careers: { cols: [['Name', a => a.name, 'nm'], ['Skills', a => a.skills || '', 'mu'], ['Perk', a => a.perk || '', 'mu']], filters: [['Perk type', a => ((a.perk || '').match(/(crafting|exploration|interpersonal|intrigue|lore|supernatural)/i) || [])[1]?.replace(/^./, c => c.toUpperCase())]] },
-  kits: { cols: [['Name', a => a.name, 'nm'], ['Type', a => a.kkind, 'mu'], ['Equipment', a => a.bonuses.Equipment || '', 'mu']], filters: [['Type', a => a.kkind], ['Bonuses', a => Object.keys(a.bonuses).filter(k => k !== 'Equipment'), null, true]] },
-  perks: { cols: [['Name', a => a.name, 'nm'], ['Type', a => a.type, 'mu']], filters: [['Type', a => a.type]] },
-  complications: { cols: [['Name', a => a.name, 'nm']], filters: [] },
-  conditions: { cols: [['Name', a => a.name, 'nm']], filters: [] },
-  skills: { cols: [['Name', a => a.name, 'nm'], ['Group', a => a.group, 'mu']], filters: [['Group', a => a.group]] },
-  treasures: {
-    cols: [['Name', a => a.name, 'nm'], ['Type', a => a.type + (a.sub ? ' (' + a.sub + ')' : ''), 'mu'], ['Echelon', a => a.echelon ? ORD(a.echelon) : '—', 'mu', a => a.echelon || 0], ['Keywords', a => a.keywords, 'mu']],
-    filters: [['Type', a => a.type], ['Leveled kind', a => a.sub || null], ['Echelon', a => a.echelon ? ORD(a.echelon) : null], ['Keywords', a => (a.keywords || '').split(/,\s*/).filter(Boolean), null, true]]
-  },
-  titles: { cols: [['Name', a => a.name, 'nm'], ['Echelon', a => ORD(a.echelon), 'mu', a => a.echelon], ['Prerequisite', a => a.prereq, 'mu']], filters: [['Echelon', a => ORD(a.echelon)]] },
-  gods: { cols: [['Name', a => a.name, 'nm'], ['Pantheon', a => a.pantheon, 'mu'], ['Domains', a => a.domains, 'mu']], filters: [['Pantheon', a => a.pantheon], ['Domain', a => (a.domains || '').split(/,\s*|\s+and\s+/).map(s => s.trim()).filter(Boolean), null, true]] },
-  glossary: { cols: [['Term', a => a.name, 'nm'], ['Page', a => a.page || '', 'mu', a => +a.page || 0]], filters: [] }
-};
 function tools(type, e) {
   return `<div class="ent-tools"><button class="ibtn ${isPinned(type, e.id) ? 'on' : ''}" data-pin="${type}--${e.id}" title="Pin">★</button>${e.src && e.src.pg ? `<button class="ibtn" data-page="${e.src.pg}" title="Open in rulebook">p. ${esc(e.src.pg)}</button>` : ''}</div>`;
 }
 function entityView(type, e) {
   if (LIST[type].view) return LIST[type].view(e);
-  let meta = TYPES[type].one;
-  if (type === 'treasures') meta = [e.echelon ? ORD(e.echelon) + '-echelon' : '', e.type, e.sub].filter(Boolean).join(' ');
-  if (type === 'titles') meta = ORD(e.echelon) + '-echelon title';
-  if (type === 'perks') meta = e.type + ' perk';
-  if (type === 'cultures') meta = e.aspect + ' culture aspect';
-  if (type === 'skills') meta = e.group + ' skill';
-  if (type === 'gods') meta = e.pantheon + (e.sub ? ' · ' + e.sub : '');
-  if (type === 'kits') meta = e.kkind + ' kit';
+  const meta = (SYS.entityMeta && SYS.entityMeta(type, e)) ?? TYPES[type].one;
   return `<div class="ent-h"><div style="flex:1"><h2>${esc(e.name)}</h2><div class="meta">${esc(meta)}</div></div>${tools(type, e)}</div><div class="rd">${renderBlocks(e.body)}</div>`;
 }
 
@@ -544,62 +409,26 @@ function showEntity(type, id) {
   $('.lp').classList.toggle('detail', !!e);
   if (!e) { v.innerHTML = '<div class="empty">Select an entry from the list.</div>'; document.title = TYPES[type].label + ' — Vanadium'; return; }
   v.innerHTML = `<div class="backbar"><button data-back="${type}">${ICON.back}${esc(TYPES[type].label)}</button><span class="sp"></span></div>` + entityView(type, e) +
-    (type === 'monsters' ? '' : `<div class="src">${esc(TYPES[type].one)} · <i>Draw Steel: Heroes</i>${e.src && e.src.pg ? `, <a data-page="${e.src.pg}">page ${esc(e.src.pg)}</a>` : ''}</div>`);
+    (SYS.entitySource ? SYS.entitySource(type, e) : '');
   v.scrollTop = 0; enhance(v);
   const tr = $(`#lbody tr[data-id="${CSS.escape(id)}"]`);
   if (tr && !isMob) { const box = tr.closest('.ltable'); const r = tr.getBoundingClientRect(), b = box.getBoundingClientRect(); if (r.top < b.top + 28 || r.bottom > b.bottom) tr.scrollIntoView({ block: 'center' }); }
   document.title = e.name + ' — Vanadium';
 }
 
-// ---------- class pages ----------
-let clsTab = 'features', clsSub = null;
-function classPage(id) {
-  const c = BYID.classes[id] || D.classes[0];
-  const abs = D.abilities.filter(a => a.source === c.name && a.group === 'Class');
-  const subs = uniq(abs.map(a => a.sub));
-  const heads = c.body.filter(b => b.t === 'h' && b.lvl === 2);
-  $('#main').innerHTML = `<div class="cls"><div class="mchips">${D.classes.map(x => `<a class="${x.id === c.id ? 'cur' : ''}" href="#classes--${x.id}">${esc(x.name)}</a>`).join('')}</div><div class="cls-nav">${D.classes.map(x => `<a class="cn ${x.id === c.id ? 'cur' : ''}" href="#classes--${x.id}">${esc(x.name)}</a>${x.id === c.id ? `<div class="sub">${heads.map(b => `<a data-jump="h-${b.id}">${esc(b.text)}</a>`).join('')}</div>` : ''}`).join('')}</div>
-   <div class="cls-main" id="cmain"><div class="cls-head"><h1>${esc(c.name)}</h1><div class="stats">
-     <div class="stat">Heroic Resource<b>${esc(c.resource || '—')}</b></div><div class="stat">Starting Stamina<b>${esc(c.stamina || '—')}</b></div><div class="stat">Abilities<b>${abs.length}</b></div></div>
-     <div class="ent-tools"><button class="ibtn" data-page="${c.src.pg}">p. ${esc(c.src.pg)}</button></div></div>
-     <div class="tabs"><button class="tab ${clsTab === 'features' ? 'on' : ''}" data-tab="features">Features</button><button class="tab ${clsTab === 'abilities' ? 'on' : ''}" data-tab="abilities">Abilities (${abs.length})</button></div>
-     <div id="ctab"></div></div></div>`;
-  const cur = $('.mchips a.cur'); if (cur) cur.scrollIntoView({ inline: 'center', block: 'nearest' });
-  const draw = () => {
-    const box = $('#ctab');
-    if (clsTab === 'features') box.innerHTML = `<div class="rd" style="max-width:900px">${renderBlocks(c.body, { sidebars: true })}</div>`;
-    else {
-      const list = abs.filter(a => !clsSub || a.sub === clsSub || !a.sub);
-      const groups = {};
-      list.forEach(a => { const k = a.cost ? a.costN + '-' + a.resource + ' abilities' : (a.kind === 'Signature' ? 'Signature abilities' : 'Feature abilities'); (groups[k] = groups[k] || []).push(a); });
-      const keys = Object.keys(groups).sort((x, y) => (x.startsWith('Sig') ? -2 : x.startsWith('Fea') ? -1 : parseInt(x)) - (y.startsWith('Sig') ? -2 : y.startsWith('Fea') ? -1 : parseInt(y)));
-      box.innerHTML = (subs.length ? `<div class="subsel"><b style="font-family:var(--cond);text-transform:uppercase">Subclass:</b><span class="pill ${!clsSub ? 'inc' : ''}" data-sub="">All</span>${subs.map(s => `<span class="pill ${clsSub === s ? 'inc' : ''}" data-sub="${esc(s)}">${esc(s)}</span>`).join('')}</div>` : '') +
-        `<div class="abgrid">${keys.map(k => `<div class="abgh">${esc(k)}</div>` + groups[k].map(a => renderAbility(a)).join('')).join('')}</div>`;
-      $$('[data-sub]', box).forEach(p => p.onclick = () => { clsSub = p.dataset.sub || null; draw(); });
-    }
-    enhance(box);
-  };
-  $$('.tab').forEach(t => t.onclick = () => { clsTab = t.dataset.tab; $$('.tab').forEach(x => x.classList.toggle('on', x === t)); draw(); });
-  $$('[data-jump]').forEach(a => a.onclick = () => { if (clsTab !== 'features') { clsTab = 'features'; $$('.tab').forEach(x => x.classList.toggle('on', x.dataset.tab === 'features')); draw(); } const el = document.getElementById(a.dataset.jump); if (el) el.scrollIntoView({ behavior: 'smooth' }); });
-  draw();
-  document.title = c.name + ' — Vanadium';
-}
-function classIndex() {
-  $('#main').innerHTML = `<div class="home"><div class="grid" style="padding-top:20px"><div class="gsec">Classes</div>${D.classes.map(c => `<a class="tile" href="#classes--${c.id}"><b>${esc(c.name)}</b><span>${esc(strip(c.body.find(b => b.t === 'p')?.html || '').slice(0, 150))}…</span><em>${esc(c.resource || '')} · ${c.abilityCount} abilities</em></a>`).join('')}</div></div>`;
-}
-
 // ---------- book reader (any pack) ----------
 function bookPage(packId, ch, anchor) {
   let pack = PK[packId];
   if (!pack) { // legacy: #book--<heroes chapter>
-    if (CHAP[packId]) { anchor = ch; ch = packId; pack = PK.heroes; }
-    else if (!PACKS.length || BUILTIN.some(b => b.id === packId)) { $('#main').innerHTML = '<div class="empty">Loading…</div>'; return; }
-    else pack = PK.heroes;
+    const corePk = PACKS.find(p => p.core);
+    if (CHAP[packId]) { anchor = ch; ch = packId; pack = corePk; }
+    else if (!PACKS.length || (SYS.builtin || []).some(b => b.id === packId)) { $('#main').innerHTML = '<div class="empty">Loading…</div>'; return; }
+    else pack = corePk;
   }
   const chs = pack.chapters.filter(c => c.blocks.length || c === pack.chapters[0]);
   let c = chs.find(x => x.id === ch) || chs.find(x => x.id !== 'front' && x.blocks.length > 5) || chs[0];
   const ci = chs.indexOf(c);
-  const pid = pack.heroes ? null : pack.id;
+  const pid = pack.core ? null : pack.id;
   const bookSel = `<div class="bk-books"><select id="booksel">${PACKS.map(p => `<option value="${p.id}" ${p.id === pack.id ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select></div>`;
   const cap = t => t.replace(/^[a-z]/, x => x.toUpperCase());
   const parts = pack.chapters.filter(x => x.isPart);
@@ -616,7 +445,7 @@ function bookPage(packId, ch, anchor) {
     return s;
   }).join('');
   const prev = chs[ci - 1], next = chs[ci + 1];
-  $('#main').innerHTML = `<div class="bk" data-pack="${pack.id}"><div class="bk-nav" id="bnav">${bookSel}${nav}</div><div class="bk-main" id="bmain">${c.part ? `<div class="chap-part">${esc(c.part)}</div>` : ''}<h1 class="chap-title">${esc(c.title.replace(/^[a-z]/, x => x.toUpperCase()))}</h1>${MTBYHEAD[pack.id + ':' + c.id + ':_'] ? `<a class="btn negrunbtn" href="#montage--${MTBYHEAD[pack.id + ':' + c.id + ':_']}">▶ Run this montage test</a>` : ''}<div class="rd">${renderBlocks(c.blocks, { book: true, pack: pid, ch: c.id, packId: pack.id })}</div>
+  $('#main').innerHTML = `<div class="bk" data-pack="${pack.id}"><div class="bk-nav" id="bnav">${bookSel}${nav}</div><div class="bk-main" id="bmain">${c.part ? `<div class="chap-part">${esc(c.part)}</div>` : ''}<h1 class="chap-title">${esc(c.title.replace(/^[a-z]/, x => x.toUpperCase()))}</h1>${SYS.chapterExtras ? SYS.chapterExtras(pack, c) || '' : ''}<div class="rd">${renderBlocks(c.blocks, { book: true, pack: pid, ch: c.id, packId: pack.id })}</div>
     <div class="bk-pager">${prev ? `<a class="ibtn" href="#book--${pack.id}--${prev.id}">← ${esc(prev.title)}</a>` : '<span></span>'}${next ? `<a class="ibtn" href="#book--${pack.id}--${next.id}">${esc(next.title)} →</a>` : ''}</div></div>
     <button class="mtoc-btn" id="mtoc"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Contents</button></div>`;
   const bm = $('#bmain'); enhance(bm);
@@ -628,20 +457,20 @@ function bookPage(packId, ch, anchor) {
   const cn = $('#bnav .ch.cur'); if (cn && !isMob) cn.scrollIntoView({ block: 'start' });
   if (anchor) {
     let el = null;
-    if (/^p\d/.test(anchor)) { const pg = anchor.slice(1); el = pack.heroes && PAGE[pg] ? bm.querySelector(`[data-bi="${PAGE[pg].i}"]`) : bm.querySelector(`#pg-${CSS.escape(pg)}`)?.parentElement; }
+    if (/^p\d/.test(anchor)) { const pg = anchor.slice(1); el = pack.core && PAGE[pg] ? bm.querySelector(`[data-bi="${PAGE[pg].i}"]`) : bm.querySelector(`#pg-${CSS.escape(pg)}`)?.parentElement; }
     else el = document.getElementById('h-' + anchor);
     if (el) { el.scrollIntoView(); el.style.transition = 'background 1.5s'; el.style.background = 'rgba(224,112,58,.25)'; setTimeout(() => el.style.background = '', 1600); }
   } else bm.scrollTop = 0;
   document.title = c.title + ' — ' + pack.title;
 }
-function gotoPage(pg) { const p = PAGE[pg]; if (p) go('book--heroes--' + p.ch + '--p' + pg); else toast('Page ' + pg + ' not found'); }
+function gotoPage(pg) { const p = PAGE[pg]; if (p) go('book--' + PACKS.find(x => x.core).id + '--' + p.ch + '--p' + pg); else toast('Page ' + pg + ' not found'); }
 
 // ---------- library ----------
 function libraryPage() {
   const card = p => {
     const nm = (p.monsters || []).length, nch = p.chapters.filter(c => c.blocks.length).length;
     return `<div class="bookc k-${p.kind}"><div class="kind">${esc(KIND[p.kind] || p.kind)}${p.builtin ? '' : ' · Imported'}</div><b>${esc(p.title)}</b>
-      <div class="cnt">${nch} chapters${nm ? ' · ' + nm + ' monsters' : ''}${p.heroes ? ' · ' + D.abilities.length + ' abilities' : ''}</div>
+      <div class="cnt">${nch} chapters${nm ? ' · ' + nm + ' monsters' : ''}${SYS.packSummary ? SYS.packSummary(p) || '' : ''}</div>
       <div class="acts"><a class="btn" href="#book--${p.id}">Read</a>${nm ? `<a class="btn ghost" href="#monsters" data-srcfilter="${esc(p.title)}">Monsters</a>` : ''}${p.builtin ? '' : `<button class="btn danger" data-delpack="${p.id}">Remove</button>`}</div></div>`;
   };
   $('#main').innerHTML = `<div class="lib"><h1>Library</h1><p class="note">Every book in Vanadium. ${window.VSync && VSync.status().enabled ? 'Imported PDFs are synced to your other devices.' : 'Imported PDFs live only in this browser (<a href="#sync">sync them across devices</a>).'}</p>
@@ -661,8 +490,8 @@ let pending = null;
 function importPage() {
   const mine = PACKS.filter(p => !p.builtin);
   $('#main').innerHTML = `<div class="imp"><h1>Import a PDF</h1>
-    <p class="note">Add an adventure, bestiary or supplement from a Draw Steel PDF. Vanadium reads the text layout and pulls out chapters, headings, tables, read-aloud text, monster stat blocks and abilities. <b>The file stays on this device</b>: it is processed in your browser and saved to this browser's storage.</p>
-    <label class="drop" id="drop"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 18v-6M9 15l3-3 3 3"/></svg><b>Drop a PDF here or tap to choose</b><span>Works best with MCDM-format Draw Steel PDFs that contain selectable text</span><input type="file" id="pdffile" accept="application/pdf,.pdf"></label><label class="row-c" style="margin-top:10px"><input type="checkbox" id="imp-imgs" checked> Keep the pictures and maps (stored in this browser)</label>
+    <p class="note">Add an adventure, bestiary or supplement from a ${esc(SYS.name)} PDF. Vanadium reads the text layout and pulls out chapters, headings, tables, read-aloud text, monster stat blocks and abilities. <b>The file stays on this device</b>: it is processed in your browser and saved to this browser's storage.</p>
+    <label class="drop" id="drop"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 18v-6M9 15l3-3 3 3"/></svg><b>Drop a PDF here or tap to choose</b><span>${esc(SYS.importer.hint)}</span><input type="file" id="pdffile" accept="application/pdf,.pdf"></label><label class="row-c" style="margin-top:10px"><input type="checkbox" id="imp-imgs" checked> Keep the pictures and maps (stored in this browser)</label>
     <div class="stage" id="stage"></div>
     <div class="mine"><h2>Your imports</h2>${mine.length ? mine.map(p => `<div class="it"><div class="t"><b>${esc(p.title)}</b><span>${esc(KIND[p.kind] || p.kind)} · ${p.chapters.length} chapters · ${(p.monsters || []).length} monsters · imported ${esc((p.importedAt || '').slice(0, 10))}</span></div><a class="btn ghost" href="#book--${p.id}">Read</a><button class="btn danger" data-delpack="${p.id}">Remove</button></div>`).join('') : '<div class="note">Nothing imported yet.</div>'}</div></div>`;
   const drop = $('#drop'), inp = $('#pdffile');
@@ -679,7 +508,7 @@ async function handleFile(file) {
   const setP = (t, f) => { const pt = $('#pt'), pb = $('#pb'); if (pt) pt.textContent = t; if (pb) pb.style.width = Math.round(f * 100) + '%'; };
   try {
     const lib = await loadPdfjs();
-    const { extractPages, parsePack } = await import('./lib/dsparse.mjs');
+    const { extractPages, parsePack } = await import(SYS.importer.module);
     const buf = new Uint8Array(await file.arrayBuffer());
     const doc = await lib.getDocument({ data: buf, fontExtraProperties: true, disableFontFace: true, isEvalSupported: false, verbosity: 0 }).promise;
     let title = file.name.replace(/\.pdf$/i, '').replace(/[_]+/g, ' ').replace(/\bv\d+(\.\d+)*\b/i, '').replace(/^\w{6,10}-/, '').trim();
@@ -728,7 +557,7 @@ function showPreview() {
   const nh = p.chapters.reduce((s, c) => s + c.blocks.filter(b => b.t === 'h').length, 0);
   const nt = p.chapters.reduce((s, c) => s + c.blocks.filter(b => b.t === 'table').length, 0);
   stage.innerHTML = `<div class="pv"><div class="row"><label>Title<input id="pvtitle" value="${esc(p.title)}"></label><label style="max-width:220px">Type<select id="pvkind">${['adventure', 'bestiary', 'supplement', 'book'].map(k => `<option value="${k}" ${p.kind === k ? 'selected' : ''}>${KIND[k]}</option>`).join('')}</select></label></div>
-    <div class="pvstats"><div class="stat">Pages<b>${p.stats.pages}</b></div><div class="stat">Chapters<b>${nch.length}</b></div><div class="stat">Headings<b>${nh}</b></div><div class="stat">Tables<b>${nt}</b></div><div class="stat">Monsters<b>${p.monsters.length}</b></div><div class="stat">Images<b>${(p.images || []).length}</b></div><div class="stat">Negotiations<b>${extractNegotiations(p).length}</b></div><div class="stat">Montages<b>${extractMontages(p).length}</b></div><div class="stat">Encounter tables<b>${p.chapters.reduce((s, c) => s + c.blocks.filter(b => b.t === 'table' && /^Group/i.test(b.head[0] || '') && /Creature/i.test(b.head[1] || '')).length, 0)}</b></div><div class="stat">Dastards<b>${(() => { const ids = new Set(p.chapters.filter(c => /dastard/i.test(c.part || '')).map(c => c.id)); return p.monsters.filter(m => ids.has(m.ch)).length; })()}</b></div><div class="stat">Abilities<b>${p.abilities.length + p.monsters.reduce((s, m) => s + m.items.length, 0)}</b></div></div>
+    <div class="pvstats"><div class="stat">Pages<b>${p.stats.pages}</b></div><div class="stat">Chapters<b>${nch.length}</b></div><div class="stat">Headings<b>${nh}</b></div><div class="stat">Tables<b>${nt}</b></div><div class="stat">Monsters<b>${p.monsters.length}</b></div><div class="stat">Images<b>${(p.images || []).length}</b></div>${SYS.importer.stats ? SYS.importer.stats(p).map(([l, n]) => `<div class="stat">${l}<b>${n}</b></div>`).join('') : ''}<div class="stat">Abilities<b>${p.abilities.length + p.monsters.reduce((s, m) => s + m.items.length, 0)}</b></div></div>
     ${!nch.length || nh < 3 ? `<div class="warn">Very little structure was found. The text will still be readable, but headings may be missing.</div>` : `<div class="okb">Looks good. Review the chapters and monsters below, then add it to your library.</div>`}
     <div class="pvlist">${nch.map(c => `<div>${esc(c.title)}<span>${c.blocks.length} blocks</span></div>`).join('')}</div>
     ${p.monsters.length ? `<div class="pvlist">${p.monsters.slice(0, 200).map(m => `<div>${esc(m.name)}<span>Level ${m.level} ${esc(m.role)}${m.ev ? ' · EV ' + esc(m.ev) : ''}</span></div>`).join('')}</div>` : ''}
@@ -767,13 +596,6 @@ function confirmSheet(msg, okLabel) {
   });
 }
 
-// ---------- respite (embedded tool) ----------
-window.__stSave = (name, blob) => deliverFile(name, blob);
-window.__stGotoPage = pg => gotoPage(String(pg));
-function respitePage() {
-  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=__ASSETV__" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
-  document.title = 'Respite — Vanadium';
-}
 
 // ---------- home ----------
 const ICO = {
@@ -787,27 +609,6 @@ const ICO = {
   skull: '<circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="m12.5 17-.5-1-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/>'
 };
 const ico = (k, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICO[k] || ''}</svg>`;
-function home() {
-  const adv = PACKS.filter(p => p.kind === 'adventure');
-  const feats = [['sessions', 'Sessions', 'Prep folders for your game night', 'folder', 'acc'], ['encounter', 'Encounter Builder', 'Pick monsters, see difficulty', 'swords', 'steel'], ['montage', 'Montage Tests', 'Run multi-skill challenges', 'timer', 'gold'], ['negotiation', 'Negotiation', 'Track arguments and patience', 'chat', 'moss'], ['respite', 'Respite & Downtime', 'Rest and roll downtime projects', 'tent', 'acc']];
-  const tiles = [
-    ['Rules', [['book--heroes', 'Heroes Rulebook', 'All chapters of the Heroes book, fully searchable'], ['conditions'], ['glossary'], ['skills']]],
-    ['Build a hero', [['classes'], ['ancestries'], ['cultures'], ['careers'], ['kits'], ['perks'], ['complications'], ['abilities']]],
-    ['Bestiary & adventures', [['monsters'], ...adv.map(p => ['book--' + p.id, p.title, 'Adventure' + (p.builtin ? '' : ' · imported')]), ['library', 'Library', 'All books, including your imports'], ['import', 'Import a PDF', 'Add adventures, bestiaries and supplements']]],
-    ['Rewards & world', [['treasures'], ['cards', 'Cards', 'Print item, quest and follower cards'], ['titles'], ['gods'], ['pinned', 'Pinned items', 'Your starred abilities, monsters and rules']]]
-  ];
-  const blurb = { abilities: 'Every class, kit, ancestry and treasure ability with power-roll tiers', classes: 'Nine classes with features by level and full ability lists', ancestries: 'Traits, signature abilities and point buys', cultures: 'Environment, organization and upbringing aspects', careers: 'Skills, perks and inciting incidents', kits: 'Equipment, bonuses and signature abilities', perks: 'Crafting, exploration, interpersonal, intrigue, lore, supernatural', complications: 'Benefits and drawbacks for your backstory', conditions: 'Bleeding, dazed, grabbed, and the rest', glossary: 'Every game term defined at a glance', skills: 'Skill groups and how each skill is used', treasures: 'Consumables, trinkets, leveled treasures, artifacts', titles: 'Titles across all four echelons', gods: 'Deities and saints of Orden', monsters: 'Stat blocks with roll buttons, filters by level, role and keyword' };
-  const ok = k => TYPES[k] || !k.startsWith('book--') || PK[k.split('--')[1]];
-  $('#main').innerHTML = `<div class="home"><div class="hero"><h1>Draw Steel, at your fingertips</h1><p>A fast, searchable reference for rules, heroes, monsters and adventures.</p>
-    <div class="hsearch">${ico('search', 20)}<input id="hq" placeholder="Search abilities, monsters, rules…" ${isMob ? 'readonly' : ''}><kbd>/</kbd></div>
-    <div class="hchips">${[['abilities', 'Abilities'], ['monsters', 'Monsters'], ['book--heroes', 'Rules'], ['treasures', 'Treasures']].map(([k, l]) => `<a href="#${k}">${l}</a>`).join('')}</div></div>
-    <div class="hwrap"><div class="gsec">Run the game</div><div class="feats">${feats.map(([k, l, d, ic, c]) => `<a class="feat" href="#${k}"><span class="fi fi-${c}">${ico(ic, 20)}</span><b>${l}</b><span>${d}</span></a>`).join('')}</div>
-    ${tiles.map(([sec, ts]) => `<div class="gsec">${sec}</div><div class="grid">` + ts.filter(([k]) => ok(k)).map(([k, l, d]) => `<a class="tile" href="#${k}"><b>${esc(l || TYPES[k].label)}</b><span>${esc(d || blurb[k] || '')}</span>${TYPES[k] ? `<em>${itemsOf(k).length} entries</em>` : ''}</a>`).join('') + '</div>').join('')}</div></div>`;
-  const hq = $('#hq');
-  if (isMob) hq.onclick = openMSearch;
-  else { hq.oninput = () => { $('#q').value = hq.value; doSearch(hq.value, hq); }; hq.onkeydown = e => searchKeys(e); hq.focus({ preventScroll: true }); }
-  document.title = 'Vanadium — Draw Steel Reference';
-}
 
 // ---------- pinned ----------
 // ---------- sync across devices (sync.js + sync.php) ----------
@@ -867,11 +668,11 @@ function syncPage() {
 
 function pinnedPage() {
   const valid = pins.map(k => { const [t, id] = k.split('--'); return [t, BYID[t] && BYID[t][id], k]; }).filter(x => x[1]);
-  const abs = valid.filter(x => x[0] === 'abilities'), mons = valid.filter(x => x[0] === 'monsters'), rest = valid.filter(x => x[0] !== 'abilities' && x[0] !== 'monsters');
+  const groups = SYS.pinGroups || [], grouped = new Set(groups.map(g => g.type));
+  const rest = valid.filter(x => !grouped.has(x[0]));
   $('#main').innerHTML = `<div class="pinpage"><h1>Pinned Items</h1><div class="note">Star (★) any ability, monster or entry to collect it here: a hero's ability sheet or tonight's encounter. Saved in this browser only. ${valid.length ? '<button class="ibtn" id="clrpins" style="display:inline-flex;margin-left:8px">Clear all</button>' : ''}</div>
    ${!valid.length ? '<div class="empty">Nothing pinned yet.</div>' : ''}
-   ${mons.length ? `<h2 class="abgh" style="margin-bottom:8px">Monsters · ${mons.reduce((s, x) => s + (parseInt(x[1].ev) || 0), 0)} EV total</h2><div class="pincols">${mons.map(x => renderMonster(x[1])).join('')}</div>` : ''}
-   ${abs.length ? `<h2 class="abgh" style="margin-bottom:8px">Abilities</h2><div class="pincols">${abs.map(x => renderAbility(x[1])).join('')}</div>` : ''}
+   ${groups.map(g => { const xs = valid.filter(x => x[0] === g.type); return xs.length ? `<h2 class="abgh" style="margin-bottom:8px">${g.title(xs.map(x => x[1]))}</h2><div class="pincols">${xs.map(x => g.render(x[1])).join('')}</div>` : ''; }).join('\n   ')}
    ${rest.map(([t, e]) => `<div class="pincard">${entityView(t, e)}</div>`).join('')}</div>`;
   if ($('#clrpins')) $('#clrpins').onclick = () => { pins = []; store.set('pins', pins); updatePins(); pinnedPage(); };
   enhance($('#main'));
@@ -880,19 +681,19 @@ function pinnedPage() {
 
 // ---------- search ----------
 let SIDX = [];
-const TPRI = { conditions: 0, classes: 0, chapter: 1, ancestries: 1, kits: 2, monsters: 2, abilities: 3, glossary: 3, rule: 6 };
+// search entries: {t: type, id, n: name, l: lowercased text, ex: extra line, ty?: label, go?: hash}
+const CORE_PRI = { chapter: 1, rule: 6 };   // lower ranks first; systems add theirs (SYS.searchPriority)
 function buildIndex() {
   SIDX = [];
   Object.keys(TYPES).forEach(t => itemsOf(t).forEach(e => SIDX.push({
     t, id: t === 'monsters' ? e.gid : e.id, n: e.name, l: e.name.toLowerCase(),
-    ex: t === 'abilities' ? (e.group === 'Class' ? e.source : e.group) + (e.cost ? ' · ' + e.cost : '') : t === 'monsters' ? 'Lv ' + e.level + ' ' + e.role : t === 'treasures' ? e.type : t === 'perks' ? e.type : ''
+    ex: SYS.searchExtra ? SYS.searchExtra(t, e) : ''
   })));
-  try { refreshNegotiations(); allNegs().forEach(n => SIDX.push({ t: 'negotiations', id: n.id, n: n.name, l: n.name.toLowerCase(), ex: 'Negotiation · ' + (n.user ? 'yours' : (PK[n.pack]?.title || '')) })); NEG_ARCH.forEach(a => SIDX.push({ t: 'negotiations', id: '', n: a.name + ' (negotiator archetype)', l: (a.name + ' negotiator').toLowerCase(), ex: 'Impression ' + a.impression })); } catch (e) { console.warn(e); }
-  try { refreshMontages(); allMt().forEach(m => SIDX.push({ t: 'montages', id: m.id, n: m.name, l: (m.name + ' montage').toLowerCase(), ex: 'Montage test · ' + (m.user ? 'yours' : (PK[m.pack]?.title || '')) })); } catch (e) { console.warn(e); }
+  if (SYS.searchIndex) SYS.searchIndex(it => SIDX.push(it));   // system tools (Draw Steel: negotiations, montages)
   for (const p of PACKS) {
     p.chapters.forEach(c => {
       SIDX.push({ t: 'chapter', id: p.id + '--' + c.id, n: c.title, l: c.title.toLowerCase(), ex: p.title });
-      c.blocks.forEach(b => { if (b.t === 'h' && b.lvl <= 5 && b.lvl !== 0 && b.text.length < 80) SIDX.push({ t: 'rule', id: p.id + '--' + c.id + '--' + b.id, n: b.text, l: b.text.toLowerCase(), ex: (p.heroes ? '' : p.title + ' · ') + c.title }); });
+      c.blocks.forEach(b => { if (b.t === 'h' && b.lvl <= 5 && b.lvl !== 0 && b.text.length < 80) SIDX.push({ t: 'rule', id: p.id + '--' + c.id + '--' + b.id, n: b.text, l: b.text.toLowerCase(), ex: (p.core ? '' : p.title + ' · ') + c.title }); });
     });
   }
 }
@@ -903,7 +704,7 @@ function runSearch(q) {
   for (const it of SIDX) {
     if (!toks.every(t => it.l.includes(t))) continue;
     let sc = it.l === s ? 0 : it.l.startsWith(s) ? 10 : it.l.includes(s) ? 20 : 30;
-    sc += (TPRI[it.t] ?? 4) + it.l.length / 100;
+    sc += ((SYS.searchPriority || {})[it.t] ?? CORE_PRI[it.t] ?? 4) + it.l.length / 100;
     res.push([sc, it]);
   }
   res.sort((a, b) => a[0] - b[0]);
@@ -911,7 +712,7 @@ function runSearch(q) {
   for (const [, it] of res) { if (it.t === 'rule' && seen.has(it.l)) continue; seen.add(it.l); out.push(it); if (out.length >= 50) break; }
   return out;
 }
-const srHtml = (list) => list.map((it, i) => `<div class="sr ${i === 0 && !isMob ? 'sel' : ''}" data-i="${i}"><span class="ty">${esc(it.t === 'rule' ? 'Rule' : it.t === 'chapter' ? 'Chapter' : it.t === 'negotiations' ? 'Negotiation' : it.t === 'montages' ? 'Montage' : TYPES[it.t].one)}</span><span class="nm">${esc(it.n)}</span><span class="ex">${esc(it.ex)}</span></div>`).join('');
+const srHtml = (list) => list.map((it, i) => `<div class="sr ${i === 0 && !isMob ? 'sel' : ''}" data-i="${i}"><span class="ty">${esc(it.ty || (it.t === 'rule' ? 'Rule' : it.t === 'chapter' ? 'Chapter' : TYPES[it.t].one))}</span><span class="nm">${esc(it.n)}</span><span class="ex">${esc(it.ex)}</span></div>`).join('');
 function doSearch(q, anchorEl) {
   const box = $('#sres');
   sresults = runSearch(q); ssel = 0;
@@ -924,7 +725,7 @@ function doSearch(q, anchorEl) {
 function openResult(it) {
   if (!it) return;
   $('#sres').classList.remove('on'); $('#q').value = ''; $('#q').blur(); closeMSearch();
-  if (it.t === 'montages') go('montage--' + it.id); else if (it.t === 'negotiations') go(it.id ? 'negotiation--' + it.id : 'negotiation'); else if (it.t === 'rule' || it.t === 'chapter') go('book--' + it.id); else go(it.t + '--' + it.id);
+  if (it.go) go(it.go); else if (it.t === 'rule' || it.t === 'chapter') go('book--' + it.id); else go(it.t + '--' + it.id);
 }
 function searchKeys(e) {
   const box = $('#sres');
@@ -949,34 +750,10 @@ $('#mq').addEventListener('keydown', e => { if (e.key === 'Enter' && mres[0]) op
 $('#mres').addEventListener('click', e => { const r = e.target.closest('.sr[data-i]'); if (r) openResult(mres[+r.dataset.i]); });
 
 // ---------- roller ----------
-const CH = ['Might', 'Agility', 'Reason', 'Intuition', 'Presence'];
-let chars = store.get('chars', { Might: 0, Agility: 0, Reason: 0, Intuition: 0, Presence: 0 });
-$('#chars').innerHTML = CH.map(c => `<label>${c.slice(0, 3)}<input type="number" inputmode="numeric" data-ch="${c}" value="${chars[c] ?? 0}"></label>`).join('');
-$$('#chars input').forEach(i => i.oninput = () => { chars[i.dataset.ch] = parseInt(i.value) || 0; store.set('chars', chars); });
 const openRoller = () => { $('#roller').classList.add('on'); if (!isMob) $('#fab').style.display = 'none'; };
 const closeRoller = () => { $('#roller').classList.remove('on'); $('#fab').style.display = ''; };
 $('#fab').onclick = openRoller;
 $('#rclose').onclick = closeRoller;
-function powerRoll(label, charList, abKey, fixed) {
-  const d1 = 1 + Math.floor(Math.random() * 10), d2 = 1 + Math.floor(Math.random() * 10);
-  const nat = d1 + d2;
-  const extra = parseInt($('#rbonus').value) || 0;
-  let mod = extra, cname = '', cval = 0;
-  if (fixed != null) { mod += fixed; }
-  else if (charList && charList.length) { cname = charList.reduce((b, c) => (chars[c] ?? 0) > (chars[b] ?? 0) ? c : b, charList[0]); cval = chars[cname] ?? 0; mod += cval; }
-  else if ($('#rchar').value) { cname = $('#rchar').value; cval = chars[cname] ?? 0; mod += cval; }
-  const ed = parseInt($('#redge').value) || 0;
-  const tot = nat + mod + (ed === 1 ? 2 : ed === -1 ? -2 : 0);
-  let tier = tot <= 11 ? 1 : tot <= 16 ? 2 : 3;
-  if (ed === 2) tier = Math.min(3, tier + 1); if (ed === -2) tier = Math.max(1, tier - 1);
-  if (nat >= 19) tier = 3;
-  const col = ['', 'var(--t1)', 'var(--t2)', 'var(--t3)'][tier];
-  const parts = [`2d10 [${d1}, ${d2}]`]; if (fixed != null) parts.push('+ ' + fixed); if (cname) parts.push('+ ' + cname + ' ' + cval); if (extra) parts.push('+ ' + extra); if (ed) parts.push('· ' + $('#redge').selectedOptions[0].text);
-  $('#rlog').insertAdjacentHTML('afterbegin', `<div class="rl"><div class="tot">${tot}</div><div><div class="lab">${esc(label || 'Power roll')}</div><div class="tt">${esc(parts.join(' '))}</div><span class="tl" style="background:${col}">Tier ${tier}${nat >= 19 ? ' · CRIT' : ''}</span></div></div>`);
-  if (abKey) { $$(`[data-ab="${CSS.escape(abKey)}"] .tier`).forEach(t => t.classList.toggle('hit', t.classList.contains('n' + tier))); setTimeout(() => $$('.tier.hit').forEach(t => t.classList.remove('hit')), 6000); }
-  toast(`${label ? esc(label) + ': ' : ''}<b>${tot}</b> → Tier ${tier}${nat >= 19 ? ' (natural ' + nat + '!)' : ''}`);
-}
-$('#rgo').onclick = () => powerRoll('', null, null);
 
 // ---------- scrim / sheets / peek ----------
 let scrimCb = null;
@@ -984,19 +761,9 @@ function showScrim(cb, light) { scrimCb = cb; $('#scrim').classList.add('on'); }
 function hideScrim() { $('#scrim').classList.remove('on'); scrimCb = null; }
 $('#scrim').onclick = () => { const cb = scrimCb; hideScrim(); $('#sheet').classList.remove('on'); $('#peek').classList.remove('on'); if (cb) cb(); };
 function closeSheets() { $('#sheet').classList.remove('on'); $('#peek').classList.remove('on'); hideScrim(); }
-function browseSheet() {
-  const sec = (t, ks) => `<h3>${t}</h3><div class="sgrid">${ks.map(([k, l, d]) => `<a href="#${k}"><b>${esc(l || TYPES[k].label)}</b><span>${esc(d || (TYPES[k] ? itemsOf(k).length + ' entries' : ''))}</span></a>`).join('')}</div>`;
-  $('#sheet').innerHTML = `<div class="grab"></div>` +
-    sec('Heroes', [['classes'], ['ancestries'], ['cultures'], ['careers'], ['kits'], ['perks'], ['complications'], ['abilities'], ['respite', 'Respite', 'Downtime projects & followers']]) +
-    sec('Director', [['sessions', 'Sessions', 'Prep & print a game night'], ['encounter', 'Encounter Builder', 'Difficulty & initiative PDF'], ['cards', 'Cards', 'Print item, quest & follower cards'], ['negotiation', 'Negotiation', 'Interest, patience & arguments'], ['montage', 'Montage Tests', 'Successes, failures & rounds'], ['monsters'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title, 'Adventure']), ['import', 'Import a PDF', 'Add your own books']]) +
-    sec('Rules & rewards', [['conditions'], ['glossary'], ['skills'], ['treasures'], ['titles'], ['gods']]) +
-    `<p style="font-size:10.5px;color:var(--ink3);margin-top:16px">Vanadium is an independent product published under the DRAW STEEL Creator License and is not affiliated with MCDM Productions, LLC. DRAW STEEL © 2024 MCDM Productions, LLC.</p>`;
-  $('#sheet').classList.add('on'); showScrim();
-  $$('#sheet a').forEach(a => a.addEventListener('click', closeSheets));
-}
 function peek(t, id) {
   const ent = BYID[t] && BYID[t][id]; if (!ent) return go(t + '--' + id);
-  const body = t === 'abilities' ? renderAbility(ent, { nosrc: true }) : t === 'monsters' ? renderMonster(ent, { nosrc: true }) : `<div class="rd">${renderBlocks(ent.body)}</div>`;
+  const body = (SYS.preview && SYS.preview(t, ent)) || `<div class="rd">${renderBlocks(ent.body)}</div>`;
   $('#peek').innerHTML = `<div class="grab"></div><div class="pk-h"><b>${esc(ent.name)}</b><a class="btn ghost" href="#${t}--${id}">Open</a></div>${body}`;
   $('#peek').classList.add('on'); showScrim(); $('#peek').scrollTop = 0;
   $$('#peek a[href]').forEach(a => a.addEventListener('click', closeSheets));
@@ -1004,7 +771,7 @@ function peek(t, id) {
 $$('#tabbar button').forEach(b => b.onclick = () => {
   const t = b.dataset.tab; closeSheets(); if (t !== 'roll') closeRoller();
   if (t === 'home') go(''); else if (t === 'library') go('library'); else if (t === 'pinned') go('pinned');
-  else if (t === 'browse') browseSheet(); else if (t === 'roll') { $('#roller').classList.contains('on') ? closeRoller() : openRoller(); }
+  else if (t === 'browse') SYS.browse(); else if (t === 'roll') { $('#roller').classList.contains('on') ? closeRoller() : openRoller(); }
 });
 function markTab() {
   const h = location.hash.slice(1); const a = h.split('--')[0];
@@ -1015,14 +782,8 @@ function markTab() {
 // ---------- global delegated clicks & hover ----------
 document.addEventListener('click', e => {
   const pin = e.target.closest('[data-pin]'); if (pin) { e.preventDefault(); togglePin(pin.dataset.pin); return; }
-  const rb = e.target.closest('[data-roll]');
-  if (rb) {
-    const txt = rb.dataset.roll; const fx = txt.match(/2d10\s*\+\s*(\d+)/);
-    openRoller(); powerRoll(rb.dataset.lab || '', fx ? null : (txt.match(/Might|Agility|Reason|Intuition|Presence/g) || []), rb.dataset.ab, fx ? +fx[1] : (/^\s*(Power Roll\s*)?2d10\s*$/.test(txt) ? 0 : null)); return;
-  }
+  if (SYS.onClick && SYS.onClick(e)) return;   // system buttons (Draw Steel: roll, add to encounter, …)
   const zi = e.target.closest('img[data-zoom]'); if (zi) { const lb = document.createElement('div'); lb.className = 'lightbox'; lb.innerHTML = `<img src="${zi.getAttribute('src')}" alt=""><button aria-label="Close">✕</button>`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); return; }
-  const le = e.target.closest('[data-loadenc]'); if (le) { e.preventDefault(); const [p, c, i] = le.dataset.loadenc.split('|'); loadBookEncounter(p, c, +i); return; }
-  const ae = e.target.closest('[data-addenc]'); if (ae) { e.preventDefault(); addToEncounter(ae.dataset.addenc); return; }
   const back = e.target.closest('[data-back]'); if (back) { go(back.dataset.back); return; }
   const del = e.target.closest('[data-delpack]'); if (del) { e.preventDefault(); deletePack(del.dataset.delpack); return; }
   const sf = e.target.closest('[data-srcfilter]'); if (sf) { LSTATE.monsters = { q: '', f: { Source: { [sf.dataset.srcfilter]: 1 } }, sort: null, dir: 1, open: false }; }
@@ -1039,7 +800,7 @@ document.addEventListener('mouseover', e => {
   clearTimeout(hovT);
   hovT = setTimeout(() => {
     const [t, id] = g.dataset.go.split('--'); const ent = BYID[t] && BYID[t][id]; if (!ent) return;
-    hov.innerHTML = t === 'abilities' ? renderAbility(ent, { nosrc: true }) : t === 'monsters' ? renderMonster(ent, { nosrc: true }) : `<h2>${esc(ent.name)}</h2><div class="rd">${renderBlocks(ent.body)}</div>`;
+    hov.innerHTML = (SYS.preview && SYS.preview(t, ent)) || `<h2>${esc(ent.name)}</h2><div class="rd">${renderBlocks(ent.body)}</div>`;
     hov.style.display = 'block';
     const r = g.getBoundingClientRect(); const w = hov.offsetWidth, h = hov.offsetHeight;
     let x = Math.min(innerWidth - w - 10, r.left), y = r.bottom + 6; if (y + h > innerHeight - 10) y = Math.max(10, r.top - h - 6);
@@ -1071,27 +832,23 @@ function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   const [a, b, c, d] = h.split('--');
   const done = () => { if (isMob) { const m = $('#main'); m.scrollTop = 0; } };
-  if (!a) { lastType = null; home(); return done(); }
-  if (a === 'book') { lastType = null; bookPage(b || 'heroes', c, d); return done(); }
+  if (!a) { lastType = null; SYS.home(); return done(); }
+  if (a === 'book') { lastType = null; bookPage(b || PACKS.find(p => p.core).id, c, d); return done(); }
   if (a === 'library') { lastType = null; libraryPage(); return done(); }
   if (a === 'import') { lastType = null; importPage(); return done(); }
   if (a === 'pinned') { lastType = null; pinnedPage(); return done(); }
   if (a === 'sync') { lastType = null; syncPage(); return done(); }
-  if (a === 'encounter') { lastType = null; encounterPage(); return done(); }
-  if (a === 'respite') { lastType = null; respitePage(); return done(); }
-  if (a === 'negotiation') { lastType = null; b ? negotiationPage(b) : negotiationHub(); return done(); }
   if (a === 'sessions') { lastType = null; sessionsHub(); return done(); }
   if (a === 'session') { lastType = null; sessionPage(b, c); return done(); }
   if (a === 'cards') { lastType = null; cardsPage(); return done(); }
-  if (a === 'montage') { lastType = null; b ? montagePage(b) : montageHub(); return done(); }
-  if (a === 'roller') { openRoller(); history.replaceState(null, '', '#'); lastType = null; home(); return; }
-  if (a === 'classes') { lastType = null; b ? classPage(b) : classIndex(); return done(); }
+  if (a === 'roller') { openRoller(); history.replaceState(null, '', '#'); lastType = null; SYS.home(); return; }
+  if (SYS.routes && SYS.routes[a]) { lastType = null; SYS.routes[a](b, c, d); return done(); }
   if (LIST[a]) {
     if (lastType === a && $('#lview')) showEntity(a, b);
     else { listPage(a, b); lastType = a; }
     if (isMob && b) { const v = $('#lview'); if (v) v.scrollTop = 0; }
     return;
   }
-  home();
+  SYS.home();
 }
 boot();
