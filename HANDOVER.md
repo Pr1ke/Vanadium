@@ -50,6 +50,10 @@ Features:
 - The required notice must stay visible on the site, and is also in README:
   > Vanadium is an independent product published under the DRAW STEEL Creator License and is not affiliated with MCDM Productions, LLC. DRAW STEEL © 2024 MCDM Productions, LLC.
 - Icon credits must stay too: game-icons.net (CC BY 3.0) and Material Design Icons (Apache 2.0).
+- **5e (SRD 5.2) content** is limited to the System Reference Document 5.2, which is CC BY 4.0. Wizards of the Coast's attribution must stay visible: it is in the 5e footer (`notice`), on 5e PDFs (`pdfNotice`), in the reference book's "About" chapter and in the README.
+  - **No trademarks:** never use Wizards of the Coast trademarks in the app, such as "Dungeons & Dragons", "D&D", or product and setting names. The system is called "5e (SRD 5.2)". `tests/srd5_test.py` checks for these.
+  - **No other books:** never add non-SRD content (other books' text). Those go through the importer, like the Draw Steel books.
+  - **No art:** never use monster art; the data's `image` fields are ignored.
 - `.gitignore` excludes `*.pdf`. Keep source PDFs out of the repo.
 
 ## 3. Repository layout
@@ -76,6 +80,7 @@ src/                   ← sources you edit
   cards.js             ← card generator: quest cards, styles, icons, customiser, card PDF, QR pictures. Other card kinds come from the system
   sync.js, *.php       ← sync client, sync/update/card servers (system-neutral)
   systems/drawsteel/   ← THE DRAW STEEL SYSTEM MODULE (§5b)
+
     drawsteel.js       ← data setup, ability/stat-block rendering, list columns/filters, class pages, menu,
                           home, power roller, hooks, and the registerSystem({...}) call
     enc.js             ← encounter builder, stones, scaling, encounter PDF + damage tracker
@@ -86,6 +91,12 @@ src/                   ← sources you edit
     ds-cards.js        ← card kinds: treasures, followers & retainers; quest rewards; rewards found in adventure text
     register.js        ← the registerSystem({...}) call (loaded last)
     respite-base.html, respite-vanadium.css ← the Respite tool (built by mkrespite.py)
+  systems/srd5/        ← THE 5e (SRD 5.2) SYSTEM MODULE
+    srd/               ← pinned 2024 data from 5e-bits/5e-database (MIT; content CC BY 4.0), see srd/README.md
+    mkdata.py          ← BUILD: srd/ → site/data/srd5.json (rules, reference book) + srd5-monsters.json (monsters book)
+    srd5.js            ← stat blocks, spell cards, list columns/filters, menu, home, browse, search hooks
+    srd5.css           ← 5e stat block / spell card styles (SYSTEM_CSS in mksite.py)
+    register.js        ← the registerSystem({...}) call (loaded last)
   sb.js                ← old stat-block PDF fragment (reference only, not in the build)
   mksite.py            ← BUILD: index.html + app.js + data/*.gz.txt (SYSTEM_FILES lists each system's files)
   mkrespite.py         ← BUILD for respite.html
@@ -218,7 +229,14 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
    - **Loading:** every system's code is in app.js, which is small, but only the active system's data file and books are loaded.
    - **Data** is separated per system as described in §5 (localStorage prefixes, tagged imports).
    - **Tests:** `tests/systems_test.py` runs 24 checks. It uses a throw-away build with `tests/fixtures/sample-system`, which is also the smallest example of a system.
-4. **Step 3:** the D&D 5e SRD module. **Step 4:** 5e tools (encounter difficulty, dice, initiative). **Step 5:** 5e stat blocks in the importer.
+4. **Step 3 (done): the 5e (SRD 5.2) module.**
+   - **Data:** `mkdata.py` runs first in `npm run build`. It fixes source glitches: words split by PDF line breaks, stray `**`, components stuck in 9 spells' range.
+   - **Lists:** spells, monsters (2024-style stat blocks), magic items, classes (feature table with spell slots, features, the subclass), species, backgrounds, feats, conditions and equipment. Each has filters.
+   - **Books:** the "SRD 5.2 Reference" core book is assembled from the data (abilities and skills, conditions, weapons, armor, damage, magic, alignment and languages, poisons). The monsters also form a book with one chapter per letter.
+   - **Hooks:** conditions are auto-linked with hover previews; search, pins (monster XP totals), previews and the mobile Browse sheet all work for 5e.
+   - **Not yet:** the SRD's running rules text (Playing the Game, Rules Glossary) isn't in the dataset. The 5e system has no dice roller, encounter builder or initiative yet (step 4), and the importer doesn't recognise 5e stat blocks yet (step 5).
+   - **Tests:** `tests/srd5_test.py` runs 31 checks.
+5. **Step 4:** 5e tools (encounter difficulty, dice, initiative). **Step 5:** 5e stat blocks in the importer.
 
 **Adding a system:**
 1. Create `src/systems/<id>/<id>.js` that calls `registerSystem` with at least `id`, `name`, `data`, `init`, `corePack`, `lists`, `menu`, `home`, `browse`, `renderMonster` and `pdfNotice`.
@@ -269,6 +287,8 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
   - `python tests/check_core.py`: checks the core is system-neutral.
   - `node tests/sync_client.mjs site/sync.js`: the sync client simulation.
   - `python tests/systems_test.py`: the system switch and per-system data, using the sample system fixture (needs a build).
+  - `python tests/srd5_test.py`: the 5e system: content, links, search, books, pins, attribution in the footer and PDFs, no trademarks (needs a build).
+  - **`python tests/snapshot.py out.json --system srd5`** crawls another system, which is useful for catching JS errors.
   - **`serve.py --site DIR`** serves another folder (used by tests; it never auto-updates).
 - **Older scripts:** serve `site/` on port 8765 first, then `python tests/<name>.py`. Scripts print `errs []` when there are no page errors.
 - Many tests point at the original sandbox paths (`/mnt/user-data/uploads/*.pdf`, `/home/claude/shots/`). Change those to your local PDF and output paths.

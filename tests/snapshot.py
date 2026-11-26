@@ -70,6 +70,7 @@ async def snapshot(out, root):
             b = await p.chromium.launch()
             ctx = await b.new_context(viewport={'width': 1280, 'height': 900}, accept_downloads=True)
             seed = seed_state()
+            if SYSTEM: await ctx.add_init_script(f'localStorage.setItem("vanadium_system", {json.dumps(SYSTEM)})')   # --system id
             # repeatable Math.random (stone colours etc.), then the seed data
             await ctx.add_init_script('(() => { let s = 42; Math.random = () => (s = (s * 16807) % 2147483647) / 2147483647; })()')
             await ctx.add_init_script('(() => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", 1);'
@@ -152,7 +153,7 @@ async def snapshot(out, root):
                 await pg.click(f'[data-ctab="{tab}"]'); await pg.wait_for_timeout(400); X['cards:tab:' + tab] = await grab('#main')
                 for sel in ['#q-new', '#q-adv', '#f-ret', '#f-art', '#f-sage']:
                     if await pg.query_selector(sel): await dialog(sel, f'cards:{tab}:{sel}')
-            await pg.click('[data-ctab="item"]'); await pg.wait_for_timeout(300)
+            if await pg.query_selector('[data-ctab="item"]'): await pg.click('[data-ctab="item"]'); await pg.wait_for_timeout(300)   # Draw Steel's treasure tab
             if await pg.query_selector('#c-q'):
                 await pg.fill('#c-q', 'potion'); await pg.wait_for_timeout(300); X['cards:search'] = await grab('#c-qres'); await pg.fill('#c-q', '')
             await dialog('[data-cust="0"]', 'cards:customise')
@@ -162,12 +163,14 @@ async def snapshot(out, root):
             for kind in ['enc', 'mtg', 'neg']: await dialog(f'[data-add="{kind}"]', 'session:add:' + kind)
             for did in ['d1', 'd2', 'd3', 'd4']:
                 await visit('#session--stest--' + did)
+                if not await pg.query_selector('#d-pdf'): X['session:pdf:' + did] = 'n/a'; continue   # the seeded session belongs to Draw Steel
                 try:
                     async with pg.expect_download(timeout=60000) as dl: await pg.click('#d-pdf')
                     d0 = await dl.value; X['session:pdf:' + did] = 'ok ' + d0.suggested_filename; X['session:pdf:' + did + ':text'] = await pdf_text(d0)
                 except Exception as e: X['session:pdf:' + did] = 'FAILED ' + type(e).__name__
             await visit('#session--stest')
             try:
+                if not await pg.query_selector('#s-export'): raise LookupError('no session')
                 async with pg.expect_download(timeout=90000) as dl: await pg.click('#s-export')
                 d0 = await dl.value; X['session:export'] = 'ok ' + d0.suggested_filename; X['session:export:text'] = await pdf_text(d0)
             except Exception as e: X['session:export'] = 'FAILED ' + type(e).__name__
@@ -238,5 +241,7 @@ def diff(a, b):
 
 if __name__ == '__main__':
     if sys.argv[1] == '--diff': sys.exit(1 if diff(sys.argv[2], sys.argv[3]) else 0)
+    # --system ID: crawl that game system instead of the default one
+    SYSTEM = sys.argv[sys.argv.index('--system') + 1] if '--system' in sys.argv else None
     # --root DIR: snapshot another checkout (e.g. a git worktree of main) instead of this one
     asyncio.run(snapshot(sys.argv[1], os.path.abspath(sys.argv[sys.argv.index('--root') + 1]) if '--root' in sys.argv else ROOT))

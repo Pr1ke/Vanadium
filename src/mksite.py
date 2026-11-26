@@ -13,12 +13,13 @@ body=open(SRC+'/body.html').read()
 head=head.replace('<meta name="viewport" content="width=device-width, initial-scale=1">','<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<meta name="theme-color" content="#ffffff">')
 head=head.replace('<title>','<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Cpath d=%22M16 2 L19 18 L16 22 L13 18Z%22 fill=%22%23cfd6de%22/%3E%3Cpath d=%22M9 20h14v3H9z%22 fill=%22%23e0703a%22/%3E%3C/svg%3E">\n<title>')
 head=head.replace('family=Inter:wght@400;500;600','family=Inter:wght@400;500;600;700').replace('<title>Vanadium','<title>Vanadium')
-html=head+extra+open(SRC+'/vanadium.css').read()+'</style>\n</head>\n'+body
-open(SITE+'/index.html','w').write(html)
 # app.js = core (src/app.js up to its trailing boot();) + each game system's files (they call
 # registerSystem) + core modules + boot(). One global script, so order only matters for code that
 # runs at load time: systems come after the core helpers they use.
-SYSTEM_FILES={'drawsteel':['drawsteel.js','enc.js','neg.js','mtg.js','ds-print.js','ds-sessions.js','ds-cards.js','register.js']}  # register.js last
+SYSTEM_FILES={'drawsteel':['drawsteel.js','enc.js','neg.js','mtg.js','ds-print.js','ds-sessions.js','ds-cards.js','register.js'],  # register.js last
+              'srd5':['srd5.js','register.js']}
+SYSTEM_CSS={'srd5':['srd5.css']}   # system styles appended to index.html (Draw Steel's still live in vanadium.css)
+html=head+extra+open(SRC+'/vanadium.css').read()+''.join(open(SRC+'/systems/%s/%s'%(s,f)).read() for s,fs in SYSTEM_CSS.items() for f in fs)+'</style>\n</head>\n'+body
 # The legacy system owns everything saved before multi-system support (unprefixed localStorage
 # keys, imported books without a system tag) and is the default. Never change it, or that data
 # would appear to belong to another system.

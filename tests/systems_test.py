@@ -12,7 +12,7 @@ to app.js, then in a browser:
   - switching back shows Draw Steel's data again; the theme is shared
 Prints PASS/FAIL per check; exits 1 on any failure.
 """
-import asyncio, json, os, shutil, socket, subprocess, sys, tempfile, time, importlib.util
+import asyncio, json, os, re, shutil, socket, subprocess, sys, tempfile, time, importlib.util
 
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
 FIX = os.path.join(HERE, 'fixtures', 'sample-system')
@@ -30,8 +30,9 @@ def make_site(tmp):
     p = os.path.join(site, 'app.js'); js = open(p, encoding='utf-8').read()
     i = js.rindex('boot();')
     js = js[:i] + open(os.path.join(FIX, 'sample.js'), encoding='utf-8').read() + '\n' + js[i:]
-    assert js.count("JSON.parse('[\"drawsteel\"]')") == 1
-    js = js.replace("JSON.parse('[\"drawsteel\"]')", "JSON.parse('[\"drawsteel\",\"sample\"]')")
+    m = re.search(r"const SYSTEM_IDS = JSON.parse\('(\[[^']*\])'\);", js); assert m, 'SYSTEM_IDS not found'
+    ids = json.loads(m.group(1)) + ['sample']   # the build's systems plus the test fixture
+    js = js.replace(m.group(0), "const SYSTEM_IDS = JSON.parse('%s');" % json.dumps(ids))
     open(p, 'w', encoding='utf-8').write(js)
     return site
 
@@ -69,8 +70,9 @@ async def main():
             await pg.reload(); await ready()
             ds_keys_before = await pg.evaluate("JSON.stringify(Object.keys(localStorage).filter(k => k.startsWith('st_') && !k.startsWith('st_sample_')).sort().map(k => [k, localStorage.getItem(k)]))")
             sel = await pg.query_selector('#syssel')
-            check('switch is shown when there are two systems', sel is not None and await sel.is_visible())
-            check('switch lists both systems, Draw Steel selected', await pg.evaluate("[...document.querySelectorAll('#syssel option')].map(o => o.value + (o.selected ? '*' : '')).join(',')") == 'drawsteel*,sample')
+            check('switch is shown when there are several systems', sel is not None and await sel.is_visible())
+            opts = await pg.evaluate("[...document.querySelectorAll('#syssel option')].map(o => o.value + (o.selected ? '*' : '')).join(',')")
+            check('switch lists every system, Draw Steel selected', opts.startswith('drawsteel*,') and opts.endswith(',sample'), opts)
             check('Draw Steel menu and footer', 'Heroes' in await pg.evaluate("document.querySelector('#menu').textContent") and 'DRAW STEEL' in await pg.evaluate("document.querySelector('footer').innerText"))
             await go('#library'); lib = await main_text()
             check('Draw Steel library shows its books and the old untagged import', 'Draw Steel: Heroes' in lib and 'Old Import' in lib, lib[:200])

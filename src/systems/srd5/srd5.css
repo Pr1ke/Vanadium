@@ -1,0 +1,26 @@
+
+/* ===== 5e (SRD 5.2) stat blocks and spell cards (srd5.js); theme tokens from vanadium.css ===== */
+.s5mon,.s5spell{background:var(--card);color:var(--cardink);border:1px solid var(--cardline);border-top:3px solid var(--accent);border-radius:var(--r-md);box-shadow:var(--sh1);padding:12px 14px;margin:0 0 14px;font-size:13.5px;line-height:1.5;max-width:720px}
+.s5mon .s5-h,.s5spell .s5-h{display:flex;align-items:flex-start;gap:10px;justify-content:space-between}
+.s5-n{font:700 18px/1.2 var(--serif)}
+.s5-n a{color:inherit;text-decoration:none;cursor:pointer}
+.s5-t{font-style:italic;color:var(--cardmut);font-size:12.5px;margin-top:2px}
+.s5-core{display:flex;flex-wrap:wrap;gap:4px 18px;margin:10px 0 8px;padding-top:8px;border-top:1px solid var(--cardline)}
+.s5-abs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:6px 0 10px}
+.s5-abs>div{background:var(--cardsub);border:1px solid var(--cardline);border-radius:var(--r-sm);text-align:center;padding:5px 2px;display:flex;flex-direction:column;line-height:1.25}
+.s5-abs span{font:700 10.5px var(--ui);letter-spacing:.06em;text-transform:uppercase;color:var(--accent2)}
+.s5-abs b{font-size:15px}
+.s5-abs em{font-style:normal;color:var(--cardmut);font-size:12px}
+.s5-abs i{font-style:normal;color:var(--cardmut);font-size:10.5px}
+.s5-lines{display:flex;flex-direction:column;gap:2px;padding-bottom:6px;border-bottom:1px solid var(--cardline)}
+.s5-lines b,.s5-core b{color:var(--accent2);margin-right:2px}
+.s5-sec h4{font:700 12px var(--ui);letter-spacing:.07em;text-transform:uppercase;color:var(--accent2);margin:12px 0 4px;padding-bottom:3px;border-bottom:1px solid var(--cardline)}
+.s5-sec p{margin:0 0 6px}
+.s5-spl{display:block;margin:3px 0 0 14px}
+.s5spell .s5-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px;margin:10px 0;padding:8px 0;border-top:1px solid var(--cardline);border-bottom:1px solid var(--cardline)}
+.s5spell .s5-meta b{display:block;font:700 10.5px var(--ui);letter-spacing:.06em;text-transform:uppercase;color:var(--accent2)}
+.s5spell .s5-body p{margin:0 0 8px}
+.pincols .s5mon,.pincols .s5spell{max-width:none}
+#hov .s5mon,#hov .s5spell,#peek .s5mon,#peek .s5spell{box-shadow:none;margin:0}
+@media (max-width:600px){.s5-abs{grid-template-columns:repeat(3,1fr)}.s5spell .s5-meta{grid-template-columns:1fr}}
+.pincols .s5mon,.pincols .s5spell{break-inside:avoid;page-break-inside:avoid;display:inline-block;width:100%}

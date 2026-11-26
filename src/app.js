@@ -786,6 +786,7 @@ function mountSystemChrome() {
   const ids = Object.keys(SYSTEMS), sel = $('#syssel');   // the system switch, only when there is a choice
   if (sel && ids.length > 1) { sel.innerHTML = ids.map(id => `<option value="${id}" ${id === SYS.id ? 'selected' : ''}>${esc(isMob ? SYSTEMS[id].short || SYSTEMS[id].name : SYSTEMS[id].name)}</option>`).join(''); sel.hidden = false; sel.onchange = () => switchSystem(sel.value); }
   if (SYS.roller) { $('#roller').innerHTML = SYS.roller.html; $('#fab').title = SYS.roller.title; if (SYS.roller.mount) SYS.roller.mount(); }
+  else { $('#fab').hidden = true; const rt = $('#tabbar button[data-tab="roll"]'); if (rt) rt.hidden = true; }   // a system without a dice roller
   $('footer').innerHTML = SYS.notice || '';
 }
 

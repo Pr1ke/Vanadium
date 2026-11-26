@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Draw Steel reference and Director's toolkit (static site)",
   "scripts": {
-    "build": "python src/mksite.py && python src/mkrespite.py && python src/mkversion.py",
+    "build": "python src/systems/srd5/mkdata.py && python src/mksite.py && python src/mkrespite.py && python src/mkversion.py",
     "serve": "python serve.py",
     "update": "python serve.py --check"
   },
