@@ -19,6 +19,9 @@ out=re.sub(r'<link href="https://fonts.googleapis.com/css2\?family=Cormorant[^>]
 sync='''<script>try{parent!==window&&parent.VSync&&parent.VSync.patch(window)}catch(e){}</script>
 <script>(function(){function ap(){try{var t=JSON.parse(localStorage.getItem('st_theme2')||'"light"');document.documentElement.dataset.theme=t;}catch(e){}}ap();window.addEventListener('storage',ap);window.__stTheme=ap;})();</script>'''
 out=out.replace('</head>',sync+'\n</head>',1)
+# beta storage shim (src/ns.js), first thing in the page (the iframe has its own Storage prototype)
+out=re.sub(r'<head[^>]*>',lambda m:m.group(0)+'\n<script>'+open(SRC+'/ns.js').read().strip()+'</script>',out,count=1)
+assert 'VANADIUM_NS' in out
 out=out.replace('<title>Respite · Draw Steel Downtime','<title>Respite · Vanadium')
 open(SITE+'/respite.html','w').write(out)
 print(len(out))

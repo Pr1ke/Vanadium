@@ -35,6 +35,9 @@ for f in glob.glob(SITE+'/data/*.json'):
 # asset version: changes whenever any source changes; added as ?v= to sync.js, app.js and respite.html
 # so browsers never keep running an old copy after an update (hosts often let them cache heuristically)
 av=hashlib.md5(b''.join(open(f,'rb').read().replace(b'\r\n',b'\n') for f in sorted(glob.glob(SRC+'/**/*',recursive=True))+[ROOT+'/importer/dsparse.mjs'] if os.path.isfile(f))).hexdigest()[:10]
+# beta storage shim (src/ns.js) runs before any other script
+assert '<meta charset="utf-8">' in html
+html=html.replace('<meta charset="utf-8">','<meta charset="utf-8">\n<script>'+open(SRC+'/ns.js').read().strip()+'</script>',1)
 html=html.replace('<script src="sync.js">','<script src="sync.js?v=%s" data-v="%s">'%(av,av))
 open(SITE+'/index.html','w').write(html)
 open(SITE+'/app.js','w').write((js[:i]+'\n'.join(parts)+'\n'+js[i:]).replace('__DATAV__',h).replace('__ASSETV__',av)

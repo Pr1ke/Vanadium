@@ -2,6 +2,39 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>// Beta storage. The copy installed in a folder named vanadiumBeta (any letter case) keeps its own
+// browser storage, separate from the main copy on the same domain: every localStorage/sessionStorage
+// key, IndexedDB database and Cache Storage name gets the prefix "vanadiumBeta:". Any other folder is
+// left exactly as it is. Inlined first in index.html and respite.html by the build, before any other
+// script, so app.js, sync.js and Respite need no changes.
+(function () {
+  if (!/(^|\/)vanadiumbeta$/i.test(location.pathname.replace(/\/[^/]*$/, ''))) return;
+  var NS = 'vanadiumBeta:'; window.VANADIUM_NS = NS;
+  try {
+    var P = Storage.prototype, g = P.getItem, s = P.setItem, r = P.removeItem, k = P.key, len = Object.getOwnPropertyDescriptor(P, 'length').get;
+    var own = function (st) { var out = []; for (var i = 0, n = len.call(st); i < n; i++) { var x = k.call(st, i); if (x != null && x.indexOf(NS) === 0) out.push(x.slice(NS.length)); } return out; };
+    P.getItem = function (x) { return g.call(this, NS + x); };
+    P.setItem = function (x, v) { return s.call(this, NS + x, v); };
+    P.removeItem = function (x) { return r.call(this, NS + x); };
+    P.key = function (i) { var o = own(this); return i >= 0 && i < o.length ? o[i] : null; };
+    P.clear = function () { var t = this; own(t).forEach(function (x) { r.call(t, NS + x); }); };
+    Object.defineProperty(P, 'length', { configurable: true, enumerable: true, get: function () { return own(this).length; } });
+  } catch (e) { }
+  try {
+    var I = IDBFactory.prototype, o = I.open, d = I.deleteDatabase;
+    I.open = function (n) { var a = [].slice.call(arguments); a[0] = NS + n; return o.apply(this, a); };
+    I.deleteDatabase = function (n) { return d.call(this, NS + n); };
+  } catch (e) { }
+  try {
+    if (window.CacheStorage) {
+      var C = CacheStorage.prototype, op = C.open, de = C.delete, ha = C.has, ke = C.keys;
+      C.open = function (n) { return op.call(this, NS + n); };
+      C.delete = function (n) { return de.call(this, NS + n); };
+      C.has = function (n) { return ha.call(this, NS + n); };
+      C.keys = function () { return ke.call(this).then(function (ks) { return ks.filter(function (x) { return x.indexOf(NS) === 0; }).map(function (x) { return x.slice(NS.length); }); }); };
+    }
+  } catch (e) { }
+})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Cpath d=%22M16 2 L19 18 L16 22 L13 18Z%22 fill=%22%23cfd6de%22/%3E%3Cpath d=%22M9 20h14v3H9z%22 fill=%22%23e0703a%22/%3E%3C/svg%3E">
@@ -1384,6 +1417,6 @@ body.mob #syssel{max-width:90px;padding:4px 20px 4px 8px;font-size:12px;margin:0
 <div id="roller"></div><!-- the game system's dice roller (SYS.roller), mounted at startup -->
 <div id="hov"></div>
 <div id="toast"></div>
-<script src="sync.js?v=2333dd376e" data-v="2333dd376e"></script><!-- pulls synced data first, then loads app.js -->
+<script src="sync.js?v=9aaf0a1e12" data-v="9aaf0a1e12"></script><!-- pulls synced data first, then loads app.js -->
 </body>
 </html>

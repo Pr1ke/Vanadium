@@ -82,6 +82,7 @@ src/                   ← sources you edit
   app.js               ← CORE (system-neutral): data loading, packs, routing, list pages, book reader, library,
                           importer UI, pins, search, sync page, updates. Talks to the game system only via SYS.* (§5b)
   print.js             ← PDF writer (makeWriter, Times/Helvetica sets), pdf-lib loader, deliverFile, markdown PDFs, mergePdfs
+  ns.js                ← beta storage separation (inlined first in index.html and respite.html)
   sess.js              ← sessions: folders, markdown pages, overview, whole-session PDF. Other item types come from the system
   cards.js             ← card generator: quest cards, styles, icons, customiser, card PDF, QR pictures. Other card kinds come from the system
   sync.js, *.php       ← sync client, sync/update/card servers (system-neutral)
@@ -150,7 +151,7 @@ VS Code: **Terminal → Run Build Task** (Ctrl/Cmd+Shift+B) builds. Run the "Ser
   - **Needs:** PHP 7.4+, the `zip` extension, and `curl` or `allow_url_fopen`.
   - **Two live copies, by folder:** the branch comes from the name of the folder `update.php` is installed in (`BRANCHES` in `src/update.php`), never from the request, so a visitor can't switch it. `vanadium/` follows `main`; `vanadiumBeta/` (any letter case) follows `beta`; any other folder follows `main`. Every JSON reply includes `branch`. Each folder has its own cooldown, update state and sync data (`.vanadium-*`).
   - **Beta workflow:** work happens on feature branches (e.g. `systems`), which are merged into `beta` to try them live, then into `main` to release. Both branches need a build committed (`site/`), because the updater installs `site/` from the branch zip.
-  - **Same domain:** if both folders are on one domain, the browser shares saved data (localStorage) between them, including the sync key, because storage is per domain, not per folder.
+  - **Separate browser storage for beta (`src/ns.js`):** browsers store data per domain, not per folder, so the two copies would otherwise share sessions, settings and the sync key. The build inlines `ns.js` as the first script in `index.html` and `respite.html`. In a folder named `vanadiumBeta` it prefixes every localStorage/sessionStorage key, IndexedDB database and Cache Storage name with `vanadiumBeta:` (`length`, `key()` and `clear()` only cover beta's own keys); elsewhere it does nothing. App code needs no changes. Beta starts empty and needs its own sync key from beta's own `sync.php`. `tests/beta_storage_test.py` serves both folders on one address and checks this.
   - **Trigger:** the app calls `update.php` with a GET request at most every 5 minutes per browser. The script also has its own **5-minute cooldown shared by all visitors**, plus a lock, stored in `.vanadium-update.json` in the web root.
   - **Update:** it compares `version.json` with the copy on GitHub. If the build differs, it downloads the repo zip from codeload, stages `site/` in `.vanadium-new-*`, moves the files in with `version.json` last, and cleans up.
   - **Deleting old files:** it only deletes files that an earlier run installed and the new build dropped. That list is kept in the same state file, so other files on the host, such as `.htaccess`, are never touched.
@@ -338,6 +339,7 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
   - `python tests/srd5_test.py`: the 5e system: content, links, search, books, pins, attribution in the footer and PDFs, no trademarks (needs a build).
   - `python tests/s5import_test.py [--folder DIR]`: the 5e JSON importer and 5e cards, on the invented fixture; with `--folder`, it also imports a real folder locally.
   - `python tests/sessions_test.py`: folders in sessions, in both systems: adding into a folder, nesting, moving, reordering, folding, folder PDF, export contents, removing a folder (needs a build).
+  - `python tests/beta_storage_test.py`: the `vanadium/` and `vanadiumBeta/` copies on one address keep separate browser storage (needs a build).
   - **`python tests/snapshot.py out.json --system srd5`** crawls another system, which is useful for catching JS errors.
   - **`serve.py --site DIR`** serves another folder (used by tests; it never auto-updates).
 - **Older scripts:** serve `site/` on port 8765 first, then `python tests/<name>.py`. Scripts print `errs []` when there are no page errors.
