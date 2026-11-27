@@ -17,7 +17,7 @@ head=head.replace('family=Inter:wght@400;500;600','family=Inter:wght@400;500;600
 # registerSystem) + core modules + boot(). One global script, so order only matters for code that
 # runs at load time: systems come after the core helpers they use.
 SYSTEM_FILES={'drawsteel':['drawsteel.js','enc.js','neg.js','mtg.js','ds-print.js','ds-sessions.js','ds-cards.js','register.js'],  # register.js last
-              'srd5':['srd5.js','s5-tools.js','register.js']}
+              'srd5':['srd5.js','s5-tools.js','s5-import.js','s5-cards.js','register.js']}
 SYSTEM_CSS={'srd5':['srd5.css']}   # system styles appended to index.html (Draw Steel's still live in vanadium.css)
 html=head+extra+open(SRC+'/vanadium.css').read()+''.join(open(SRC+'/systems/%s/%s'%(s,f)).read() for s,fs in SYSTEM_CSS.items() for f in fs)+'</style>\n</head>\n'+body
 # The legacy system owns everything saved before multi-system support (unprefixed localStorage

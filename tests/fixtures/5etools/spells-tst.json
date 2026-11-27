@@ -1,0 +1,17 @@
+{
+  "spell": [
+    {
+      "name": "Test Spark", "source": "TST", "page": 20, "level": 1, "school": "V",
+      "time": [{"number": 1, "unit": "action"}], "range": {"type": "point", "distance": {"type": "feet", "amount": 60}},
+      "components": {"v": true, "s": true, "m": "a pinch of soot"}, "duration": [{"type": "instant"}],
+      "entries": ["A spark leaps at a creature you can see within range. Make a ranged spell attack. On a hit, the target takes {@damage 2d8} fire damage."],
+      "entriesHigherLevel": [{"type": "entries", "name": "Using a Higher-Level Spell Slot", "entries": ["The damage increases by {@damage 1d8} for each spell slot level above 1."]}]
+    },
+    {
+      "name": "Quiet Ward", "source": "TST", "page": 21, "level": 2, "school": "A", "meta": {"ritual": true},
+      "time": [{"number": 1, "unit": "minute"}], "range": {"type": "point", "distance": {"type": "touch"}},
+      "components": {"v": true, "s": true}, "duration": [{"type": "timed", "duration": {"type": "hour", "amount": 1}, "concentration": true}],
+      "entries": ["You touch a door. Sounds can't pass through it for the duration."]
+    }
+  ]
+}

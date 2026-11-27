@@ -1,0 +1,20 @@
+{
+  "class": [
+    {
+      "name": "Lamplighter", "source": "TST", "page": 30, "hd": {"number": 1, "faces": 8}, "proficiency": ["dex", "wis"],
+      "primaryAbility": [{"wis": true}],
+      "classTableGroups": [{"colLabels": ["Lamps"], "rows": [[1], [1], [2], [2], [2], [3], [3], [3], [3], [4], [4], [4], [4], [4], [5], [5], [5], [5], [5], [6]]}],
+      "classFeatures": ["Kindle|Lamplighter|TST|1", {"classFeature": "Lamplighter Path|Lamplighter|TST|3", "gainSubclassFeature": true}]
+    }
+  ],
+  "classFeature": [
+    {"name": "Kindle", "source": "TST", "className": "Lamplighter", "classSource": "TST", "level": 1, "entries": ["You can light a lamp with a touch. Roll {@dice 1d6} for its brightness."]},
+    {"name": "Lamplighter Path", "source": "TST", "className": "Lamplighter", "classSource": "TST", "level": 3, "entries": ["Choose a path."]}
+  ],
+  "subclass": [
+    {"name": "Path of Embers", "shortName": "Embers", "source": "TST", "className": "Lamplighter", "classSource": "TST", "subclassFeatures": ["Path of Embers|Lamplighter|TST|Embers|TST|3"]}
+  ],
+  "subclassFeature": [
+    {"name": "Path of Embers", "source": "TST", "className": "Lamplighter", "classSource": "TST", "subclassShortName": "Embers", "subclassSource": "TST", "level": 3, "entries": ["Your lamps burn hotter. {@b Ember Burst.} You deal extra fire damage."]}
+  ]
+}

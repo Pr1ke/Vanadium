@@ -78,7 +78,7 @@ async def main():
             await go('#pinned'); await pg.wait_for_timeout(400); t = await text()
             check('pins: grouped monsters (with XP total) and spells', 'Monsters · 50 XP total' in t and 'Spells' in t and await pg.evaluate("localStorage.getItem('st_srd5_pins')") is not None, t[:200])
             # a quest card PDF carries the SRD attribution
-            await go('#cards'); await pg.wait_for_timeout(1200); await pg.click('#q-new'); await pg.fill('#qe-t', 'Find the lost bell'); await pg.click('#qe-ok'); await pg.wait_for_timeout(500)
+            await go('#cards'); await pg.wait_for_timeout(1200); await pg.click('[data-ctab="quest"]'); await pg.wait_for_timeout(400); await pg.click('#q-new'); await pg.fill('#qe-t', 'Find the lost bell'); await pg.click('#qe-ok'); await pg.wait_for_timeout(500)
             async with pg.expect_download(timeout=60000) as dl: await pg.click('#c-pdf')
             path = await (await dl.value).path()
             pt = subprocess.run(['node', os.path.join(HERE, 'pdftext.mjs'), str(path)], capture_output=True, text=True, encoding='utf-8', cwd=HERE).stdout

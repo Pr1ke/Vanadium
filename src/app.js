@@ -34,6 +34,7 @@ const PK = {};            // id -> pack
 let MONS = [];            // all monsters (global ids)
 const MON = {};           // gid -> monster
 const PAB = {};           // packId:localId -> ability
+const PENT = {};          // type -> entries added by books (pack.entities), shown in the lists next to D[type]
 let TYPES, BYID;          // entity types and id lookups, filled by SYS.init
 let LIST = {};            // list-page config per type (SYS.lists)
 let CHAP = {}, PAGE = {}; // core rulebook: chapter id -> chapter, page number -> {ch, i}
@@ -125,6 +126,8 @@ function addPack(p) {
     m.gid = gid; m.pack = p.id; MON[gid] = m; MONS.push(m); p.monMap[m.id] = gid;
   }
   for (const a of p.abilities || []) { PAB[p.id + ':' + a.id] = a; a.pack = p.id; }
+  // books can add entries to the system's lists (e.g. imported 5e spells and classes): p.entities = {type: [entry]}
+  for (const [t, list] of Object.entries(p.entities || {})) { delete PENT_MERGED[t]; for (const e of list) { e.pack = p.id; (PENT[t] = PENT[t] || []).push(e); if (BYID && BYID[t]) BYID[t][e.id] = e; } }
   if (SYS.onAddPack) SYS.onAddPack(p);
 }
 function removePack(id) {
@@ -133,6 +136,7 @@ function removePack(id) {
   MONS = MONS.filter(m => m.pack !== id);
   for (const k of Object.keys(MON)) if (MON[k].pack === id) delete MON[k];
   for (const k of Object.keys(PAB)) if (k.startsWith(id + ':')) delete PAB[k];
+  for (const t of Object.keys(PENT)) { delete PENT_MERGED[t]; PENT[t] = PENT[t].filter(e => { if (e.pack !== id) return true; if (BYID && BYID[t] && BYID[t][e.id] === e) delete BYID[t][e.id]; return false; }); }
 }
 
 // ---- update check: site/version.json changes whenever a new build lands (update.php or
@@ -225,7 +229,9 @@ async function boot() {
   });
 }
 
-const itemsOf = t => t === 'monsters' ? MONS : (D[t] || []);
+// with book entries, a type's list is the system's entries plus the books', sorted by name (cached until a book changes)
+const PENT_MERGED = {};
+const itemsOf = t => t === 'monsters' ? MONS : PENT[t] && PENT[t].length ? (PENT_MERGED[t] = PENT_MERGED[t] || (D[t] || []).concat(PENT[t]).sort((a, b) => a.name.localeCompare(b.name))) : (D[t] || []);
 
 // ---------- routing ----------
 function go(h) { if (location.hash.slice(1) === h) route(); else location.hash = h; }
@@ -452,6 +458,7 @@ function bookPage(packId, ch, anchor) {
     else pack = corePk;
   }
   const chs = pack.chapters.filter(c => c.blocks.length || c === pack.chapters[0]);
+  if (!chs.length) { $('#main').innerHTML = `<div class="lib"><h1>${esc(pack.title)}</h1><p class="note">This book has no chapters to read; its entries are in the lists${SYS.packSummary ? ` (${esc((SYS.packSummary(pack) || '').replace(/^ · /, ''))})` : ''}.</p></div>`; document.title = pack.title + ' — Vanadium'; return; }
   let c = chs.find(x => x.id === ch) || chs.find(x => x.id !== 'front' && x.blocks.length > 5) || chs[0];
   const ci = chs.indexOf(c);
   const pid = pack.core ? null : pack.id;
@@ -497,10 +504,10 @@ function libraryPage() {
     const nm = (p.monsters || []).length, nch = p.chapters.filter(c => c.blocks.length).length;
     return `<div class="bookc k-${p.kind}"><div class="kind">${esc(KIND[p.kind] || p.kind)}${p.builtin ? '' : ' · Imported'}</div><b>${esc(p.title)}</b>
       <div class="cnt">${nch} chapters${nm ? ' · ' + nm + ' monsters' : ''}${SYS.packSummary ? SYS.packSummary(p) || '' : ''}</div>
-      <div class="acts"><a class="btn" href="#book--${p.id}">Read</a>${nm ? `<a class="btn ghost" href="#monsters" data-srcfilter="${esc(p.title)}">Monsters</a>` : ''}${p.builtin ? '' : `<button class="btn danger" data-delpack="${p.id}">Remove</button>`}</div></div>`;
+      <div class="acts">${nch ? `<a class="btn" href="#book--${p.id}">Read</a>` : ''}${nm ? `<a class="btn ghost" href="#monsters" data-srcfilter="${esc(p.title)}">Monsters</a>` : ''}${p.builtin ? '' : `<button class="btn danger" data-delpack="${p.id}">Remove</button>`}</div></div>`;
   };
-  $('#main').innerHTML = `<div class="lib"><h1>Library</h1><p class="note">Every book in Vanadium. ${window.VSync && VSync.status().enabled ? 'Imported PDFs are synced to your other devices.' : 'Imported PDFs live only in this browser (<a href="#sync">sync them across devices</a>).'}</p>
-    <div class="books">${PACKS.map(card).join('')}<a class="bookc" href="#import" style="text-decoration:none;color:var(--ink);border-style:dashed;align-items:flex-start;justify-content:center"><div class="kind">Add content</div><b>Import a PDF →</b><div class="cnt">Adventures, bestiaries, supplements</div></a></div></div>`;
+  $('#main').innerHTML = `<div class="lib"><h1>Library</h1><p class="note">Every book in Vanadium. ${window.VSync && VSync.status().enabled ? `Imported ${esc(SYS.importer.noun || 'PDFs')} are synced to your other devices.` : `Imported ${esc(SYS.importer.noun || 'PDFs')} live only in this browser (<a href="#sync">sync them across devices</a>).`}</p>
+    <div class="books">${PACKS.map(card).join('')}<a class="bookc" href="#import" style="text-decoration:none;color:var(--ink);border-style:dashed;align-items:flex-start;justify-content:center"><div class="kind">Add content</div><b>${esc(SYS.importer.label || 'Import a PDF')} →</b><div class="cnt">Adventures, bestiaries, supplements</div></a></div></div>`;
   document.title = 'Library — Vanadium';
 }
 
@@ -514,6 +521,7 @@ async function loadPdfjs() {
 }
 let pending = null;
 function importPage() {
+  if (SYS.importer.run) return importPageFiles();   // systems with their own file reader (5e: JSON); else the PDF importer below
   const mine = PACKS.filter(p => !p.builtin);
   $('#main').innerHTML = `<div class="imp"><h1>Import a PDF</h1>
     <p class="note">Add an adventure, bestiary or supplement from a ${esc(SYS.name)} PDF. Vanadium reads the text layout and pulls out chapters, headings, tables, read-aloud text, monster stat blocks and abilities. <b>The file stays on this device</b>: it is processed in your browser and saved to this browser's storage.</p>
@@ -601,6 +609,70 @@ function showPreview() {
     toast(persisted ? 'Added to your library' : 'Added for this session (browser storage unavailable)');
     go('book--' + clean.id);
   };
+}
+// ---- importer for systems with their own file reader (SYS.importer.run), e.g. 5e JSON files ----
+// run(files, progress) -> {packs: [pack], notes: [text]}; each pack is shown in a preview, then stored
+// like a PDF import (this browser's IndexedDB, tagged with the system, synced if sync is on).
+let pendingPacks = null;
+function importPageFiles() {
+  const I = SYS.importer, mine = PACKS.filter(p => !p.builtin);
+  $('#main').innerHTML = `<div class="imp"><h1>${esc(I.label || 'Import')}</h1>
+    <p class="note">${I.intro} <b>The files stay on this device</b>: they are read in your browser and saved to this browser's storage.</p>
+    <label class="drop" id="drop"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 18v-6M9 15l3-3 3 3"/></svg><b>Drop files or a folder here, or tap to choose files</b><span>${esc(I.hint)}</span><input type="file" id="impfiles" accept="${esc(I.accept || '')}" multiple></label>
+    <div class="row-c" style="margin-top:10px;gap:8px"><button class="btn ghost" id="impdir">Choose a folder…</button><input type="file" id="impdirin" webkitdirectory multiple hidden></div>
+    <div class="stage" id="stage"></div>
+    <div class="mine"><h2>Your imports</h2>${mine.length ? mine.map(p => `<div class="it"><div class="t"><b>${esc(p.title)}</b><span>${esc(KIND[p.kind] || p.kind)} · ${p.chapters.length} chapters · ${(p.monsters || []).length} monsters${SYS.packSummary ? esc(SYS.packSummary(p) || '') : ''} · imported ${esc((p.importedAt || '').slice(0, 10))}</span></div>${p.chapters.length ? `<a class="btn ghost" href="#book--${p.id}">Read</a>` : ''}<button class="btn danger" data-delpack="${p.id}">Remove</button></div>`).join('') : '<div class="note">Nothing imported yet.</div>'}</div></div>`;
+  const drop = $('#drop'), inp = $('#impfiles'), dir = $('#impdirin');
+  inp.onchange = () => inp.files.length && handleImportFiles([...inp.files]);
+  $('#impdir').onclick = () => dir.click();
+  dir.onchange = () => dir.files.length && handleImportFiles([...dir.files]);
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', async e => {   // files and whole folders
+    const items = [...(e.dataTransfer.items || [])].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+    if (!items.length) return handleImportFiles([...e.dataTransfer.files]);
+    const out = [], walk = async en => { if (en.isFile) out.push(await new Promise((res, rej) => en.file(res, rej))); else if (en.isDirectory) { const r = en.createReader(); for (;;) { const batch = await new Promise((res, rej) => r.readEntries(res, rej)); if (!batch.length) break; for (const x of batch) await walk(x); } } };
+    for (const en of items) await walk(en);
+    handleImportFiles(out);
+  });
+  document.title = 'Import — Vanadium';
+}
+async function handleImportFiles(files) {
+  const stage = $('#stage');
+  stage.innerHTML = `<div class="progt" id="pt">Reading ${files.length} file${files.length === 1 ? '' : 's'}…</div><div class="prog"><div id="pb"></div></div>`;
+  const setP = (t, f) => { const pt = $('#pt'), pb = $('#pb'); if (pt) pt.textContent = t; if (pb) pb.style.width = Math.round(f * 100) + '%'; };
+  try {
+    const res = await SYS.importer.run(files, setP);
+    pendingPacks = res.packs;
+    const notes = res.notes || [];
+    if (!pendingPacks.length) { stage.innerHTML = `<div class="warn">Nothing to import in ${files.length === 1 ? 'that file' : 'those files'}.${notes.length ? '<br>' + notes.map(esc).join('<br>') : ''}</div>`; return; }
+    const n = (k, one, many) => k ? `${k} ${k === 1 ? one : many}` : '';
+    const sum = p => [n(p.chapters.length, 'chapter', 'chapters'), n((p.monsters || []).length, 'monster', 'monsters'), ...Object.entries(p.entities || {}).map(([t, l]) => n(l.length, TYPES[t] ? TYPES[t].one.toLowerCase() : t, TYPES[t] ? TYPES[t].label.toLowerCase() : t))].filter(Boolean).join(' · ');
+    stage.innerHTML = `<div class="pv"><div class="okb">Found ${pendingPacks.length} book${pendingPacks.length === 1 ? '' : 's'}. Check the titles, then add them to your library. Importing the same files again replaces the earlier import.</div>
+      <div class="pvlist pvfiles">${pendingPacks.map((p, i) => `<div><label class="row-c" style="gap:8px;flex:1"><input type="checkbox" data-pk="${i}" checked><input class="pvt" data-pt="${i}" value="${esc(p.title)}" aria-label="Title"></label><span>${esc(KIND[p.kind] || p.kind)} · ${esc(sum(p))}${PK[p.id] ? ' · replaces your earlier import' : ''}</span></div>`).join('')}</div>
+      ${notes.length ? `<details class="note"><summary>${notes.length} note${notes.length === 1 ? '' : 's'}</summary>${notes.map(n => `<div>${esc(n)}</div>`).join('')}</details>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="pvsave">Add to library</button><button class="btn ghost" id="pvcancel">Discard</button></div></div>`;
+    $('#pvcancel').onclick = () => { pendingPacks = null; stage.innerHTML = ''; };
+    $('#pvsave').onclick = async () => {
+      const btn = $('#pvsave'); btn.disabled = true; let n = 0, persisted = true;
+      for (const [i, p] of pendingPacks.entries()) {
+        if (!$(`[data-pk="${i}"]`).checked) continue;
+        p.title = $(`[data-pt="${i}"]`).value.trim() || p.title;
+        btn.textContent = `Saving ${++n}…`; await new Promise(r => setTimeout(r, 0));
+        const clean = JSON.parse(JSON.stringify(p, (k, v) => (k === 'monMap' || k === 'gid' || k === 'pack' || k === '_t') ? undefined : v));
+        clean.system = SYS.id; clean.importedAt = clean.importedAt || new Date().toISOString();
+        try { await IDB.put(clean); } catch (e) { persisted = false; memPacks.push(clean); }
+        addPack(clean);
+      }
+      buildIndex(); buildMenu(); pendingPacks = null;
+      if (persisted && window.VSync) VSync.packsChanged();
+      toast(persisted ? `Added ${n} book${n === 1 ? '' : 's'} to your library` : 'Added for this session (browser storage unavailable)');
+      go('library');
+    };
+  } catch (e) {
+    console.error(e);
+    stage.innerHTML = `<div class="warn">Import failed: ${esc(e.message || e)}</div>`;
+  }
 }
 async function deletePack(id) {
   const p = PK[id]; if (!p || p.builtin) return;

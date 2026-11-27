@@ -181,8 +181,9 @@ async def snapshot(out, root):
             pdf = os.path.join(os.path.dirname(os.path.abspath(out)), 'snapshot-fixture.pdf')
             subprocess.run(['node', os.path.join(HERE, 'make_fixture_pdf.mjs'), pdf], check=True, stdout=subprocess.DEVNULL)
             cur['page'] = 'import'; await visit('#import')
-            await pg.set_input_files('#pdffile', pdf)
             try:
+                if not await pg.query_selector('#pdffile'): raise LookupError('this system imports other files (5e: JSON)')
+                await pg.set_input_files('#pdffile', pdf)
                 await pg.wait_for_selector('#pvsave', timeout=60000); X['import:preview'] = await grab('#stage')
             except Exception as e: X['import:preview'] = 'FAILED ' + await grab('#stage')
             # mobile: Browse sheet and tap-to-peek on a linked term

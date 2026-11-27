@@ -52,8 +52,8 @@ const s5Time = s => /^Action/.test(s.time) ? 'Action' : /^Bonus Action/.test(s.t
 const s5Head = (type, e, meta, tools2 = '') => `<div class="ent-h"><div style="flex:1"><h2>${esc(e.name)}</h2><div class="meta">${esc(meta)}</div></div>${tools2 || tools(type, e)}</div>`;
 const S5_LISTS = {
   spells: {
-    cols: [['Name', s => s.name, 'nm'], ['Level', s5Lvl, 'mu', s => s.level], ['School', s => s.school, 'mu'], ['Casting Time', s => s.time.replace(/,.*$/, ''), 'mu'], ['Range', s => s.range, 'mu']],
-    filters: [['Level', s5Lvl, (x, y) => (x === 'Cantrip' ? 0 : +x) - (y === 'Cantrip' ? 0 : +y)], ['School', s => s.school], ['Class', s => s.classes, null, true],
+    cols: [['Name', s => s.name, 'nm'], ['Level', s5Lvl, 'mu', s => s.level], ['School', s => s.school, 'mu'], ['Casting Time', s => s.time.replace(/,.*$/, ''), 'mu'], ['Range', s => s.range, 'mu'], ['Source', e => s5Src(e), 'mu']],
+    filters: [['Source', e => s5Src(e)], ['Level', s5Lvl, (x, y) => (x === 'Cantrip' ? 0 : +x) - (y === 'Cantrip' ? 0 : +y)], ['School', s => s.school], ['Class', s => s.classes, null, true],
       ['Casting time', s5Time], ['Ritual', s => s.ritual ? 'Ritual' : 'Not a ritual'], ['Concentration', s => s.conc ? 'Concentration' : 'No concentration']],
     text: s => s.name + ' ' + s.school + ' ' + s.classes.join(' ') + ' ' + s.body.map(b => strip(b.html || b.text || '')).join(' '),
     view: s => s5Head('spells', s, s5SpellLine(s)) + s5SpellCard(s, { nohead: true })   // the page header already names it
@@ -70,7 +70,7 @@ const S5_LISTS = {
     cols: [['Name', i => i.name, 'nm'], ['Type', i => i.type, 'mu'], ['Rarity', s5Rarity, 'mu', i => S5_RARITY.indexOf(s5Rarity(i))], ['Attunement', i => i.attune ? 'Yes' : '', 'mu']],
     filters: [['Type', i => i.type], ['Rarity', s5Rarity, (x, y) => S5_RARITY.indexOf(x) - S5_RARITY.indexOf(y)], ['Attunement', i => i.attune ? 'Requires attunement' : 'No attunement']]
   },
-  classes: { cols: [['Name', c => c.name, 'nm'], ['Hit Die', c => 'd' + c.hitDie, 'mu', c => c.hitDie], ['Primary Ability', c => c.primary, 'mu']], filters: [] },
+  classes: { cols: [['Name', c => c.name, 'nm'], ['Hit Die', c => c.hitDie ? 'd' + c.hitDie : '', 'mu', c => +c.hitDie || 0], ['Primary Ability', c => c.primary, 'mu'], ['Source', e => s5Src(e), 'mu']], filters: [['Source', e => s5Src(e)]] },
   species: { cols: [['Name', s => s.name, 'nm'], ['Size', s => s.size, 'mu'], ['Speed', s => s.speed + ' ft.', 'mu', s => s.speed]], filters: [] },
   backgrounds: { cols: [['Name', b => b.name, 'nm'], ['Feat', b => b.feat, 'mu'], ['Skills', b => b.skills.join(', '), 'mu']], filters: [] },
   feats: { cols: [['Name', f => f.name, 'nm'], ['Type', f => f.type, 'mu']], filters: [['Type', f => f.type]] },
@@ -85,13 +85,13 @@ function s5EntityMeta(type, e) {
     const base = e.sub ? strip(e.sub) : e.type.replace(/s$/, '');
     return base + (new RegExp(s5Rarity(e), 'i').test(base) ? '' : ', ' + e.rarity) + (e.attune && !/attunement/i.test(base) ? ' (requires attunement)' : '');
   }
-  if (type === 'classes') return `d${e.hitDie} Hit Point Die · Primary ability: ${e.primary}`;
+  if (type === 'classes') return [e.hitDie ? `d${e.hitDie} Hit Point Die` : '', e.primary ? 'Primary ability: ' + e.primary : '', e.pack ? s5Src(e) : ''].filter(Boolean).join(' · ');
   if (type === 'species') return `${e.size} · Speed ${e.speed} feet`;
   if (type === 'backgrounds') return `Background · Feat: ${e.feat}`;
   if (type === 'feats') return `${e.type} Feat`;
   if (type === 'equipment') return [e.category, e.cost, e.weight ? e.weight + ' lb.' : ''].filter(Boolean).join(' · ');
 }
-const s5EntitySource = (type, e) => type === 'monsters' ? '' : `<div class="src">${esc(TYPES[type].one)} · <i>System Reference Document 5.2</i> (CC BY 4.0)</div>`;
+const s5EntitySource = (type, e) => type === 'monsters' ? '' : e.pack ? `<div class="src">${esc(TYPES[type].one)} · <i>${esc(s5Src(e))}</i>${e.pg ? ', page ' + esc(e.pg) : ''} · imported</div>` : `<div class="src">${esc(TYPES[type].one)} · <i>System Reference Document 5.2</i> (CC BY 4.0)</div>`;
 function s5Preview(t, e) {
   if (t === 'monsters') return s5RenderMonster(e, { nosrc: true });
   if (t === 'spells') return s5SpellCard(e, { nopin: true });
@@ -102,8 +102,8 @@ function s5Menu() {
   return [
     ['Rules', [['library', 'Library'], ['book--srd52', 'SRD 5.2 Reference'], ['-'], ['conditions'], ['equipment']]],
     ['Characters', [['classes'], ['species'], ['backgrounds'], ['feats'], ['-'], ['spells']]],
-    ['Game Master', [['sessions', 'Sessions'], ['encounter', 'Encounter Builder'], ['initiative', 'Initiative Tracker'], ['-'], ['monsters'], ['book--srd5-monsters', 'Monsters A–Z'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title]), ['-'], ['items'], ['cards', 'Cards: quests']]],
-    ['Utilities', [['import', 'Import a PDF'], ['roller', 'Dice Roller'], ['pinned', 'Pinned Items'], ['-'], ['sync', 'Sync across devices'], ['!update', 'Check for updates']]]
+    ['Game Master', [['sessions', 'Sessions'], ['encounter', 'Encounter Builder'], ['initiative', 'Initiative Tracker'], ['-'], ['monsters'], ['book--srd5-monsters', 'Monsters A–Z'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title]), ['-'], ['items'], ['cards', 'Cards: items, spells, quests']]],
+    ['Utilities', [['import', 'Import files'], ['roller', 'Dice Roller'], ['pinned', 'Pinned Items'], ['-'], ['sync', 'Sync across devices'], ['!update', 'Check for updates']]]
   ];
 }
 const S5_BLURB = { spells: 'Every SRD spell with level, school, classes and full text', monsters: 'Stat blocks for every SRD creature, filter by CR, type and size', items: 'Magic items by type, rarity and attunement',
@@ -116,7 +116,7 @@ function s5Home() {
     ['Rules', [['book--srd52', 'SRD 5.2 Reference', 'Abilities and skills, conditions, weapons, armor and more'], ['conditions'], ['equipment']]],
     ['Characters', [['classes'], ['species'], ['backgrounds'], ['feats'], ['spells']]],
     ['Run the game', [['encounter', 'Encounter Builder', 'Pick monsters, see Low / Moderate / High difficulty'], ['initiative', 'Initiative Tracker', 'Turn order, HP and conditions'], ['sessions', 'Sessions', 'Prep folders for your game night'], ['roller', 'Dice Roller', 'Any dice, d20 with advantage']]],
-    ['Game master', [['monsters'], ['book--srd5-monsters', 'Monsters A–Z', 'Read the bestiary like a book'], ['items'], ...adv.map(p => ['book--' + p.id, p.title, 'Adventure · imported']), ['library', 'Library', 'All books, including your imports'], ['import', 'Import a PDF', 'Add your own books'], ['pinned', 'Pinned items', 'Your starred spells, monsters and rules']]]
+    ['Game master', [['monsters'], ['book--srd5-monsters', 'Monsters A–Z', 'Read the bestiary like a book'], ['items'], ...adv.map(p => ['book--' + p.id, p.title, 'Adventure · imported']), ['library', 'Library', 'All books, including your imports'], ['import', 'Import files', 'Your own books, adventures and bestiaries (JSON)'], ['pinned', 'Pinned items', 'Your starred spells, monsters and rules']]]
   ];
   $('#main').innerHTML = `<div class="home"><div class="hero"><h1>5e rules, at your fingertips</h1><p>A fast, searchable reference for the fifth edition System Reference Document 5.2.</p>
     <div class="hsearch">${ico('search', 20)}<input id="hq" placeholder="Search spells, monsters, items, rules…" ${isMob ? 'readonly' : ''}><kbd>/</kbd></div>
@@ -131,7 +131,7 @@ function s5Browse() {
   const sec = (t, ks) => `<h3>${t}</h3><div class="sgrid">${ks.map(([k, l, d]) => `<a href="#${k}"><b>${esc(l || TYPES[k].label)}</b><span>${esc(d || (TYPES[k] ? itemsOf(k).length + ' entries' : ''))}</span></a>`).join('')}</div>`;
   $('#sheet').innerHTML = `<div class="grab"></div>` +
     sec('Characters', [['classes'], ['species'], ['backgrounds'], ['feats'], ['spells']]) +
-    sec('Game master', [['encounter', 'Encounter Builder', 'Difficulty & PDF'], ['initiative', 'Initiative', 'Turns, HP & conditions'], ['monsters'], ['items'], ['sessions', 'Sessions', 'Prep & print a game night'], ['cards', 'Cards', 'Print quest cards'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title, 'Adventure']), ['import', 'Import a PDF', 'Add your own books']]) +
+    sec('Game master', [['encounter', 'Encounter Builder', 'Difficulty & PDF'], ['initiative', 'Initiative', 'Turns, HP & conditions'], ['monsters'], ['items'], ['sessions', 'Sessions', 'Prep & print a game night'], ['cards', 'Cards', 'Print quest cards'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title, 'Adventure']), ['import', 'Import files', 'Add your own books (JSON)']]) +
     sec('Rules', [['book--srd52', 'SRD 5.2 Reference', 'Reference chapters'], ['conditions'], ['equipment']]) +
     `<p style="font-size:10.5px;color:var(--ink3);margin-top:16px">${esc(S5_ATTRIB)}</p>`;
   $('#sheet').classList.add('on'); showScrim();
@@ -191,4 +191,31 @@ function s5Dicify(html, label) {
   return String(html).split(/(<[^>]+>)/).map(seg => seg.startsWith('<') ? seg : seg
     .replace(/(Attack Roll:)\s*([+−-]\d+)/g, (m, a, b) => `${a} <button class="s5-roll" data-dice="1d20${s5Signed(b)}" data-lab="${esc(label)}: attack">${b}</button>`)
     .replace(/\b(\d+d\d+(?:\s*[+−-]\s*\d+)?)(?![^<]*<\/button>)/g, (m, d) => `<button class="s5-roll" data-dice="${esc(d)}" data-lab="${esc(label)}">${d}</button>`)).join('');
+}
+
+// ---- imported books (s5-import.js): book blocks and cross-references ----
+const s5Src = e => e.pack ? (e.srcCode || '').toUpperCase() || PK[e.pack]?.title || 'Imported' : 'SRD 5.2';   // short: PHB, XPHB, SRD 5.2
+function s5Find(kind, name, src) {
+  const n = String(name).toLowerCase(), list = kind === 'creature' ? MONS : itemsOf(kind === 'spell' ? 'spells' : 'items');
+  return list.find(x => x.name.toLowerCase() === n && (!src || x.srcCode === src)) || list.find(x => x.name.toLowerCase() === n) || null;
+}
+function s5RenderBlock(b, { pm, idx }) {
+  if (b.t === 's5read') return `<div class="s5read"${idx}>${pm}${renderBlocks(b.blocks)}</div>`;
+  if (b.t === 's5inset') return `<aside class="s5inset"${idx}>${pm}${b.title ? `<div class="ah">${esc(b.title)}</div>` : ''}${renderBlocks(b.blocks)}</aside>`;
+  if (b.t === 's5mref') {
+    const m = s5Find('creature', b.name, b.source);
+    return `<div${idx}>${pm}</div>` + (m ? s5RenderMonster(m, { nosrc: true }) : `<p class="small s5-missing">Stat block: <b>${esc(b.name)}</b>. Import the bestiary it comes from to see it here.</p>`);
+  }
+}
+function s5FindClick(e) {
+  const f = e.target.closest('[data-s5find]'); if (!f) return false;
+  e.preventDefault();
+  const [kind, name, src] = f.dataset.s5find.split('|'), x = s5Find(kind, name, src);
+  if (x) go((kind === 'creature' ? 'monsters--' + x.gid : kind === 'spell' ? 'spells--' + x.id : 'items--' + x.id));
+  else toast(`“${esc(name)}” isn’t in your library${kind === 'creature' ? ' (import its bestiary)' : kind === 'spell' ? ' (import its spells)' : ''}`);
+  return true;
+}
+function s5PackSummary(p) {
+  const n = Object.entries(p.entities || {}).map(([t, l]) => l.length + ' ' + (TYPES[t] ? TYPES[t].label.toLowerCase() : t));
+  return n.length ? ' · ' + n.join(' · ') : '';
 }

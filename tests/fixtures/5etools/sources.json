@@ -1,0 +1,6 @@
+{
+  "TST": {
+    "Test Spark": {"class": [{"name": "Sorcerer", "source": "TST"}, {"name": "Wizard", "source": "TST"}]},
+    "Quiet Ward": {"class": [{"name": "Cleric", "source": "TST"}]}
+  }
+}

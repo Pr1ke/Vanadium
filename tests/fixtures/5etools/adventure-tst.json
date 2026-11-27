@@ -1,0 +1,24 @@
+{
+  "adventureData": [
+    {
+      "id": "TST", "source": "TST",
+      "data": [
+        {"type": "section", "name": "Chapter 1: The Pond", "page": 4, "entries": [
+          "The village of Reedmoor sits beside a pond that glows at night.",
+          {"type": "insetReadaloud", "entries": ["Lanterns bob over the dark water. Something croaks, loud as a drum."]},
+          {"type": "entries", "name": "The Glowing Pond", "id": "a1", "entries": [
+            "A {@creature Glimmer Toad|TST} rests on a lily pad. Roll {@dice 1d4} toads.",
+            {"type": "list", "items": ["Reeds hide a rowing boat.", {"type": "item", "name": "Old Shrine", "entries": ["A mossy stone altar."]}]},
+            {"type": "table", "caption": "Pond Events", "colLabels": ["d4", "Event"], "rows": [[{"type": "cell", "roll": {"min": 1, "max": 2}}, "Fog rolls in."], [{"type": "cell", "roll": {"min": 3, "max": 4}}, "A toad sings."]]},
+            {"type": "inset", "name": "Running the Pond", "entries": ["Let the players choose where to search first."]},
+            {"type": "image", "href": {"type": "internal", "path": "adventure/TST/pond.webp"}},
+            {"type": "statblock", "tag": "creature", "name": "Glimmer Toad", "source": "TST"}
+          ]}
+        ]},
+        {"type": "section", "name": "Chapter 2: The Shrine", "page": 9, "entries": [
+          {"type": "entries", "name": "Inside the Shrine", "entries": ["A {@spell Test Spark|TST} scorch mark covers the wall. It deals {@damage 2d6} fire damage."]}
+        ]}
+      ]
+    }
+  ]
+}

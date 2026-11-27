@@ -54,6 +54,12 @@ Features:
   - **No trademarks:** never use Wizards of the Coast trademarks in the app, such as "Dungeons & Dragons", "D&D", or product and setting names. The system is called "5e (SRD 5.2)". `tests/srd5_test.py` checks for these.
   - **No other books:** never add non-SRD content (other books' text). Those go through the importer, like the Draw Steel books.
   - **No art:** never use monster art; the data's `image` fields are ignored.
+- **Imported 5e books (your own JSON files)** follow the same rules as PDF imports:
+  - **Local only:** they are read in the browser and stored only in IndexedDB, plus the owner's private sync.
+  - **Never commit them:** never commit, bundle or host them. `dndbeyond/` (the owner's files) is in `.gitignore`.
+  - **Test data:** tests use only the invented fixture in `tests/fixtures/5etools/`. `tests/s5import_test.py --folder DIR` checks a real folder locally without writing anything to the repo.
+  - **Nothing fetched:** the importer fetches nothing; pictures referenced by the files are skipped.
+  - **Card pictures are public:** QR card pictures made from imported spells or items become public pictures, the same trade-off as before.
 - `.gitignore` excludes `*.pdf`. Keep source PDFs out of the repo.
 
 ## 3. Repository layout
@@ -97,6 +103,8 @@ src/                   ← sources you edit
     extract_initiative.py ← one-off: monster Initiative from the official SRD 5.2 PDF text → srd/initiative.json (the dataset lacks it)
     srd5.js            ← stat blocks, spell cards, list columns/filters, menu, home, browse, search hooks
     s5-tools.js        ← dice roller, encounter builder (SRD 5.2 XP budgets), initiative tracker, session items, encounter PDF
+    s5-import.js       ← importer for JSON files in the 5etools data format (bestiary-, adventure-, book-, spells- + sources.json, class-)
+    s5-cards.js        ← 5e card kinds: magic items (by rarity), spells (by class/level), 5e quest rewards
     srd5.css           ← 5e stat block / spell card styles (SYSTEM_CSS in mksite.py)
     register.js        ← the registerSystem({...}) call (loaded last)
   sb.js                ← old stat-block PDF fragment (reference only, not in the build)
@@ -244,7 +252,23 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
    - **Initiative tracker (`#initiative`):** monsters roll d20 plus their SRD Initiative. 340 of 341 come from the PDF; the Knight falls back to its Dex modifier. It tracks turns and rounds, HP damage and healing, and conditions, and keeps its state per system (`st_srd5_init`).
    - **Sessions:** 5e sessions can hold encounters (`S5_SESSION`), with the party as characters and level.
    - **Tests:** `tests/srd5_test.py` now runs 47 checks, including the SRD's own worked example.
-6. **Step 5:** 5e stat blocks in the importer.
+6. **Step 5 (done): 5e cards and the 5e importer.**
+   - **Format:** the importer reads JSON files in the 5etools data format (the format of the owner's files) instead of PDFs; Draw Steel keeps its PDF importer.
+   - **Core support:**
+     - `SYS.importer.run(files, progress)` returns `{packs, notes}`. The core then shows a preview with editable titles and stores each pack like any import (`importPageFiles`). Files can be picked, dropped, or a whole folder chosen.
+     - Packs can carry `entities` (`{spells:[…], classes:[…]}`). These join the lists (`PENT`, merged and sorted by name in `itemsOf`) and are removed with the pack.
+     - Pack ids are `imp-5et-<source>-<kind>`, so importing the same files again replaces the earlier import.
+   - **What it converts:**
+     - **Bestiaries:** monsters become the 5e stat block format. That covers 2014-style attacks, 2024 save effects, spellcasting blocks, lair XP, and XP and PB from the SRD tables by CR. `_copy` variants are resolved against the monsters in the same import (`replaceTxt`, `appendArr`, `replaceArr`, …); variants whose base isn't in the files are skipped and listed in the notes.
+     - **Adventures and books:** these become chapters with read-aloud boxes (`s5read`), sidebars (`s5inset`), lists, tables and stat blocks in place (`s5mref`, found by name and source).
+     - **Spells and classes:** spells (with classes from `sources.json`) and classes (feature table, features, subclasses) join the lists. The list Source column shows PHB, XPHB, SRD 5.2 and so on.
+     - **`{@tags}`:** these become links (`data-s5find`, resolved when clicked), dice buttons and condition links.
+   - **Tested on the owner's 182 files:** 145 books, about 2,500 monsters, 1,038 spells and 43 classes, read in about 2.5 seconds. Every imported book opens without JS errors. 19 `_copy` variants are skipped because their base bestiary isn't in the folder.
+   - **Cards (`S5_CARDS`):**
+     - Magic item cards are coloured by rarity, with search and "add all of a rarity".
+     - Spell cards are coloured by school, with search and "add all of a class and level". Imported spells work too.
+     - Quest rewards are XP, Gold, Magic Item and Other.
+   - **Tests:** `tests/s5import_test.py` runs 24 checks on the fixture.
 
 **Adding a system:**
 1. Create `src/systems/<id>/<id>.js` that calls `registerSystem` with at least `id`, `name`, `data`, `init`, `corePack`, `lists`, `menu`, `home`, `browse`, `renderMonster` and `pdfNotice`.
@@ -296,6 +320,7 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
   - `node tests/sync_client.mjs site/sync.js`: the sync client simulation.
   - `python tests/systems_test.py`: the system switch and per-system data, using the sample system fixture (needs a build).
   - `python tests/srd5_test.py`: the 5e system: content, links, search, books, pins, attribution in the footer and PDFs, no trademarks (needs a build).
+  - `python tests/s5import_test.py [--folder DIR]`: the 5e JSON importer and 5e cards, on the invented fixture; with `--folder`, it also imports a real folder locally.
   - **`python tests/snapshot.py out.json --system srd5`** crawls another system, which is useful for catching JS errors.
   - **`serve.py --site DIR`** serves another folder (used by tests; it never auto-updates).
 - **Older scripts:** serve `site/` on port 8765 first, then `python tests/<name>.py`. Scripts print `errs []` when there are no page errors.

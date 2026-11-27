@@ -5,3 +5,6 @@ node_modules/
 .vanadium-update.json
 .vanadium-new-*/
 site/.vanadium-*
+
+# content you own from D&D Beyond: import it in the app, never commit it
+dndbeyond/

@@ -1,0 +1,21 @@
+{
+  "monster": [
+    {
+      "name": "Glimmer Toad", "source": "TST", "page": 12, "size": ["S"], "type": "beast", "alignment": ["U"],
+      "ac": [{"ac": 13, "from": ["natural armor"]}], "hp": {"average": 18, "formula": "4d6 + 4"},
+      "speed": {"walk": 20, "swim": 40}, "str": 8, "dex": 16, "con": 12, "int": 2, "wis": 12, "cha": 6,
+      "save": {"dex": "+5"}, "skill": {"stealth": "+5"}, "senses": ["darkvision 60 ft."], "passive": 11,
+      "conditionImmune": ["charmed"], "languages": [], "cr": "1/2",
+      "trait": [{"name": "Amphibious", "entries": ["The toad can breathe air and water."]}],
+      "action": [{"name": "Tongue Lash", "entries": ["{@atk mw} {@hit 5} to hit, reach 10 ft., one target. {@h}6 ({@damage 1d6 + 3}) bludgeoning damage, and the target has the {@condition prone} condition."]}]
+    },
+    {
+      "name": "Glimmer Toad Matriarch", "source": "TST", "page": 13,
+      "_copy": {"name": "Glimmer Toad", "source": "TST", "_mod": {
+        "*": {"mode": "replaceTxt", "replace": "the toad", "with": "the matriarch", "flags": "gi"},
+        "action": {"mode": "appendArr", "items": {"name": "Croak", "entries": ["Each creature within 30 feet must succeed on a {@dc 12} Constitution saving throw or have the {@condition deafened} condition."]}}
+      }},
+      "hp": {"average": 33, "formula": "6d8 + 6"}, "cr": "2"
+    }
+  ]
+}

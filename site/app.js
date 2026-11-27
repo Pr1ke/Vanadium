@@ -34,6 +34,7 @@ const PK = {};            // id -> pack
 let MONS = [];            // all monsters (global ids)
 const MON = {};           // gid -> monster
 const PAB = {};           // packId:localId -> ability
+const PENT = {};          // type -> entries added by books (pack.entities), shown in the lists next to D[type]
 let TYPES, BYID;          // entity types and id lookups, filled by SYS.init
 let LIST = {};            // list-page config per type (SYS.lists)
 let CHAP = {}, PAGE = {}; // core rulebook: chapter id -> chapter, page number -> {ch, i}
@@ -125,6 +126,8 @@ function addPack(p) {
     m.gid = gid; m.pack = p.id; MON[gid] = m; MONS.push(m); p.monMap[m.id] = gid;
   }
   for (const a of p.abilities || []) { PAB[p.id + ':' + a.id] = a; a.pack = p.id; }
+  // books can add entries to the system's lists (e.g. imported 5e spells and classes): p.entities = {type: [entry]}
+  for (const [t, list] of Object.entries(p.entities || {})) { delete PENT_MERGED[t]; for (const e of list) { e.pack = p.id; (PENT[t] = PENT[t] || []).push(e); if (BYID && BYID[t]) BYID[t][e.id] = e; } }
   if (SYS.onAddPack) SYS.onAddPack(p);
 }
 function removePack(id) {
@@ -133,6 +136,7 @@ function removePack(id) {
   MONS = MONS.filter(m => m.pack !== id);
   for (const k of Object.keys(MON)) if (MON[k].pack === id) delete MON[k];
   for (const k of Object.keys(PAB)) if (k.startsWith(id + ':')) delete PAB[k];
+  for (const t of Object.keys(PENT)) { delete PENT_MERGED[t]; PENT[t] = PENT[t].filter(e => { if (e.pack !== id) return true; if (BYID && BYID[t] && BYID[t][e.id] === e) delete BYID[t][e.id]; return false; }); }
 }
 
 // ---- update check: site/version.json changes whenever a new build lands (update.php or
@@ -225,7 +229,9 @@ async function boot() {
   });
 }
 
-const itemsOf = t => t === 'monsters' ? MONS : (D[t] || []);
+// with book entries, a type's list is the system's entries plus the books', sorted by name (cached until a book changes)
+const PENT_MERGED = {};
+const itemsOf = t => t === 'monsters' ? MONS : PENT[t] && PENT[t].length ? (PENT_MERGED[t] = PENT_MERGED[t] || (D[t] || []).concat(PENT[t]).sort((a, b) => a.name.localeCompare(b.name))) : (D[t] || []);
 
 // ---------- routing ----------
 function go(h) { if (location.hash.slice(1) === h) route(); else location.hash = h; }
@@ -452,6 +458,7 @@ function bookPage(packId, ch, anchor) {
     else pack = corePk;
   }
   const chs = pack.chapters.filter(c => c.blocks.length || c === pack.chapters[0]);
+  if (!chs.length) { $('#main').innerHTML = `<div class="lib"><h1>${esc(pack.title)}</h1><p class="note">This book has no chapters to read; its entries are in the lists${SYS.packSummary ? ` (${esc((SYS.packSummary(pack) || '').replace(/^ · /, ''))})` : ''}.</p></div>`; document.title = pack.title + ' — Vanadium'; return; }
   let c = chs.find(x => x.id === ch) || chs.find(x => x.id !== 'front' && x.blocks.length > 5) || chs[0];
   const ci = chs.indexOf(c);
   const pid = pack.core ? null : pack.id;
@@ -497,10 +504,10 @@ function libraryPage() {
     const nm = (p.monsters || []).length, nch = p.chapters.filter(c => c.blocks.length).length;
     return `<div class="bookc k-${p.kind}"><div class="kind">${esc(KIND[p.kind] || p.kind)}${p.builtin ? '' : ' · Imported'}</div><b>${esc(p.title)}</b>
       <div class="cnt">${nch} chapters${nm ? ' · ' + nm + ' monsters' : ''}${SYS.packSummary ? SYS.packSummary(p) || '' : ''}</div>
-      <div class="acts"><a class="btn" href="#book--${p.id}">Read</a>${nm ? `<a class="btn ghost" href="#monsters" data-srcfilter="${esc(p.title)}">Monsters</a>` : ''}${p.builtin ? '' : `<button class="btn danger" data-delpack="${p.id}">Remove</button>`}</div></div>`;
+      <div class="acts">${nch ? `<a class="btn" href="#book--${p.id}">Read</a>` : ''}${nm ? `<a class="btn ghost" href="#monsters" data-srcfilter="${esc(p.title)}">Monsters</a>` : ''}${p.builtin ? '' : `<button class="btn danger" data-delpack="${p.id}">Remove</button>`}</div></div>`;
   };
-  $('#main').innerHTML = `<div class="lib"><h1>Library</h1><p class="note">Every book in Vanadium. ${window.VSync && VSync.status().enabled ? 'Imported PDFs are synced to your other devices.' : 'Imported PDFs live only in this browser (<a href="#sync">sync them across devices</a>).'}</p>
-    <div class="books">${PACKS.map(card).join('')}<a class="bookc" href="#import" style="text-decoration:none;color:var(--ink);border-style:dashed;align-items:flex-start;justify-content:center"><div class="kind">Add content</div><b>Import a PDF →</b><div class="cnt">Adventures, bestiaries, supplements</div></a></div></div>`;
+  $('#main').innerHTML = `<div class="lib"><h1>Library</h1><p class="note">Every book in Vanadium. ${window.VSync && VSync.status().enabled ? `Imported ${esc(SYS.importer.noun || 'PDFs')} are synced to your other devices.` : `Imported ${esc(SYS.importer.noun || 'PDFs')} live only in this browser (<a href="#sync">sync them across devices</a>).`}</p>
+    <div class="books">${PACKS.map(card).join('')}<a class="bookc" href="#import" style="text-decoration:none;color:var(--ink);border-style:dashed;align-items:flex-start;justify-content:center"><div class="kind">Add content</div><b>${esc(SYS.importer.label || 'Import a PDF')} →</b><div class="cnt">Adventures, bestiaries, supplements</div></a></div></div>`;
   document.title = 'Library — Vanadium';
 }
 
@@ -514,6 +521,7 @@ async function loadPdfjs() {
 }
 let pending = null;
 function importPage() {
+  if (SYS.importer.run) return importPageFiles();   // systems with their own file reader (5e: JSON); else the PDF importer below
   const mine = PACKS.filter(p => !p.builtin);
   $('#main').innerHTML = `<div class="imp"><h1>Import a PDF</h1>
     <p class="note">Add an adventure, bestiary or supplement from a ${esc(SYS.name)} PDF. Vanadium reads the text layout and pulls out chapters, headings, tables, read-aloud text, monster stat blocks and abilities. <b>The file stays on this device</b>: it is processed in your browser and saved to this browser's storage.</p>
@@ -601,6 +609,70 @@ function showPreview() {
     toast(persisted ? 'Added to your library' : 'Added for this session (browser storage unavailable)');
     go('book--' + clean.id);
   };
+}
+// ---- importer for systems with their own file reader (SYS.importer.run), e.g. 5e JSON files ----
+// run(files, progress) -> {packs: [pack], notes: [text]}; each pack is shown in a preview, then stored
+// like a PDF import (this browser's IndexedDB, tagged with the system, synced if sync is on).
+let pendingPacks = null;
+function importPageFiles() {
+  const I = SYS.importer, mine = PACKS.filter(p => !p.builtin);
+  $('#main').innerHTML = `<div class="imp"><h1>${esc(I.label || 'Import')}</h1>
+    <p class="note">${I.intro} <b>The files stay on this device</b>: they are read in your browser and saved to this browser's storage.</p>
+    <label class="drop" id="drop"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 18v-6M9 15l3-3 3 3"/></svg><b>Drop files or a folder here, or tap to choose files</b><span>${esc(I.hint)}</span><input type="file" id="impfiles" accept="${esc(I.accept || '')}" multiple></label>
+    <div class="row-c" style="margin-top:10px;gap:8px"><button class="btn ghost" id="impdir">Choose a folder…</button><input type="file" id="impdirin" webkitdirectory multiple hidden></div>
+    <div class="stage" id="stage"></div>
+    <div class="mine"><h2>Your imports</h2>${mine.length ? mine.map(p => `<div class="it"><div class="t"><b>${esc(p.title)}</b><span>${esc(KIND[p.kind] || p.kind)} · ${p.chapters.length} chapters · ${(p.monsters || []).length} monsters${SYS.packSummary ? esc(SYS.packSummary(p) || '') : ''} · imported ${esc((p.importedAt || '').slice(0, 10))}</span></div>${p.chapters.length ? `<a class="btn ghost" href="#book--${p.id}">Read</a>` : ''}<button class="btn danger" data-delpack="${p.id}">Remove</button></div>`).join('') : '<div class="note">Nothing imported yet.</div>'}</div></div>`;
+  const drop = $('#drop'), inp = $('#impfiles'), dir = $('#impdirin');
+  inp.onchange = () => inp.files.length && handleImportFiles([...inp.files]);
+  $('#impdir').onclick = () => dir.click();
+  dir.onchange = () => dir.files.length && handleImportFiles([...dir.files]);
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', async e => {   // files and whole folders
+    const items = [...(e.dataTransfer.items || [])].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+    if (!items.length) return handleImportFiles([...e.dataTransfer.files]);
+    const out = [], walk = async en => { if (en.isFile) out.push(await new Promise((res, rej) => en.file(res, rej))); else if (en.isDirectory) { const r = en.createReader(); for (;;) { const batch = await new Promise((res, rej) => r.readEntries(res, rej)); if (!batch.length) break; for (const x of batch) await walk(x); } } };
+    for (const en of items) await walk(en);
+    handleImportFiles(out);
+  });
+  document.title = 'Import — Vanadium';
+}
+async function handleImportFiles(files) {
+  const stage = $('#stage');
+  stage.innerHTML = `<div class="progt" id="pt">Reading ${files.length} file${files.length === 1 ? '' : 's'}…</div><div class="prog"><div id="pb"></div></div>`;
+  const setP = (t, f) => { const pt = $('#pt'), pb = $('#pb'); if (pt) pt.textContent = t; if (pb) pb.style.width = Math.round(f * 100) + '%'; };
+  try {
+    const res = await SYS.importer.run(files, setP);
+    pendingPacks = res.packs;
+    const notes = res.notes || [];
+    if (!pendingPacks.length) { stage.innerHTML = `<div class="warn">Nothing to import in ${files.length === 1 ? 'that file' : 'those files'}.${notes.length ? '<br>' + notes.map(esc).join('<br>') : ''}</div>`; return; }
+    const n = (k, one, many) => k ? `${k} ${k === 1 ? one : many}` : '';
+    const sum = p => [n(p.chapters.length, 'chapter', 'chapters'), n((p.monsters || []).length, 'monster', 'monsters'), ...Object.entries(p.entities || {}).map(([t, l]) => n(l.length, TYPES[t] ? TYPES[t].one.toLowerCase() : t, TYPES[t] ? TYPES[t].label.toLowerCase() : t))].filter(Boolean).join(' · ');
+    stage.innerHTML = `<div class="pv"><div class="okb">Found ${pendingPacks.length} book${pendingPacks.length === 1 ? '' : 's'}. Check the titles, then add them to your library. Importing the same files again replaces the earlier import.</div>
+      <div class="pvlist pvfiles">${pendingPacks.map((p, i) => `<div><label class="row-c" style="gap:8px;flex:1"><input type="checkbox" data-pk="${i}" checked><input class="pvt" data-pt="${i}" value="${esc(p.title)}" aria-label="Title"></label><span>${esc(KIND[p.kind] || p.kind)} · ${esc(sum(p))}${PK[p.id] ? ' · replaces your earlier import' : ''}</span></div>`).join('')}</div>
+      ${notes.length ? `<details class="note"><summary>${notes.length} note${notes.length === 1 ? '' : 's'}</summary>${notes.map(n => `<div>${esc(n)}</div>`).join('')}</details>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="pvsave">Add to library</button><button class="btn ghost" id="pvcancel">Discard</button></div></div>`;
+    $('#pvcancel').onclick = () => { pendingPacks = null; stage.innerHTML = ''; };
+    $('#pvsave').onclick = async () => {
+      const btn = $('#pvsave'); btn.disabled = true; let n = 0, persisted = true;
+      for (const [i, p] of pendingPacks.entries()) {
+        if (!$(`[data-pk="${i}"]`).checked) continue;
+        p.title = $(`[data-pt="${i}"]`).value.trim() || p.title;
+        btn.textContent = `Saving ${++n}…`; await new Promise(r => setTimeout(r, 0));
+        const clean = JSON.parse(JSON.stringify(p, (k, v) => (k === 'monMap' || k === 'gid' || k === 'pack' || k === '_t') ? undefined : v));
+        clean.system = SYS.id; clean.importedAt = clean.importedAt || new Date().toISOString();
+        try { await IDB.put(clean); } catch (e) { persisted = false; memPacks.push(clean); }
+        addPack(clean);
+      }
+      buildIndex(); buildMenu(); pendingPacks = null;
+      if (persisted && window.VSync) VSync.packsChanged();
+      toast(persisted ? `Added ${n} book${n === 1 ? '' : 's'} to your library` : 'Added for this session (browser storage unavailable)');
+      go('library');
+    };
+  } catch (e) {
+    console.error(e);
+    stage.innerHTML = `<div class="warn">Import failed: ${esc(e.message || e)}</div>`;
+  }
 }
 async function deletePack(id) {
   const p = PK[id]; if (!p || p.builtin) return;
@@ -1104,7 +1176,7 @@ function classIndex() {
 window.__stSave = (name, blob) => deliverFile(name, blob);
 window.__stGotoPage = pg => gotoPage(String(pg));
 function respitePage() {
-  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=b64899a680" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
+  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=b1c8cb546f" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
   document.title = 'Respite — Vanadium';
 }
 
@@ -3194,8 +3266,8 @@ const s5Time = s => /^Action/.test(s.time) ? 'Action' : /^Bonus Action/.test(s.t
 const s5Head = (type, e, meta, tools2 = '') => `<div class="ent-h"><div style="flex:1"><h2>${esc(e.name)}</h2><div class="meta">${esc(meta)}</div></div>${tools2 || tools(type, e)}</div>`;
 const S5_LISTS = {
   spells: {
-    cols: [['Name', s => s.name, 'nm'], ['Level', s5Lvl, 'mu', s => s.level], ['School', s => s.school, 'mu'], ['Casting Time', s => s.time.replace(/,.*$/, ''), 'mu'], ['Range', s => s.range, 'mu']],
-    filters: [['Level', s5Lvl, (x, y) => (x === 'Cantrip' ? 0 : +x) - (y === 'Cantrip' ? 0 : +y)], ['School', s => s.school], ['Class', s => s.classes, null, true],
+    cols: [['Name', s => s.name, 'nm'], ['Level', s5Lvl, 'mu', s => s.level], ['School', s => s.school, 'mu'], ['Casting Time', s => s.time.replace(/,.*$/, ''), 'mu'], ['Range', s => s.range, 'mu'], ['Source', e => s5Src(e), 'mu']],
+    filters: [['Source', e => s5Src(e)], ['Level', s5Lvl, (x, y) => (x === 'Cantrip' ? 0 : +x) - (y === 'Cantrip' ? 0 : +y)], ['School', s => s.school], ['Class', s => s.classes, null, true],
       ['Casting time', s5Time], ['Ritual', s => s.ritual ? 'Ritual' : 'Not a ritual'], ['Concentration', s => s.conc ? 'Concentration' : 'No concentration']],
     text: s => s.name + ' ' + s.school + ' ' + s.classes.join(' ') + ' ' + s.body.map(b => strip(b.html || b.text || '')).join(' '),
     view: s => s5Head('spells', s, s5SpellLine(s)) + s5SpellCard(s, { nohead: true })   // the page header already names it
@@ -3212,7 +3284,7 @@ const S5_LISTS = {
     cols: [['Name', i => i.name, 'nm'], ['Type', i => i.type, 'mu'], ['Rarity', s5Rarity, 'mu', i => S5_RARITY.indexOf(s5Rarity(i))], ['Attunement', i => i.attune ? 'Yes' : '', 'mu']],
     filters: [['Type', i => i.type], ['Rarity', s5Rarity, (x, y) => S5_RARITY.indexOf(x) - S5_RARITY.indexOf(y)], ['Attunement', i => i.attune ? 'Requires attunement' : 'No attunement']]
   },
-  classes: { cols: [['Name', c => c.name, 'nm'], ['Hit Die', c => 'd' + c.hitDie, 'mu', c => c.hitDie], ['Primary Ability', c => c.primary, 'mu']], filters: [] },
+  classes: { cols: [['Name', c => c.name, 'nm'], ['Hit Die', c => c.hitDie ? 'd' + c.hitDie : '', 'mu', c => +c.hitDie || 0], ['Primary Ability', c => c.primary, 'mu'], ['Source', e => s5Src(e), 'mu']], filters: [['Source', e => s5Src(e)]] },
   species: { cols: [['Name', s => s.name, 'nm'], ['Size', s => s.size, 'mu'], ['Speed', s => s.speed + ' ft.', 'mu', s => s.speed]], filters: [] },
   backgrounds: { cols: [['Name', b => b.name, 'nm'], ['Feat', b => b.feat, 'mu'], ['Skills', b => b.skills.join(', '), 'mu']], filters: [] },
   feats: { cols: [['Name', f => f.name, 'nm'], ['Type', f => f.type, 'mu']], filters: [['Type', f => f.type]] },
@@ -3227,13 +3299,13 @@ function s5EntityMeta(type, e) {
     const base = e.sub ? strip(e.sub) : e.type.replace(/s$/, '');
     return base + (new RegExp(s5Rarity(e), 'i').test(base) ? '' : ', ' + e.rarity) + (e.attune && !/attunement/i.test(base) ? ' (requires attunement)' : '');
   }
-  if (type === 'classes') return `d${e.hitDie} Hit Point Die · Primary ability: ${e.primary}`;
+  if (type === 'classes') return [e.hitDie ? `d${e.hitDie} Hit Point Die` : '', e.primary ? 'Primary ability: ' + e.primary : '', e.pack ? s5Src(e) : ''].filter(Boolean).join(' · ');
   if (type === 'species') return `${e.size} · Speed ${e.speed} feet`;
   if (type === 'backgrounds') return `Background · Feat: ${e.feat}`;
   if (type === 'feats') return `${e.type} Feat`;
   if (type === 'equipment') return [e.category, e.cost, e.weight ? e.weight + ' lb.' : ''].filter(Boolean).join(' · ');
 }
-const s5EntitySource = (type, e) => type === 'monsters' ? '' : `<div class="src">${esc(TYPES[type].one)} · <i>System Reference Document 5.2</i> (CC BY 4.0)</div>`;
+const s5EntitySource = (type, e) => type === 'monsters' ? '' : e.pack ? `<div class="src">${esc(TYPES[type].one)} · <i>${esc(s5Src(e))}</i>${e.pg ? ', page ' + esc(e.pg) : ''} · imported</div>` : `<div class="src">${esc(TYPES[type].one)} · <i>System Reference Document 5.2</i> (CC BY 4.0)</div>`;
 function s5Preview(t, e) {
   if (t === 'monsters') return s5RenderMonster(e, { nosrc: true });
   if (t === 'spells') return s5SpellCard(e, { nopin: true });
@@ -3244,8 +3316,8 @@ function s5Menu() {
   return [
     ['Rules', [['library', 'Library'], ['book--srd52', 'SRD 5.2 Reference'], ['-'], ['conditions'], ['equipment']]],
     ['Characters', [['classes'], ['species'], ['backgrounds'], ['feats'], ['-'], ['spells']]],
-    ['Game Master', [['sessions', 'Sessions'], ['encounter', 'Encounter Builder'], ['initiative', 'Initiative Tracker'], ['-'], ['monsters'], ['book--srd5-monsters', 'Monsters A–Z'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title]), ['-'], ['items'], ['cards', 'Cards: quests']]],
-    ['Utilities', [['import', 'Import a PDF'], ['roller', 'Dice Roller'], ['pinned', 'Pinned Items'], ['-'], ['sync', 'Sync across devices'], ['!update', 'Check for updates']]]
+    ['Game Master', [['sessions', 'Sessions'], ['encounter', 'Encounter Builder'], ['initiative', 'Initiative Tracker'], ['-'], ['monsters'], ['book--srd5-monsters', 'Monsters A–Z'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title]), ['-'], ['items'], ['cards', 'Cards: items, spells, quests']]],
+    ['Utilities', [['import', 'Import files'], ['roller', 'Dice Roller'], ['pinned', 'Pinned Items'], ['-'], ['sync', 'Sync across devices'], ['!update', 'Check for updates']]]
   ];
 }
 const S5_BLURB = { spells: 'Every SRD spell with level, school, classes and full text', monsters: 'Stat blocks for every SRD creature, filter by CR, type and size', items: 'Magic items by type, rarity and attunement',
@@ -3258,7 +3330,7 @@ function s5Home() {
     ['Rules', [['book--srd52', 'SRD 5.2 Reference', 'Abilities and skills, conditions, weapons, armor and more'], ['conditions'], ['equipment']]],
     ['Characters', [['classes'], ['species'], ['backgrounds'], ['feats'], ['spells']]],
     ['Run the game', [['encounter', 'Encounter Builder', 'Pick monsters, see Low / Moderate / High difficulty'], ['initiative', 'Initiative Tracker', 'Turn order, HP and conditions'], ['sessions', 'Sessions', 'Prep folders for your game night'], ['roller', 'Dice Roller', 'Any dice, d20 with advantage']]],
-    ['Game master', [['monsters'], ['book--srd5-monsters', 'Monsters A–Z', 'Read the bestiary like a book'], ['items'], ...adv.map(p => ['book--' + p.id, p.title, 'Adventure · imported']), ['library', 'Library', 'All books, including your imports'], ['import', 'Import a PDF', 'Add your own books'], ['pinned', 'Pinned items', 'Your starred spells, monsters and rules']]]
+    ['Game master', [['monsters'], ['book--srd5-monsters', 'Monsters A–Z', 'Read the bestiary like a book'], ['items'], ...adv.map(p => ['book--' + p.id, p.title, 'Adventure · imported']), ['library', 'Library', 'All books, including your imports'], ['import', 'Import files', 'Your own books, adventures and bestiaries (JSON)'], ['pinned', 'Pinned items', 'Your starred spells, monsters and rules']]]
   ];
   $('#main').innerHTML = `<div class="home"><div class="hero"><h1>5e rules, at your fingertips</h1><p>A fast, searchable reference for the fifth edition System Reference Document 5.2.</p>
     <div class="hsearch">${ico('search', 20)}<input id="hq" placeholder="Search spells, monsters, items, rules…" ${isMob ? 'readonly' : ''}><kbd>/</kbd></div>
@@ -3273,7 +3345,7 @@ function s5Browse() {
   const sec = (t, ks) => `<h3>${t}</h3><div class="sgrid">${ks.map(([k, l, d]) => `<a href="#${k}"><b>${esc(l || TYPES[k].label)}</b><span>${esc(d || (TYPES[k] ? itemsOf(k).length + ' entries' : ''))}</span></a>`).join('')}</div>`;
   $('#sheet').innerHTML = `<div class="grab"></div>` +
     sec('Characters', [['classes'], ['species'], ['backgrounds'], ['feats'], ['spells']]) +
-    sec('Game master', [['encounter', 'Encounter Builder', 'Difficulty & PDF'], ['initiative', 'Initiative', 'Turns, HP & conditions'], ['monsters'], ['items'], ['sessions', 'Sessions', 'Prep & print a game night'], ['cards', 'Cards', 'Print quest cards'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title, 'Adventure']), ['import', 'Import a PDF', 'Add your own books']]) +
+    sec('Game master', [['encounter', 'Encounter Builder', 'Difficulty & PDF'], ['initiative', 'Initiative', 'Turns, HP & conditions'], ['monsters'], ['items'], ['sessions', 'Sessions', 'Prep & print a game night'], ['cards', 'Cards', 'Print quest cards'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title, 'Adventure']), ['import', 'Import files', 'Add your own books (JSON)']]) +
     sec('Rules', [['book--srd52', 'SRD 5.2 Reference', 'Reference chapters'], ['conditions'], ['equipment']]) +
     `<p style="font-size:10.5px;color:var(--ink3);margin-top:16px">${esc(S5_ATTRIB)}</p>`;
   $('#sheet').classList.add('on'); showScrim();
@@ -3333,6 +3405,33 @@ function s5Dicify(html, label) {
   return String(html).split(/(<[^>]+>)/).map(seg => seg.startsWith('<') ? seg : seg
     .replace(/(Attack Roll:)\s*([+−-]\d+)/g, (m, a, b) => `${a} <button class="s5-roll" data-dice="1d20${s5Signed(b)}" data-lab="${esc(label)}: attack">${b}</button>`)
     .replace(/\b(\d+d\d+(?:\s*[+−-]\s*\d+)?)(?![^<]*<\/button>)/g, (m, d) => `<button class="s5-roll" data-dice="${esc(d)}" data-lab="${esc(label)}">${d}</button>`)).join('');
+}
+
+// ---- imported books (s5-import.js): book blocks and cross-references ----
+const s5Src = e => e.pack ? (e.srcCode || '').toUpperCase() || PK[e.pack]?.title || 'Imported' : 'SRD 5.2';   // short: PHB, XPHB, SRD 5.2
+function s5Find(kind, name, src) {
+  const n = String(name).toLowerCase(), list = kind === 'creature' ? MONS : itemsOf(kind === 'spell' ? 'spells' : 'items');
+  return list.find(x => x.name.toLowerCase() === n && (!src || x.srcCode === src)) || list.find(x => x.name.toLowerCase() === n) || null;
+}
+function s5RenderBlock(b, { pm, idx }) {
+  if (b.t === 's5read') return `<div class="s5read"${idx}>${pm}${renderBlocks(b.blocks)}</div>`;
+  if (b.t === 's5inset') return `<aside class="s5inset"${idx}>${pm}${b.title ? `<div class="ah">${esc(b.title)}</div>` : ''}${renderBlocks(b.blocks)}</aside>`;
+  if (b.t === 's5mref') {
+    const m = s5Find('creature', b.name, b.source);
+    return `<div${idx}>${pm}</div>` + (m ? s5RenderMonster(m, { nosrc: true }) : `<p class="small s5-missing">Stat block: <b>${esc(b.name)}</b>. Import the bestiary it comes from to see it here.</p>`);
+  }
+}
+function s5FindClick(e) {
+  const f = e.target.closest('[data-s5find]'); if (!f) return false;
+  e.preventDefault();
+  const [kind, name, src] = f.dataset.s5find.split('|'), x = s5Find(kind, name, src);
+  if (x) go((kind === 'creature' ? 'monsters--' + x.gid : kind === 'spell' ? 'spells--' + x.id : 'items--' + x.id));
+  else toast(`“${esc(name)}” isn’t in your library${kind === 'creature' ? ' (import its bestiary)' : kind === 'spell' ? ' (import its spells)' : ''}`);
+  return true;
+}
+function s5PackSummary(p) {
+  const n = Object.entries(p.entities || {}).map(([t, l]) => l.length + ' ' + (TYPES[t] ? TYPES[t].label.toLowerCase() : t));
+  return n.length ? ' · ' + n.join(' · ') : '';
 }
 
 // ================= 5e tools: encounter builder, initiative tracker, session items =================
@@ -3541,8 +3640,410 @@ function s5OnClick(e) {
   const a = e.target.closest('[data-addenc5]'); if (a) { e.preventDefault(); s5AddToEnc(a.dataset.addenc5); return true; }
 }
 
+// ================= 5e importer: JSON files in the 5etools data format =================
+// Reads the files a person owns and brings into Vanadium themselves (bestiary-*.json,
+// adventure-*.json, book-*.json, spells-*.json, class-*.json; sources.json supplies spell classes).
+// Everything is converted in the browser and stored like any import (IndexedDB, private sync);
+// nothing is fetched from anywhere: pictures referenced by the files are skipped.
+// Output: packs with chapters (books), monsters (s5RenderMonster format) and entities
+// (spells and classes for the lists). Wired up as SYS.importer.run in register.js.
+
+const S5I_SIZE = { T: 'Tiny', S: 'Small', M: 'Medium', L: 'Large', H: 'Huge', G: 'Gargantuan' };
+const S5I_SCHOOL = { A: 'Abjuration', C: 'Conjuration', D: 'Divination', E: 'Enchantment', V: 'Evocation', I: 'Illusion', N: 'Necromancy', T: 'Transmutation', P: 'Psionic' };
+const S5I_ALIGN = { L: 'Lawful', N: 'Neutral', NX: 'Neutral', NY: 'Neutral', C: 'Chaotic', G: 'Good', E: 'Evil' };
+// SRD 5.2 "Experience Points by Challenge Rating" and "Proficiency Bonus by Challenge Rating"
+const S5I_XP = { '0': 10, '1/8': 25, '1/4': 50, '1/2': 100, '1': 200, '2': 450, '3': 700, '4': 1100, '5': 1800, '6': 2300, '7': 2900, '8': 3900, '9': 5000, '10': 5900, '11': 7200, '12': 8400, '13': 10000, '14': 11500, '15': 13000, '16': 15000, '17': 18000, '18': 20000, '19': 22000, '20': 25000, '21': 33000, '22': 41000, '23': 50000, '24': 62000, '25': 75000, '26': 90000, '27': 105000, '28': 120000, '29': 135000, '30': 155000 };
+const s5iPB = cr => { const n = s5CrNum(String(cr)) || 0; return n < 5 ? 2 : n < 9 ? 3 : n < 13 ? 4 : n < 17 ? 5 : n < 21 ? 6 : n < 25 ? 7 : n < 29 ? 8 : 9; };
+const s5iSlug = s => String(s).toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
+const s5iCap = s => String(s).replace(/(^|[\s(-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
+const s5iOrd = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
+
+// ---- {@tag ...} markup -> html ----
+const S5I_ATK = { mw: 'Melee Weapon Attack:', rw: 'Ranged Weapon Attack:', 'mw,rw': 'Melee or Ranged Weapon Attack:', ms: 'Melee Spell Attack:', rs: 'Ranged Spell Attack:', 'ms,rs': 'Melee or Ranged Spell Attack:', m: 'Melee Attack Roll:', r: 'Ranged Attack Roll:', 'm,r': 'Melee or Ranged Attack Roll:' };
+const S5I_FIND = { creature: 'creature', spell: 'spell', item: 'item' };
+function s5iTag(tag, body) {
+  const parts = body.split('|'), text = parts[0], shown = (parts[2] || parts[0]).trim();
+  switch (tag) {
+    case 'b': case 'bold': return `<b>${text}</b>`;
+    case 'i': case 'italic': case 'note': return `<i>${text}</i>`;
+    case 's': case 'strike': return `<s>${text}</s>`;
+    case 'u': case 'underline': return `<u>${text}</u>`;
+    case 'sup': return `<sup>${text}</sup>`;
+    case 'sub': return `<sub>${text}</sub>`;
+    case 'h': return '<i>Hit:</i> ';
+    case 'm': return '<i>Miss:</i> ';
+    case 'atk': case 'atkr': return `<i>${S5I_ATK[text.trim()] || 'Attack:'}</i>`;
+    case 'hit': return `<button class="s5-roll" data-dice="1d20${s5Signed(text)}">${s5Signed(text)}</button>`;
+    case 'd20': return `<button class="s5-roll" data-dice="1d20${s5Signed(text)}">${s5Signed(text)}</button>`;
+    case 'damage': case 'dice': { const d = text.replace(/×/g, '*'); return s5ParseDice(d) ? `<button class="s5-roll" data-dice="${esc(d)}">${esc(parts[1] && tag === 'dice' ? parts[1] : text)}</button>` : esc(parts[1] || text); }
+    case 'scaledice': case 'scaledamage': return esc(parts[2] || parts[0]);
+    case 'dc': return 'DC ' + esc(parts[1] || text);
+    case 'recharge': return text ? `(Recharge ${esc(text)}–6)` : '(Recharge 6)';
+    case 'chance': return `${esc(parts[1] || text + ' percent')}`;
+    case 'actSave': return `<i>${s5iCap({ str: 'strength', dex: 'dexterity', con: 'constitution', int: 'intelligence', wis: 'wisdom', cha: 'charisma' }[text.trim()] || text)} Saving Throw:</i>`;
+    case 'actSaveFail': return text ? `<i>Failure by ${esc(text)} or More:</i>` : '<i>Failure:</i>';
+    case 'actSaveSuccess': return '<i>Success:</i>';
+    case 'actSaveSuccessOrFail': return '<i>Failure or Success:</i>';
+    case 'actTrigger': return '<i>Trigger:</i>';
+    case 'actResponse': return '<i>Response:</i>';
+    case 'hitYourSpellAttack': return esc(parts[0] || 'your spell attack modifier');
+    case 'link': return `<a href="${esc(parts[1] || '')}" target="_blank" rel="noopener">${text}</a>`;
+    case 'condition': case 'status': { const id = s5iSlug(text); return BYID && BYID.conditions && BYID.conditions[id] ? `<span class="lnk" data-go="conditions--${id}">${esc(shown)}</span>` : esc(shown); }
+    case 'creature': case 'spell': case 'item':
+      return `<a class="lnk" data-s5find="${S5I_FIND[tag]}|${esc(text.trim())}|${esc((parts[1] || '').trim().toLowerCase())}">${esc(shown)}</a>`;
+    case 'filter': return esc(text);
+    case '5etoolsImg': case 'comic': return '';
+    default: return esc(shown);   // book, adventure, skill, sense, action, variantrule, quickref, table, area, …
+  }
+}
+function s5iText(s) {
+  let out = esc(String(s ?? ''));
+  for (let i = 0; i < 6 && out.includes('{@'); i++) out = out.replace(/\{@(\w+)\s*([^{}]*)\}/g, (m, t, b) => s5iTag(t, b.replace(/&amp;/g, '&').replace(/&quot;/g, '"')));
+  return out.replace(/\{@\w+\s*([^{}|]*)[^{}]*\}/g, '$1');
+}
+// short html for a monster ability (lists flattened)
+function s5iInline(entries) {
+  return (entries || []).map(e => {
+    if (typeof e === 'string' || typeof e === 'number') return s5iText(e);
+    if (e.type === 'list') return e.items.map(it => '• ' + (typeof it === 'string' ? s5iText(it) : `${it.name ? `<b>${s5iText(it.name)}.</b> ` : ''}${s5iInline(it.entries || (it.entry ? [it.entry] : []))}`)).join('<br>');
+    if (e.type === 'entries' || e.type === 'item' || e.type === 'inset') return `${e.name ? `<b>${s5iText(e.name)}.</b> ` : ''}${s5iInline(e.entries || (e.entry ? [e.entry] : []))}`;
+    if (e.type === 'table') return (e.rows || []).map(r => (r.row || r).map(c => s5iText(typeof c === 'object' ? (c.roll ? (c.roll.exact ?? `${c.roll.min}–${c.roll.max}`) : c.entry || '') : c)).join(' — ')).join('<br>');
+    return s5iInline(e.entries || []);
+  }).join('<br>');
+}
+
+// ---- entries -> book blocks ----
+function s5iBlocks(entries, depth, ctx) {
+  const out = [];
+  const head = (name, id) => { const base = s5iSlug(name); let hid = id ? 'e' + id : base; while (ctx.ids.has(hid)) hid = base + '-' + (++ctx.n); ctx.ids.add(hid); return { t: 'h', lvl: Math.min(5, depth + 1), text: String(name).replace(/\{@\w+\s*([^{}|]*)[^{}]*\}/g, '$1'), id: hid }; };
+  for (const e of entries || []) {
+    if (e == null) continue;
+    if (typeof e === 'string' || typeof e === 'number') { out.push({ t: 'p', style: 'body', html: s5iText(e) }); continue; }
+    switch (e.type) {
+      case 'section': case 'entries': case 'flowBlock': case 'homebrew':
+        if (e.name) out.push(head(e.name, e.id));
+        out.push(...s5iBlocks(e.entries, depth + (e.name ? 1 : 0), ctx)); break;
+      case 'inset': case 'variant': case 'variantInner': case 'variantSub': case 'flowchart':
+        out.push({ t: 's5inset', title: (e.type.startsWith('variant') ? 'Variant: ' : '') + (e.name || ''), blocks: s5iBlocks(e.entries || e.blocks, 3, ctx) }); break;
+      case 'insetReadaloud':
+        out.push({ t: 's5read', blocks: s5iBlocks(e.entries, 3, ctx) }); break;
+      case 'quote':
+        out.push({ t: 'p', style: 'body', html: '<i>' + (e.entries || []).map(s5iText).join('<br>') + '</i>' + (e.by ? ` <span class="s5-by">— ${s5iText(e.by)}${e.from ? ', <i>' + s5iText(e.from) + '</i>' : ''}</span>` : '') }); break;
+      case 'list': case 'options':
+        for (const it of e.items || e.entries || []) {
+          if (typeof it === 'string') out.push({ t: 'li', html: s5iText(it) });
+          else if (it.type === 'list') out.push(...s5iBlocks([it], depth, ctx));
+          else out.push({ t: 'li', html: `${it.name ? `<b>${s5iText(it.name)}.</b> ` : ''}${s5iInline(it.entries || (it.entry ? [it.entry] : []))}` });
+        }
+        break;
+      case 'table': {
+        if (e.caption) out.push({ t: 'p', style: 'body', html: `<b>${s5iText(e.caption)}</b>` });
+        const cell = c => typeof c === 'object' && c ? (c.type === 'cell' ? (c.roll ? (c.roll.exact != null ? String(c.roll.exact) : `${c.roll.min}–${c.roll.max}`) : s5iInline([c.entry])) : s5iInline([c])) : s5iText(c);
+        out.push({ t: 'table', head: (e.colLabels || []).map(h => String(h).replace(/\{@\w+\s*([^{}|]*)[^{}]*\}/g, '$1')), rows: (e.rows || []).map(r => (r.row || r).map(cell)) });
+        break;
+      }
+      case 'tableGroup': out.push(...s5iBlocks(e.tables, depth, ctx)); break;
+      case 'statblock':
+        if (e.tag === 'creature' || !e.tag) out.push({ t: 's5mref', name: e.name, source: (e.source || '').toLowerCase() });
+        else out.push({ t: 'p', style: 'body', html: `<b>${s5iText(e.name || '')}</b> <span class="s5-by">(${esc(e.tag)})</span>` });
+        break;
+      case 'statblockInline':
+        if (e.dataType === 'monster' && e.data) { const m = s5iMonster(e.data, ctx.src); if (m) { ctx.monsters.push(m); out.push({ t: 'monster', ref: m.id }); } }
+        break;
+      case 'abilityDc': out.push({ t: 'p', style: 'body', html: `<b>${s5iText(e.name)} save DC</b> = 8 + your Proficiency Bonus + your ${(e.attributes || []).map(a => s5iCap({ str: 'strength', dex: 'dexterity', con: 'constitution', int: 'intelligence', wis: 'wisdom', cha: 'charisma' }[a] || a)).join(' or ')} modifier` }); break;
+      case 'abilityAttackMod': out.push({ t: 'p', style: 'body', html: `<b>${s5iText(e.name)} attack modifier</b> = your Proficiency Bonus + your ${(e.attributes || []).map(a => s5iCap({ str: 'strength', dex: 'dexterity', con: 'constitution', int: 'intelligence', wis: 'wisdom', cha: 'charisma' }[a] || a)).join(' or ')} modifier` }); break;
+      case 'refClassFeature': case 'refSubclassFeature': case 'refOptionalfeature': {
+        const f = ctx.ref && ctx.ref(e); if (f) { out.push(head(f.name)); out.push(...s5iBlocks(f.entries, depth + 1, ctx)); }
+        break;
+      }
+      case 'image': case 'gallery': case 'hr': break;   // pictures aren't in the files; nothing is fetched
+      case 'item': out.push({ t: 'li', html: `${e.name ? `<b>${s5iText(e.name)}.</b> ` : ''}${s5iInline(e.entries || (e.entry ? [e.entry] : []))}` }); break;
+      case 'dice': out.push({ t: 'p', style: 'body', html: (e.toRoll || []).map(d => `<button class="s5-roll" data-dice="${d.number}d${d.faces}${d.modifier ? s5Signed(d.modifier) : ''}">${d.number}d${d.faces}${d.modifier ? s5Signed(d.modifier) : ''}</button>`).join(' + ') }); break;
+      default:
+        if (e.entries) out.push(...s5iBlocks(e.entries, depth, ctx));
+        else if (e.entry) out.push(...s5iBlocks([e.entry], depth, ctx));
+    }
+  }
+  return out;
+}
+
+// ---- monsters ----
+const s5iJoinList = (arr, key) => (arr || []).map(x => typeof x === 'string' ? s5iCap(x) : x.special ? x.special : `${s5iJoinList(x[key], key)}${x.note ? ' ' + x.note : ''}${x.cond ? '' : ''}`.trim()).filter(Boolean).join(', ');
+function s5iAlign(a) {
+  if (!a || !a.length) return '';
+  if (typeof a[0] === 'object') return a.map(x => x.special || s5iAlign(x.alignment) + (x.chance ? ` (${x.chance}%)` : '')).join(' or ');
+  if (a.includes('A')) return 'Any Alignment';
+  if (a.includes('U')) return 'Unaligned';
+  if (a.length === 1 && a[0] === 'N') return 'Neutral';
+  if (a.length > 2) { const ax = a.filter(x => ['L', 'NX', 'C'].includes(x)), ay = a.filter(x => ['G', 'NY', 'E'].includes(x)); if (ax.length === 3 && ay.length === 1) return 'Any ' + S5I_ALIGN[ay[0]]; if (ay.length === 3 && ax.length === 1) return 'Any ' + S5I_ALIGN[ax[0]]; if (!a.includes('E') && a.length === 5) return 'Any Non-Evil'; if (!a.includes('G') && a.length === 5) return 'Any Non-Good'; return 'Any Alignment'; }
+  return a.map(x => S5I_ALIGN[x] || x).join(' ');
+}
+function s5iType(t) {
+  if (!t) return '';
+  if (typeof t === 'string') return s5iCap(t);
+  const base = typeof t.type === 'object' ? (t.type.choose || []).map(s5iCap).join(' or ') : s5iCap(t.type);
+  if (t.swarmSize) return `Swarm of ${S5I_SIZE[t.swarmSize] || ''} ${base}s`;
+  return base + (t.tags && t.tags.length ? ` (${t.tags.map(x => typeof x === 'string' ? s5iCap(x) : s5iCap((x.prefix ? x.prefix + ' ' : '') + x.tag)).join(', ')})` : '');
+}
+function s5iSpeed(sp) {
+  if (!sp) return '';
+  const v = x => typeof x === 'object' ? `${x.number} ft.${x.condition ? ' ' + x.condition.replace(/\{@\w+\s*([^{}|]*)[^{}]*\}/g, '$1') : ''}` : x === true ? '' : `${x} ft.`;
+  const out = [];
+  if (sp.walk != null) out.push(v(sp.walk));
+  for (const k of ['burrow', 'climb', 'fly', 'swim']) if (sp[k] != null) out.push(`${s5iCap(k)} ${v(sp[k])}`);
+  const s = out.join(', ');
+  return s + (sp.canHover && !/hover/.test(s) ? ' (hover)' : '');
+}
+function s5iSpellcasting(sc) {
+  const lines = [];
+  if (sc.will) lines.push(`<b>At Will:</b> ${sc.will.map(s5iText).join(', ')}`);
+  for (const [k, list] of Object.entries(sc.daily || {})) lines.push(`<b>${k.replace('e', '')}/Day${k.endsWith('e') ? ' Each' : ''}:</b> ${list.map(s5iText).join(', ')}`);
+  for (const [lvl, o] of Object.entries(sc.spells || {})) lines.push(`<b>${lvl === '0' ? 'Cantrips (at will)' : s5iOrd(+lvl) + ' level' + (o.slots ? ` (${o.slots} slot${o.slots === 1 ? '' : 's'})` : '')}:</b> ${(o.spells || []).map(s5iText).join(', ')}`);
+  for (const [k, list] of Object.entries(sc.recharge || {})) lines.push(`<b>Recharge ${k}:</b> ${list.map(s5iText).join(', ')}`);
+  return { name: s5iText(sc.name || 'Spellcasting').replace(/<[^>]+>/g, ''), html: s5iInline(sc.headerEntries || []) + (sc.footerEntries ? ' ' + s5iInline(sc.footerEntries) : ''), spells: lines };
+}
+function s5iMonster(m, src) {
+  if (!m || !m.name || m._copy) return null;
+  const ab = { str: m.str ?? 10, dex: m.dex ?? 10, con: m.con ?? 10, int: m.int ?? 10, wis: m.wis ?? 10, cha: m.cha ?? 10 };
+  const crRaw = m.cr == null ? '—' : typeof m.cr === 'object' ? m.cr.cr : String(m.cr);
+  const pb = s5iPB(crRaw), mod = k => Math.floor((ab[k] - 10) / 2);
+  const ac0 = (m.ac || [])[0], acv = typeof ac0 === 'object' ? ac0.ac ?? ac0.special : ac0;
+  const acNote = typeof ac0 === 'object' && ac0 ? [(ac0.from || []).map(x => s5iText(x).replace(/<[^>]+>/g, '')).join(', '), ac0.condition ? s5iText(ac0.condition).replace(/<[^>]+>/g, '') : ''].filter(Boolean).join(' ') : '';
+  const saves = {}; for (const k of Object.keys(ab)) saves[k] = m.save && m.save[k] ? s5Signed(m.save[k]) : s5Mod(ab[k]).replace('−', '-').replace(/^-/, '−');
+  const skills = Object.entries(m.skill || {}).filter(([k]) => k !== 'other').map(([k, v]) => `${s5iCap(k)} ${String(v).replace(/^-/, '−')}`).join(', ');
+  const xpN = typeof m.cr === 'object' && m.cr.xp != null ? m.cr.xp : S5I_XP[crRaw] ?? 0;
+  const xpL = typeof m.cr === 'object' && m.cr.lair ? (m.cr.xpLair ?? S5I_XP[m.cr.lair]) : null;
+  const initMod = m.initiative && typeof m.initiative === 'object' ? (m.initiative.initiative ?? (mod('dex') + pb * (m.initiative.proficiency || 0))) : typeof m.initiative === 'number' ? m.initiative : mod('dex');
+  const ability = a => ({ name: s5iText(a.name || '').replace(/<[^>]+>/g, ''), html: s5iInline(a.entries) });
+  const bucket = { trait: [], action: [], bonus: [], reaction: [], legendary: [] };
+  for (const sc of m.spellcasting || []) (bucket[sc.displayAs || 'trait'] || bucket.trait).push(s5iSpellcasting(sc));
+  const immune = [s5iJoinList(m.immune, 'immune'), s5iJoinList(m.conditionImmune, 'conditionImmune')].filter(Boolean).join('; ');
+  const senses = [...(m.senses || []).map(x => s5iCap(s5iText(x).replace(/<[^>]+>/g, '')).replace(/ Ft\./g, ' ft.')), `Passive Perception ${m.passive ?? 10 + mod('wis')}`];
+  const id = s5iSlug(m.name) + '~' + (m.source || src || '').toLowerCase();
+  return {
+    id, name: m.name, srcCode: (m.source || src || '').toLowerCase(), pg: m.page || '',
+    size: (m.size || []).map(x => S5I_SIZE[x] || x).join(' or '), type: s5iType(m.type), alignment: (m.alignmentPrefix ? m.alignmentPrefix : '') + s5iAlign(m.alignment),
+    ac: acv ?? '—', acNote, init: s5Signed(initMod).replace('-', '−'), initSrd: !!m.initiative,
+    hp: m.hp ? m.hp.average ?? m.hp.special ?? '—' : '—', hpRoll: m.hp && m.hp.formula ? m.hp.formula.replace(/\s*([+-])\s*/g, ' $1 ').replace('-', '−') : '',
+    speed: s5iSpeed(m.speed), ab, saves, skills,
+    vuln: s5iJoinList(m.vulnerable, 'vulnerable'), resist: s5iJoinList(m.resist, 'resist'), immune,
+    senses: senses.join(', ').replace(/, Passive/, '; Passive'), languages: (m.languages || []).map(x => s5iText(x).replace(/<[^>]+>/g, '')).join(', ') || '—',
+    gear: (m.gear || []).map(g => s5iText(typeof g === 'string' ? `{@item ${g}}` : g.item ? `{@item ${g.item}}` : '').replace(/<[^>]+>/g, '')).filter(Boolean).join(', '),
+    cr: crRaw, crNum: s5CrNum(crRaw) || 0, xp: xpN.toLocaleString('en') + (xpL ? `, or ${xpL.toLocaleString('en')} in lair` : ''), pb: '+' + pb,
+    traits: [...(m.trait || []).map(ability), ...bucket.trait], actions: [...(m.action || []).map(ability), ...bucket.action],
+    bonus: [...(m.bonus || []).map(ability), ...bucket.bonus], reactions: [...(m.reaction || []).map(ability), ...bucket.reaction],
+    legendary: [...(m.legendary || []).map(ability), ...bucket.legendary, ...(m.mythic || []).map(a => ({ ...ability(a), name: 'Mythic: ' + ability(a).name }))],
+    group: s5iType(typeof m.type === 'object' ? m.type.type : m.type)
+  };
+}
+// _copy: a monster made from another one plus changes (_mod). Base must be among the imported files.
+function s5iApplyCopy(m, index) {
+  const c = m._copy, base = index.get((c.name + '|' + (c.source || '')).toLowerCase());
+  if (!base) return null;
+  const b = base._copy ? s5iApplyCopy(base, index) : base; if (!b) return null;
+  const out = JSON.parse(JSON.stringify(b));
+  for (const [k, v] of Object.entries(m)) if (k !== '_copy') out[k] = v;
+  const mods = c._mod || {};
+  const wq = w => w.replace(/"/g, '\\"');   // keep a capital letter at the start of the replaced text ("The toad" -> "The matriarch")
+  const txt = (o, re, w) => JSON.parse(JSON.stringify(o).replace(re, m => /^[A-Z]/.test(m) && /^[a-z]/.test(w) ? wq(w[0].toUpperCase() + w.slice(1)) : wq(w)));
+  for (const [prop, ops] of Object.entries(mods)) for (const op of [].concat(ops)) {
+    if (op === 'remove') { delete out[prop]; continue; }
+    const arrProp = prop === '*' ? null : prop;
+    if (op.mode === 'replaceTxt') { const re = new RegExp(op.replace, op.flags || 'g'); for (const k of arrProp ? [arrProp] : ['trait', 'action', 'bonus', 'reaction', 'legendary']) if (out[k]) out[k] = txt(out[k], re, op.with); continue; }
+    const arr = out[arrProp] = out[arrProp] || [];
+    const items = [].concat(op.items || []), nm = x => typeof x === 'string' ? x : x.name;
+    if (op.mode === 'appendArr') arr.push(...items);
+    else if (op.mode === 'prependArr') arr.unshift(...items);
+    else if (op.mode === 'insertArr') arr.splice(op.index || 0, 0, ...items);
+    else if (op.mode === 'removeArr') { const rm = [].concat(op.names || op.items || []).map(x => nm(x)); out[arrProp] = arr.filter(x => !rm.includes(nm(x))); }
+    else if (op.mode === 'replaceArr') { const i = arr.findIndex(x => nm(x) === (typeof op.replace === 'string' ? op.replace : op.replace?.index != null ? nm(arr[op.replace.index]) : '')); if (i >= 0) arr.splice(i, 1, ...items); else arr.push(...items); }
+    else if (op.mode === 'replaceOrAppendArr') { const i = arr.findIndex(x => nm(x) === op.replace); if (i >= 0) arr.splice(i, 1, ...items); else arr.push(...items); }
+  }
+  delete out._copy;
+  return out;
+}
+
+// ---- spells ----
+function s5iSpell(s, classes, src) {
+  const t = (s.time || [])[0] || {};
+  const unit = { action: 'Action', bonus: 'Bonus Action', reaction: 'Reaction' }[t.unit];
+  const time = unit && t.number === 1 ? unit + (t.condition ? ', which you take ' + s5iText(t.condition).replace(/<[^>]+>/g, '') : '') : `${t.number || ''} ${t.unit || ''}${t.number > 1 ? 's' : ''}`.trim();
+  const r = s.range || {}, d = r.distance || {};
+  const range = r.type === 'special' ? 'Special' : d.type === 'self' ? 'Self' : d.type === 'touch' ? 'Touch' : d.type === 'sight' ? 'Sight' : d.type === 'unlimited' ? 'Unlimited' :
+    r.type === 'point' ? `${d.amount} ${d.type === 'feet' && d.amount === 1 ? 'foot' : d.type}` : `Self (${d.amount}-${d.type === 'feet' ? 'foot' : d.type} ${r.type})`;
+  const c = s.components || {}, m = c.m;
+  const components = [c.v && 'V', c.s && 'S', m && 'M'].filter(Boolean).join(', ') + (m ? ` (${typeof m === 'object' ? m.text : m === true ? '' : m})` : '');
+  const du = (s.duration || [])[0] || {}, dd = du.duration || {};
+  const duration = du.type === 'instant' ? 'Instantaneous' : du.type === 'permanent' ? 'Until dispelled' + ((du.ends || []).includes('trigger') ? ' or triggered' : '') : du.type === 'special' ? 'Special' :
+    `${du.concentration ? 'Concentration, up to ' : ''}${dd.amount} ${dd.type}${dd.amount > 1 ? 's' : ''}`;
+  const ctx = { ids: new Set(), n: 0, monsters: [], src };
+  const body = s5iBlocks(s.entries, 2, ctx);
+  for (const h of s.entriesHigherLevel || []) { const bl = s5iBlocks(h.entries, 2, ctx); if (bl[0] && bl[0].t === 'p') bl[0].html = `<b><i>${s5iText(h.name || 'At Higher Levels')}.</i></b> ` + bl[0].html; body.push(...bl); }
+  return { id: s5iSlug(s.name) + '~' + (s.source || src).toLowerCase(), name: s.name, srcCode: (s.source || src).toLowerCase(), pg: s.page || '', level: s.level, school: S5I_SCHOOL[s.school] || s.school,
+    classes, time, range, components, duration, conc: !!du.concentration, ritual: !!(s.meta && s.meta.ritual), body };
+}
+
+// ---- classes ----
+function s5iClasses(file) {
+  const out = [], feats = file.classFeature || [], subFeats = file.subclassFeature || [];
+  for (const c of file.class || []) {
+    const fname = ref => (typeof ref === 'string' ? ref : ref.classFeature).split('|');
+    const findF = ref => { const [name, cls, csrc, lvl, fsrc] = fname(ref); return feats.find(f => f.name === name && f.className === cls && String(f.level) === lvl && (!fsrc || f.source === fsrc) && (!csrc || (f.classSource || f.source) === csrc)) || feats.find(f => f.name === name && f.className === cls && String(f.level) === lvl); };
+    const refSub = e => { const [name, cls, csrc, sub, ssrc, lvl] = (e.subclassFeature || '').split('|'); return subFeats.find(f => f.name === name && f.className === cls && f.subclassShortName === sub && String(f.level) === lvl); };
+    const refCls = e => { const p = (e.classFeature || '').split('|'); return findF(e.classFeature) || null; };
+    const ctx = { ids: new Set(), n: 0, monsters: [], src: c.source, ref: e => e.type === 'refSubclassFeature' ? refSub(e) : e.type === 'refClassFeature' ? refCls(e) : null };
+    const hd = c.hd ? `d${c.hd.faces}` : '';
+    const prim = (c.primaryAbility || []).map(o => Object.keys(o).map(k => s5iCap({ str: 'strength', dex: 'dexterity', con: 'constitution', int: 'intelligence', wis: 'wisdom', cha: 'charisma' }[k] || k)).join(' and ')).join(' or ');
+    const body = [{ t: 'p', style: 'body', html: [prim && `<b>Primary Ability:</b> ${prim}`, hd && `<b>Hit Point Die:</b> ${hd} per ${esc(c.name)} level`, (c.proficiency || []).length && `<b>Saving Throws:</b> ${(c.proficiency || []).map(x => x.toUpperCase()).join(', ')}`].filter(Boolean).join(' · ') }];
+    const levelFeats = Array.from({ length: 20 }, () => []);
+    for (const ref of c.classFeatures || []) { const [name, , , lvl] = fname(ref); if (+lvl >= 1 && +lvl <= 20) levelFeats[+lvl - 1].push(name); }
+    const groups = c.classTableGroups || [];
+    const cols = groups.flatMap(g => (g.colLabels || []).map(l => String(l).replace(/\{@\w+\s*([^{}|]*)[^{}]*\}/g, '$1')));
+    const cellv = v => typeof v === 'object' && v ? (v.value != null ? (v.type === 'dice' ? `${v.toRoll?.[0]?.number}d${v.toRoll?.[0]?.faces}` : v.value) : v.toRoll ? `${v.toRoll[0].number}d${v.toRoll[0].faces}` : v.type === 'bonus' ? '+' + v.value : '') : v === 0 ? '—' : v;
+    const rows = Array.from({ length: 20 }, (_, i) => [String(i + 1), '+' + (2 + Math.floor(i / 4)), esc(levelFeats[i].join(', ') || '—'), ...groups.flatMap(g => (g.rows || g.rowsSpellProgression || [])[i] || []).map(v => esc(String(cellv(v) ?? '')))]);
+    body.push({ t: 'h', lvl: 2, text: `${c.name} Features`, id: 'features' }, { t: 'table', head: ['Level', 'Proficiency Bonus', 'Class Features', ...cols], rows });
+    for (const ref of c.classFeatures || []) { const f = findF(ref); if (!f) continue; body.push({ t: 'h', lvl: 3, text: `Level ${f.level}: ${f.name}`, id: s5iSlug(f.name + '-' + f.level) }); body.push(...s5iBlocks(f.entries, 3, ctx)); }
+    for (const sc of (file.subclass || []).filter(s => s.className === c.name && s.classSource === c.source)) {
+      body.push({ t: 'h', lvl: 2, text: `Subclass: ${sc.name}`, id: s5iSlug('sub-' + sc.shortName) });
+      for (const ref of sc.subclassFeatures || []) { const [name, cls, , sub, , lvl] = String(ref).split('|'); const f = subFeats.find(x => x.name === name && x.className === cls && x.subclassShortName === sub && String(x.level) === lvl); if (f) { body.push({ t: 'h', lvl: 3, text: `Level ${f.level}: ${f.name}`, id: s5iSlug(sc.shortName + '-' + f.name + '-' + f.level) }); body.push(...s5iBlocks(f.entries, 3, ctx)); } }
+    }
+    out.push({ id: s5iSlug(c.name) + '~' + c.source.toLowerCase(), name: c.name, srcCode: c.source.toLowerCase(), hitDie: c.hd ? c.hd.faces : '', primary: prim, subclasses: (file.subclass || []).filter(s => s.className === c.name && s.classSource === c.source).map(s => s.name), body });
+  }
+  return out;
+}
+
+// ---- the importer ----
+async function s5ImportFiles(files, progress) {
+  const notes = [], parsed = [];
+  for (const [i, f] of files.entries()) {
+    progress(`Reading ${f.name} (${i + 1} of ${files.length})…`, i / files.length * 0.5);
+    if (!/\.json$/i.test(f.name)) { notes.push(`${f.name}: not a JSON file, skipped`); continue; }
+    try { parsed.push({ name: f.name, data: JSON.parse(await f.text()) }); } catch (e) { notes.push(`${f.name}: could not be read (${e.message})`); }
+  }
+  const sources = parsed.find(p => /^sources\.json$/i.test(p.name))?.data || {};
+  // every raw monster in the batch, for _copy
+  const index = new Map(); for (const p of parsed) for (const m of p.data.monster || []) index.set((m.name + '|' + (m.source || '')).toLowerCase(), m);
+  const packs = [];
+  const kindTitle = { adventure: 'Adventure', book: 'Book', bestiary: 'Monsters', spells: 'Spells', classes: 'Classes' };
+  const newPack = (src, kind) => ({ id: `imp-5et-${s5iSlug(src)}-${kind}`, title: `${src} — ${kindTitle[kind]}`, kind: kind === 'adventure' ? 'adventure' : kind === 'bestiary' ? 'bestiary' : kind === 'book' ? 'book' : 'supplement', source: src, chapters: [], monsters: [], abilities: [], format: '5etools' });
+  for (const [i, { name, data }] of parsed.entries()) {
+    progress(`Converting ${name}…`, 0.5 + i / parsed.length * 0.5); await new Promise(r => setTimeout(r, 0));
+    if (data.adventureData || data.bookData) {
+      for (const a of data.adventureData || data.bookData) {
+        const kind = data.adventureData ? 'adventure' : 'book', p = newPack(a.source || a.id || name, kind), ctx = { ids: new Set(), n: 0, monsters: [], src: a.source };
+        p.chapters = (a.data || []).map((sec, k) => ({ id: s5iSlug(sec.name || 'chapter-' + (k + 1)) + '-' + k, title: (sec.name || `Chapter ${k + 1}`).replace(/\{@\w+\s*([^{}|]*)[^{}]*\}/g, '$1'), blocks: s5iBlocks(sec.entries, 1, ctx) }));
+        p.monsters = ctx.monsters; packs.push(p);
+      }
+    } else if (data.monster) {
+      const src = data.monster.find(m => m.source)?.source || name.replace(/^bestiary-|\.json$/g, '').toUpperCase(), p = newPack(src, 'bestiary');
+      let skipped = 0;
+      for (const raw of data.monster) {
+        const m = s5iMonster(raw._copy ? s5iApplyCopy(raw, index) : raw, src);
+        if (m) p.monsters.push(m); else skipped++;
+      }
+      if (skipped) notes.push(`${name}: ${skipped === 1 ? '1 monster is' : skipped + ' monsters are'} based on a monster that isn't in these files and ${skipped === 1 ? 'was' : 'were'} skipped (import that bestiary together with this one)`);
+      p.monsters.sort((a, b) => a.name.localeCompare(b.name));
+      const letters = [...new Set(p.monsters.map(m => m.name[0].toUpperCase()))];
+      p.chapters = letters.map(L => ({ id: L.toLowerCase(), title: `Monsters: ${L}`, blocks: p.monsters.filter(m => m.name[0].toUpperCase() === L).flatMap(m => [{ t: 'h', lvl: 2, text: m.name, id: s5iSlug(m.id) }, { t: 'monster', ref: m.id }]) }));
+      for (const m of p.monsters) m.ch = m.name[0].toLowerCase();
+      if (p.monsters.length) packs.push(p);
+    } else if (data.spell) {
+      const src = data.spell.find(s => s.source)?.source || name.replace(/^spells-|\.json$/g, '').toUpperCase(), p = newPack(src, 'spells');
+      p.entities = { spells: data.spell.map(s => s5iSpell(s, [...new Set(((sources[s.source] || {})[s.name]?.class || []).filter(c => !c.definedInSource).map(c => c.name))].sort(), src)) };
+      if (!Object.keys(sources).length) notes.push(`${name}: add sources.json from the same folder to see which classes can cast each spell`);
+      packs.push(p);
+    } else if (data.class) {
+      const p = newPack(data.class[0].source + ' ' + data.class[0].name, 'classes');
+      p.id = `imp-5et-class-${s5iSlug(data.class[0].name)}`; p.title = `${data.class[0].name} (class)`;
+      p.entities = { classes: s5iClasses(data) }; packs.push(p);
+    } else if (!/^(index|fluff-index|sources|foundry)\.json$|^fluff-/i.test(name)) notes.push(`${name}: no adventure, book, monsters, spells or class found, skipped`);
+  }
+  progress('Done', 1);
+  return { packs, notes };
+}
+
+// ================= 5e cards: magic items, spells, 5e quest rewards (SYS.cards) =================
+// The core card generator (cards.js) does styles, icons, the deck, PDF and QR codes; this adds the
+// 5e card kinds. Cards draw from the SRD and from imported books (spells and classes in the lists).
+
+const S5C_RARITY = { Common: '#6b6b6b', Uncommon: '#3d7a4a', Rare: '#2d5f8a', 'Very Rare': '#6b3fa0', Legendary: '#c2531f', Artifact: '#a8322d', 'Rarity Varies': '#555555' };
+const S5C_SCHOOL = { Abjuration: '#2d5f8a', Conjuration: '#a87a1e', Divination: '#2a7f7a', Enchantment: '#b0406f', Evocation: '#c2531f', Illusion: '#6b3fa0', Necromancy: '#3b4a63', Transmutation: '#5b6b2e' };
+const S5C_ICONS = {
+  'Wondrous Items': 'gi:swap-bag', 'Wondrous Item': 'gi:swap-bag', Weapons: 'gi:broadsword', Weapon: 'gi:broadsword', Armor: 'gi:breastplate', Potion: 'gi:potion-ball', Potions: 'gi:potion-ball',
+  Ring: 'gi:diamond-ring', Rings: 'gi:diamond-ring', Rod: 'gi:orb-wand', Rods: 'gi:orb-wand', Scroll: 'gi:scroll-unfurled', Scrolls: 'gi:scroll-unfurled', Staff: 'gi:wizard-staff', Staffs: 'gi:wizard-staff',
+  Wand: 'gi:crystal-wand', Wands: 'gi:crystal-wand', Ammunition: 'gi:arrow-cluster',
+  Abjuration: 'gi:magic-shield', Conjuration: 'gi:magic-portal', Divination: 'gi:third-eye', Enchantment: 'gi:charm', Evocation: 'gi:fireball', Illusion: 'gi:invisible', Necromancy: 'gi:dread-skull', Transmutation: 'gi:transform'
+};
+// card text: keep <b>, <i>, <br>; links and dice buttons become plain text; tables become lines
+const s5cClean = h => String(h || '').replace(/<(?!\/?(b|i|br)\b)[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+const s5cParas = blocks => (blocks || []).flatMap(b => b.t === 'p' || b.t === 'li' ? [(b.t === 'li' ? '• ' : '') + s5cClean(b.html)] : b.t === 'table' ? [(b.head.length ? '<b>' + b.head.map(esc).join(' · ') + '</b><br>' : '') + b.rows.map(r => r.map(s5cClean).join(' · ')).join('<br>')] : b.t === 'h' ? [`<b>${esc(b.text)}</b>`] : []).filter(Boolean);
+const s5cSrc = e => e.pack ? (PK[e.pack]?.title || '') + (e.pg ? ' p. ' + e.pg : '') : 'SRD 5.2';
+
+function s5cItemCard(it) {
+  return { name: it.name, sub: s5EntityMeta('items', it), keywords: '', paras: s5cParas(it.body), color: S5C_RARITY[s5Rarity(it)] || '#555555', back: 'Magic Item', foot: s5cSrc(it), hint: it.type };
+}
+function s5cSpellCard(s) {
+  const meta = `<b>Casting Time:</b> ${esc(s.time)}${s.ritual ? ' or Ritual' : ''} · <b>Range:</b> ${esc(s.range)} · <b>Components:</b> ${esc(s.components)} · <b>Duration:</b> ${esc(s.duration)}`;
+  return { name: s.name, sub: s.level === 0 ? `${s.school} cantrip` : `Level ${s.level} ${s.school}`, keywords: s.classes.join(', '), paras: [meta, ...s5cParas(s.body)], color: S5C_SCHOOL[s.school] || '#555555', back: 'Spell', foot: s5cSrc(s), hint: s.school };
+}
+const s5cFind = (t, id) => itemsOf(t).find(x => x.id === id);
+
+const S5_CARDS = {
+  intro: 'magic items, spells and quests',
+  tabs: [['item', 'Magic items'], ['spell', 'Spells'], ['quest', 'Quests']],
+  icons: S5C_ICONS,
+  rewards: { labels: ['XP', 'Gold', 'Magic Item', 'Other'], hints: { XP: '450', Gold: '250 gp', 'Magic Item': 'Bag of Holding', Other: '' }, defaults: [{ label: 'XP', value: '' }, { label: 'Gold', value: '' }] },
+  kinds: {
+    item: {
+      entry(d) { const it = s5cFind('items', d.id); return it && { label: it.name, kind: s5Rarity(it), c: s5cItemCard(it) }; },
+      adder() {
+        const rar = [...new Set(itemsOf('items').map(s5Rarity))].sort((a, b) => S5_RARITY.indexOf(a) - S5_RARITY.indexOf(b));
+        return `<div class="cardadd"><div class="csearch">${ico('search', 16)}<input id="c5-q" placeholder="Search ${itemsOf('items').length} magic items…" autocomplete="off"><div id="c5-qres" class="cqres"></div></div>
+          <select id="c5-all"><option value="">Add all of a rarity…</option>${rar.map(r => `<option>${esc(r)}</option>`).join('')}</select></div>`;
+      },
+      wire(re) {
+        s5cSearch('items', 'item', it => `${s5Rarity(it)} · ${it.type}`, it => S5C_RARITY[s5Rarity(it)], it => it.type);
+        $('#c5-all').onchange = e => { const r = e.target.value; if (!r) return; itemsOf('items').filter(it => s5Rarity(it) === r).forEach(it => { if (!CARDS.deck.some(x => x.k === 'item' && x.id === it.id)) CARDS.deck.push({ k: 'item', id: it.id, n: 1 }); }); re(); };
+      }
+    },
+    spell: {
+      entry(d) { const s = s5cFind('spells', d.id); return s && { label: s.name, kind: s.level === 0 ? 'Cantrip' : 'Level ' + s.level, c: s5cSpellCard(s) }; },
+      adder() {
+        const sp = itemsOf('spells'), cls = [...new Set(sp.flatMap(s => s.classes))].sort();
+        return `<div class="cardadd"><div class="csearch">${ico('search', 16)}<input id="c5-q" placeholder="Search ${sp.length} spells…" autocomplete="off"><div id="c5-qres" class="cqres"></div></div>
+          <select id="c5-cls"><option value="">Class…</option>${cls.map(c => `<option>${esc(c)}</option>`).join('')}</select>
+          <select id="c5-lvl"><option value="">Level…</option>${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(l => `<option value="${l}">${l === 0 ? 'Cantrips' : 'Level ' + l}</option>`).join('')}</select><button class="btn ghost" id="c5-addcl">Add all</button></div>`;
+      },
+      wire(re) {
+        s5cSearch('spells', 'spell', s => (s.level === 0 ? 'Cantrip' : 'Level ' + s.level) + ' · ' + s.school + (s.pack ? ' · ' + (PK[s.pack]?.title || '') : ''), s => S5C_SCHOOL[s.school], s => s.school);
+        $('#c5-addcl').onclick = () => {
+          const c = $('#c5-cls').value, l = $('#c5-lvl').value;
+          if (!c && l === '') { toast('Pick a class, a level, or both'); return; }
+          const pick = itemsOf('spells').filter(s => (!c || s.classes.includes(c)) && (l === '' || s.level === +l));
+          const seen = new Set(); pick.forEach(s => { if (seen.has(s.name)) return; seen.add(s.name); if (!CARDS.deck.some(x => x.k === 'spell' && x.id === s.id)) CARDS.deck.push({ k: 'spell', id: s.id, n: 1 }); });
+          toast(`Added ${seen.size} spell card${seen.size === 1 ? '' : 's'}`); re();
+        };
+      }
+    }
+  }
+};
+// search box shared by both kinds (same behaviour as Draw Steel's treasure search)
+function s5cSearch(type, kind, sub, color, hint) {
+  const cq = $('#c5-q'); if (!cq) return;
+  const show = () => {
+    const q = cq.value.trim().toLowerCase(), box = $('#c5-qres'); if (!q) { box.innerHTML = ''; box.classList.remove('on'); return; }
+    const hits = itemsOf(type).filter(x => x.name.toLowerCase().includes(q)).sort((a, b) => (b.name.toLowerCase().startsWith(q) - a.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name)).slice(0, 12);
+    box.innerHTML = hits.map(x => `<button data-add5c="${esc(x.id)}"><span class="cd-ic" style="--cc:${color(x) || '#555'}">${iconSvg(autoIcon({ name: x.name, hint: hint(x) }))}</span><b>${esc(x.name)}</b><small>${esc(sub(x))}</small>${CARDS.deck.some(d => d.k === kind && d.id === x.id) ? '<em>in deck</em>' : ''}</button>`).join('') || '<div class="empty">No match.</div>';
+    box.classList.add('on');
+    $$('[data-add5c]', box).forEach(b => b.onmousedown = e => { e.preventDefault(); addToDeck(kind, b.dataset.add5c); saveCards(); cardsPage(); setTimeout(() => { const n = $('#c5-q'); if (n) { n.value = cq.value; n.focus(); n.dispatchEvent(new Event('input')); } }, 0); });
+  };
+  cq.oninput = show; cq.onfocus = show; cq.onblur = () => setTimeout(() => $('#c5-qres')?.classList.remove('on'), 150);
+  cq.onkeydown = e => { if (e.key === 'Enter') { const f = $('#c5-qres [data-add5c]'); if (f) f.dispatchEvent(new MouseEvent('mousedown')); } if (e.key === 'Escape') { cq.value = ''; show(); } };
+}
+
 // Registers 5e (SRD 5.2) with the core. Loaded last of the srd5 files (SYSTEM_FILES in mksite.py).
-// Tools (encounter builder, initiative, dice, session items) live in s5-tools.js; 5e stat blocks in the importer come in step 5.
+// Tools (encounter builder, initiative, dice, session items): s5-tools.js. Cards: s5-cards.js.
+// Importer for your own books (JSON files in the 5etools data format): s5-import.js.
 registerSystem({
   id: 'srd5', name: '5e (SRD 5.2)', short: '5e',
   data: { file: 'data/srd5.json', loading: 'Loading the SRD 5.2 rules…' },
@@ -3555,7 +4056,10 @@ registerSystem({
   packRoutes: ['monsters', 'encounter', 'initiative'],
   roller: { title: 'Dice', html: S5_DICE_HTML, mount: s5MountRoller },
   session: S5_SESSION,
-  onClick: s5OnClick,
+  onClick: e => s5FindClick(e) || s5OnClick(e),
+  cards: S5_CARDS,
+  renderBlock: s5RenderBlock,
+  packSummary: s5PackSummary,
   renderMonster: s5RenderMonster,
   entityMeta: s5EntityMeta, entitySource: s5EntitySource, preview: s5Preview,
   pinGroups: [
@@ -3566,7 +4070,9 @@ registerSystem({
   noLink: '.s5-n,.s5-spl,.s5iname',
   searchExtra: s5SearchExtra,
   searchPriority: { conditions: 0, classes: 0, spells: 1, species: 1, monsters: 2, items: 2, feats: 2, backgrounds: 2, equipment: 3 },
-  importer: { module: './lib/dsparse.mjs', hint: 'PDFs with selectable text. Text, headings and tables are imported; 5e stat blocks are not recognised yet.' },
+  importer: { run: s5ImportFiles, accept: '.json,application/json', label: 'Import files', noun: 'books',
+    intro: 'Add your own 5e books, adventures, bestiaries, spells and classes from JSON files in the 5etools data format. Monsters become stat blocks, adventures become readable books with read-aloud boxes and stat blocks in place, and spells and classes join the lists.',
+    hint: 'JSON files or a whole folder: bestiary-, adventure-, book-, spells- (with sources.json) and class- files' },
   pdfNotice: 'Includes SRD 5.2 material by Wizards of the Coast LLC, licensed CC BY 4.0 (creativecommons.org/licenses/by/4.0)',
   notice: S5_ATTRIB,
   syncWhat: 'sessions, encounters, initiative, cards, pins, settings'
@@ -4279,7 +4785,7 @@ async function buildCardsPdf(opt = {}) {
 // ---- QR codes → public card JPGs (uploaded through sync.php, served by card.php) ----
 let qrLoad = null;
 function loadQr() {  // lib/qrcode.js: qrcode-generator 1.4.4 (MIT), defines window.qrcode
-  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=b64899a680'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
+  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=b1c8cb546f'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
 }
 // 22-char id from the key's private salt + what the face looks like: stable, but unguessable
 async function cardImageId(salt, content) {
