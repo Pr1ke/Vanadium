@@ -284,7 +284,9 @@ async function s5ImportFiles(files, progress) {
   const packs = [];
   const kindTitle = { adventure: 'Adventure', book: 'Book', bestiary: 'Monsters', spells: 'Spells', classes: 'Classes' };
   const newPack = (src, kind) => ({ id: `imp-5et-${s5iSlug(src)}-${kind}`, title: `${src} — ${kindTitle[kind]}`, kind: kind === 'adventure' ? 'adventure' : kind === 'bestiary' ? 'bestiary' : kind === 'book' ? 'book' : 'supplement', source: src, chapters: [], monsters: [], abilities: [], format: '5etools' });
+  const AUX = /^(index|fluff-index|sources|foundry)\.json$|^fluff-/i;   // support files: used above (sources.json) or ignored
   for (const [i, { name, data }] of parsed.entries()) {
+    if (AUX.test(name)) continue;
     progress(`Converting ${name}…`, 0.5 + i / parsed.length * 0.5); await new Promise(r => setTimeout(r, 0));
     if (data.adventureData || data.bookData) {
       for (const a of data.adventureData || data.bookData) {
@@ -316,6 +318,9 @@ async function s5ImportFiles(files, progress) {
       p.entities = { classes: s5iClasses(data) }; packs.push(p);
     } else if (!/^(index|fluff-index|sources|foundry)\.json$|^fluff-/i.test(name)) notes.push(`${name}: no adventure, book, monsters, spells or class found, skipped`);
   }
+  // two files must never become the same book (one would silently replace the other)
+  const seen = new Set();
+  for (const p of packs) { if (seen.has(p.id)) { let k = 2; while (seen.has(p.id + '-' + k)) k++; p.id += '-' + k; p.title += ` (${k})`; } seen.add(p.id); }
   progress('Done', 1);
   return { packs, notes };
 }

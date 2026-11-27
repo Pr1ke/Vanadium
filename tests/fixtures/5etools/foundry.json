@@ -1,0 +1,5 @@
+{
+  "spell": [
+    {"name": "Test Spark", "source": "TST", "system": {"note": "support data for another tool: the importer must skip this file, not import it as a second spell book"}}
+  ]
+}

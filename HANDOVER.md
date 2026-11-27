@@ -263,12 +263,14 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
      - **Adventures and books:** these become chapters with read-aloud boxes (`s5read`), sidebars (`s5inset`), lists, tables and stat blocks in place (`s5mref`, found by name and source).
      - **Spells and classes:** spells (with classes from `sources.json`) and classes (feature table, features, subclasses) join the lists. The list Source column shows PHB, XPHB, SRD 5.2 and so on.
      - **`{@tags}`:** these become links (`data-s5find`, resolved when clicked), dice buttons and condition links.
-   - **Tested on the owner's 182 files:** 145 books, about 2,500 monsters, 1,038 spells and 43 classes, read in about 2.5 seconds. Every imported book opens without JS errors. 19 `_copy` variants are skipped because their base bestiary isn't in the folder.
+   - **Tested on the owner's 182 files:** 144 books, about 2,500 monsters, 1,038 spells and 43 classes, read in about 2.5 seconds. Every imported book opens without JS errors. 19 `_copy` variants are skipped because their base bestiary isn't in the folder.
    - **Cards (`S5_CARDS`):**
      - Magic item cards are coloured by rarity, with search and "add all of a rarity".
      - Spell cards are coloured by school, with search and "add all of a class and level". Imported spells work too.
      - Quest rewards are XP, Gold, Magic Item and Other.
-   - **Tests:** `tests/s5import_test.py` runs 24 checks on the fixture.
+   - **Imports page (`#imports`):** imported books are listed on one page, grouped, with a filter, instead of a home tile or menu item per book.
+   - **Support files:** `index.json`, `sources.json`, `foundry.json` and `fluff-*` are never imported as books. Two files that would get the same pack id get distinct ids.
+   - **Tests:** `tests/s5import_test.py` runs 28 checks on the fixture.
 
 **Adding a system:**
 1. Create `src/systems/<id>/<id>.js` that calls `registerSystem` with at least `id`, `name`, `data`, `init`, `corePack`, `lists`, `menu`, `home`, `browse`, `renderMonster` and `pdfNotice`.

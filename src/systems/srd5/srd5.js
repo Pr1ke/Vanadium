@@ -102,7 +102,7 @@ function s5Menu() {
   return [
     ['Rules', [['library', 'Library'], ['book--srd52', 'SRD 5.2 Reference'], ['-'], ['conditions'], ['equipment']]],
     ['Characters', [['classes'], ['species'], ['backgrounds'], ['feats'], ['-'], ['spells']]],
-    ['Game Master', [['sessions', 'Sessions'], ['encounter', 'Encounter Builder'], ['initiative', 'Initiative Tracker'], ['-'], ['monsters'], ['book--srd5-monsters', 'Monsters A–Z'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title]), ['-'], ['items'], ['cards', 'Cards: items, spells, quests']]],
+    ['Game Master', [['sessions', 'Sessions'], ['encounter', 'Encounter Builder'], ['initiative', 'Initiative Tracker'], ['-'], ['monsters'], ['book--srd5-monsters', 'Monsters A–Z'], ['imports', 'Imports'], ['-'], ['items'], ['cards', 'Cards: items, spells, quests']]],
     ['Utilities', [['import', 'Import files'], ['roller', 'Dice Roller'], ['pinned', 'Pinned Items'], ['-'], ['sync', 'Sync across devices'], ['!update', 'Check for updates']]]
   ];
 }
@@ -110,13 +110,13 @@ const S5_BLURB = { spells: 'Every SRD spell with level, school, classes and full
   classes: 'Twelve classes with feature tables, features and a subclass each', species: 'Traits and options for each species', backgrounds: 'Ability scores, feats, skills and equipment',
   feats: 'Origin, general, fighting style and epic boon feats', conditions: 'Blinded, Charmed, Prone and the rest', equipment: 'Weapons, armor, tools and adventuring gear' };
 function s5Home() {
-  const adv = PACKS.filter(p => p.kind === 'adventure');
+  const nImp = PACKS.filter(p => !p.builtin).length;
   const ok = k => TYPES[k] || !k.startsWith('book--') || PK[k.split('--')[1]];
   const tiles = [
     ['Rules', [['book--srd52', 'SRD 5.2 Reference', 'Abilities and skills, conditions, weapons, armor and more'], ['conditions'], ['equipment']]],
     ['Characters', [['classes'], ['species'], ['backgrounds'], ['feats'], ['spells']]],
     ['Run the game', [['encounter', 'Encounter Builder', 'Pick monsters, see Low / Moderate / High difficulty'], ['initiative', 'Initiative Tracker', 'Turn order, HP and conditions'], ['sessions', 'Sessions', 'Prep folders for your game night'], ['roller', 'Dice Roller', 'Any dice, d20 with advantage']]],
-    ['Game master', [['monsters'], ['book--srd5-monsters', 'Monsters A–Z', 'Read the bestiary like a book'], ['items'], ...adv.map(p => ['book--' + p.id, p.title, 'Adventure · imported']), ['library', 'Library', 'All books, including your imports'], ['import', 'Import files', 'Your own books, adventures and bestiaries (JSON)'], ['pinned', 'Pinned items', 'Your starred spells, monsters and rules']]]
+    ['Game master', [['monsters'], ['book--srd5-monsters', 'Monsters A–Z', 'Read the bestiary like a book'], ['items'], ['imports', 'Imports', nImp ? `Your ${nImp} imported book${nImp === 1 ? '' : 's'}: adventures, bestiaries, spells, classes` : 'Nothing imported yet'], ['library', 'Library', 'All books, including your imports'], ['import', 'Import files', 'Your own books, adventures and bestiaries (JSON)'], ['pinned', 'Pinned items', 'Your starred spells, monsters and rules']]]
   ];
   $('#main').innerHTML = `<div class="home"><div class="hero"><h1>5e rules, at your fingertips</h1><p>A fast, searchable reference for the fifth edition System Reference Document 5.2.</p>
     <div class="hsearch">${ico('search', 20)}<input id="hq" placeholder="Search spells, monsters, items, rules…" ${isMob ? 'readonly' : ''}><kbd>/</kbd></div>
@@ -131,7 +131,7 @@ function s5Browse() {
   const sec = (t, ks) => `<h3>${t}</h3><div class="sgrid">${ks.map(([k, l, d]) => `<a href="#${k}"><b>${esc(l || TYPES[k].label)}</b><span>${esc(d || (TYPES[k] ? itemsOf(k).length + ' entries' : ''))}</span></a>`).join('')}</div>`;
   $('#sheet').innerHTML = `<div class="grab"></div>` +
     sec('Characters', [['classes'], ['species'], ['backgrounds'], ['feats'], ['spells']]) +
-    sec('Game master', [['encounter', 'Encounter Builder', 'Difficulty & PDF'], ['initiative', 'Initiative', 'Turns, HP & conditions'], ['monsters'], ['items'], ['sessions', 'Sessions', 'Prep & print a game night'], ['cards', 'Cards', 'Print quest cards'], ...PACKS.filter(p => p.kind === 'adventure').map(p => ['book--' + p.id, p.title, 'Adventure']), ['import', 'Import files', 'Add your own books (JSON)']]) +
+    sec('Game master', [['encounter', 'Encounter Builder', 'Difficulty & PDF'], ['initiative', 'Initiative', 'Turns, HP & conditions'], ['monsters'], ['items'], ['sessions', 'Sessions', 'Prep & print a game night'], ['cards', 'Cards', 'Items, spells & quests'], ['imports', 'Imports', 'Your imported books'], ['import', 'Import files', 'Add your own books (JSON)']]) +
     sec('Rules', [['book--srd52', 'SRD 5.2 Reference', 'Reference chapters'], ['conditions'], ['equipment']]) +
     `<p style="font-size:10.5px;color:var(--ink3);margin-top:16px">${esc(S5_ATTRIB)}</p>`;
   $('#sheet').classList.add('on'); showScrim();
@@ -218,4 +218,22 @@ function s5FindClick(e) {
 function s5PackSummary(p) {
   const n = Object.entries(p.entities || {}).map(([t, l]) => l.length + ' ' + (TYPES[t] ? TYPES[t].label.toLowerCase() : t));
   return n.length ? ' · ' + n.join(' · ') : '';
+}
+
+// ---- #imports: every imported book in one place (instead of a home tile / menu entry each) ----
+let s5ImpQ = '';
+function s5ImportsPage() {
+  const mine = PACKS.filter(p => !p.builtin).sort((a, b) => a.title.localeCompare(b.title));
+  const groups = [['adventure', 'Adventures'], ['book', 'Books'], ['bestiary', 'Bestiaries'], ['supplement', 'Spells and classes']];
+  const q = s5ImpQ.trim().toLowerCase(), shown = mine.filter(p => !q || p.title.toLowerCase().includes(q));
+  const what = p => [p.chapters.filter(c => c.blocks.length).length && p.chapters.filter(c => c.blocks.length).length + ' chapters', (p.monsters || []).length && p.monsters.length + ' monsters', s5PackSummary(p).replace(/^ · /, '')].filter(Boolean).join(' · ');
+  const row = p => `<div class="s5imp"><div><b>${p.chapters.some(c => c.blocks.length) ? `<a href="#book--${esc(p.id)}">${esc(p.title)}</a>` : esc(p.title)}</b><span>${esc(what(p))}</span></div>
+    <div class="s5imp-a">${p.chapters.some(c => c.blocks.length) ? `<a class="btn ghost sm" href="#book--${esc(p.id)}">Read</a>` : ''}${(p.monsters || []).length ? `<a class="btn ghost sm" href="#monsters" data-srcfilter="${esc(p.title)}">Monsters</a>` : ''}${p.entities?.spells ? '<a class="btn ghost sm" href="#spells">Spells</a>' : ''}${p.entities?.classes ? '<a class="btn ghost sm" href="#classes">Classes</a>' : ''}</div></div>`;
+  $('#main').innerHTML = `<div class="lib s5imps"><h1>Imports <small>${mine.length}</small></h1>
+    <p class="note">The books you imported from your own JSON files. Their monsters, spells and classes are also in the lists. <a href="#import">Import more</a> · <a href="#library">Library</a></p>
+    ${mine.length ? `<input id="s5-impq" type="search" placeholder="Filter ${mine.length} books…" value="${esc(s5ImpQ)}" autocomplete="off">` : ''}
+    ${groups.map(([k, label]) => { const xs = shown.filter(p => (p.kind === k) || (k === 'supplement' && !groups.some(g => g[0] === p.kind))); return xs.length ? `<h2>${label} <small>${xs.length}</small></h2><div class="s5implist">${xs.map(row).join('')}</div>` : ''; }).join('')
+    || (mine.length ? '<div class="empty">No book matches.</div>' : '<div class="empty">Nothing imported yet. <a href="#import">Import files</a></div>')}</div>`;
+  const f = $('#s5-impq'); if (f) f.oninput = () => { s5ImpQ = f.value; const pos = f.selectionStart; s5ImportsPage(); const n = $('#s5-impq'); n.focus(); n.setSelectionRange(pos, pos); };
+  document.title = 'Imports — Vanadium';
 }

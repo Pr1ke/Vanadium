@@ -1321,6 +1321,17 @@ body.mob #syssel{max-width:90px;padding:4px 20px 4px 8px;font-size:12px;margin:0
 .pvfiles>div{justify-content:space-between}
 .pvfiles>div>label{display:flex;flex-direction:row;align-items:center;gap:8px;flex:1;min-width:240px;margin:0}
 .pvfiles>div>label input[type=checkbox]{flex:none;margin:0}
+.s5imps h1 small,.s5imps h2 small{font:500 13px var(--ui);color:var(--ink3);margin-left:4px}
+.s5imps h2{font-size:15px;margin:22px 0 8px}
+#s5-impq{width:100%;max-width:520px;box-sizing:border-box;padding:8px 10px;border:1px solid var(--line2);border-radius:var(--r-sm);background:var(--field);color:var(--ink);font:inherit}
+.s5implist{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);max-width:900px}
+.s5imp{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.s5imp:last-child{border-bottom:0}
+.s5imp>div:first-child{display:flex;flex-direction:column;min-width:0}
+.s5imp b a{color:var(--ink);text-decoration:none}
+.s5imp b a:hover{color:var(--accent2)}
+.s5imp span{font-size:12.5px;color:var(--ink3)}
+.s5imp-a{display:flex;gap:6px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -1358,6 +1369,6 @@ body.mob #syssel{max-width:90px;padding:4px 20px 4px 8px;font-size:12px;margin:0
 <div id="roller"></div><!-- the game system's dice roller (SYS.roller), mounted at startup -->
 <div id="hov"></div>
 <div id="toast"></div>
-<script src="sync.js?v=b1c8cb546f" data-v="b1c8cb546f"></script><!-- pulls synced data first, then loads app.js -->
+<script src="sync.js?v=f55fa3499c" data-v="f55fa3499c"></script><!-- pulls synced data first, then loads app.js -->
 </body>
 </html>
