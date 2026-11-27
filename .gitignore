@@ -8,3 +8,7 @@ site/.vanadium-*
 
 # content you own from D&D Beyond: import it in the app, never commit it
 dndbeyond/
+
+# picture folders for imported books (you host these yourself; never commit them)
+site/img/
+site/vanadium-img/

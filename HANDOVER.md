@@ -268,9 +268,13 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
      - Magic item cards are coloured by rarity, with search and "add all of a rarity".
      - Spell cards are coloured by school, with search and "add all of a class and level". Imported spells work too.
      - Quest rewards are XP, Gold, Magic Item and Other.
+   - **Pictures (references only):**
+     - The importer keeps picture paths: `{t:'s5img', path}` blocks for adventure, book, class and spell pictures (`image` and `gallery` entries), monster `token` paths (the 5etools naming pattern `bestiary/tokens/<SOURCE>/<Name>.webp`, only when the monster's own entry has `hasToken`), and `art` paths for monsters and classes from `fluff-*` files in the same import. It stores no image data and fetches nothing.
+     - The owner hosts the picture folder and enters its address on the Imports page (`st_srd5_imgbase`, synced). Each picture is shown from that address plus its path. Nothing loads until the address is set, including full URLs in the files. Pictures missing on the server are hidden (`s5img-missing`).
+     - `site/img/` and `site/vanadium-img/` are git-ignored, and `serve.py`'s updater never deletes them. The owner's folder has 3,795 references: 1,585 book pictures, the rest tokens.
    - **Imports page (`#imports`):** imported books are listed on one page, grouped, with a filter, instead of a home tile or menu item per book.
    - **Support files:** `index.json`, `sources.json`, `foundry.json` and `fluff-*` are never imported as books. Two files that would get the same pack id get distinct ids.
-   - **Tests:** `tests/s5import_test.py` runs 28 checks on the fixture.
+   - **Tests:** `tests/s5import_test.py` runs 37 checks on the fixture, including pictures (addresses, off until set, missing hidden, no other hosts).
 
 **Adding a system:**
 1. Create `src/systems/<id>/<id>.js` that calls `registerSystem` with at least `id`, `name`, `data`, `init`, `corePack`, `lists`, `menu`, `home`, `browse`, `renderMonster` and `pdfNotice`.

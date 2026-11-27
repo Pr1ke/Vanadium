@@ -35,7 +35,8 @@ function s5RenderMonster(m, opts = {}) {
   const pinned = isPinned('monsters', m.gid);
   const line = (l, v) => v ? `<div><b>${l}</b> ${esc(v)}</div>` : '';
   const sec = (title, list) => list && list.length ? `<div class="s5-sec">${title ? `<h4>${title}</h4>` : ''}${list.map(a => `<p><b><i>${esc(a.name)}.</i></b> ${s5Dicify(a.html, m.name + ': ' + a.name.replace(/\s*\(.*\)$/, ''))}${a.spells ? a.spells.map(x => `<span class="s5-spl">${x}</span>`).join('') : ''}</p>`).join('')}</div>` : '';
-  let h = `<div class="s5mon" data-mon="${m.gid}"><div class="s5-h"><div><div class="s5-n"><a data-go="monsters--${m.gid}">${esc(m.name)}</a></div><div class="s5-t">${esc(m.size)} ${esc(m.type)}, ${esc(m.alignment)}</div></div><button class="ab-pin ${pinned ? 'on' : ''}" data-pin="monsters--${m.gid}" title="Pin">★</button></div>
+  const tok = m.token ? s5ImgUrl(m.token) : '';   // imported monsters: token and artwork from the owner's picture folder
+  let h = `${m.art && !opts.nosrc ? s5ImgFigure(m.art, 'mon-art', '') : ''}<div class="s5mon" data-mon="${m.gid}"><div class="s5-h">${tok ? `<span class="s5tok"><img src="${esc(tok)}" alt="" loading="lazy" data-zoom="1" ${S5_IMG_MISSING}></span>` : ''}<div style="flex:1"><div class="s5-n"><a data-go="monsters--${m.gid}">${esc(m.name)}</a></div><div class="s5-t">${esc(m.size)} ${esc(m.type)}, ${esc(m.alignment)}</div></div><button class="ab-pin ${pinned ? 'on' : ''}" data-pin="monsters--${m.gid}" title="Pin">★</button></div>
     <div class="s5-core"><div><b>AC</b> ${esc(m.ac)}${m.acNote ? ` (${esc(m.acNote)})` : ''}</div><div><b>Initiative</b> <button class="s5-roll" data-dice="1d20${s5Signed(m.init)}" data-lab="${esc(m.name)}: initiative">${esc(m.init)} (${10 + s5Int(m.init)})</button></div><div><b>HP</b> ${esc(m.hp)}${m.hpRoll ? ` (${esc(m.hpRoll)})` : ''}</div><div><b>Speed</b> ${esc(m.speed)}</div></div>
     <div class="s5-abs">${S5_AB.map(([k, l]) => `<div><span>${l}</span><b>${m.ab[k]}</b><button class="s5-roll" data-dice="1d20${s5Signed(s5Mod(m.ab[k]))}" data-lab="${esc(m.name)}: ${l} check" title="Roll a ${l} check">${s5Mod(m.ab[k])}</button><button class="s5-roll s5-save" data-dice="1d20${s5Signed(m.saves[k])}" data-lab="${esc(m.name)}: ${l} save" title="Roll a ${l} saving throw">save ${esc(m.saves[k])}</button></div>`).join('')}</div>
     <div class="s5-lines">${line('Skills', m.skills)}${line('Vulnerabilities', m.vuln)}${line('Resistances', m.resist)}${line('Immunities', m.immune)}${line('Gear', m.gear)}${line('Senses', m.senses)}${line('Languages', m.languages)}<div><b>CR</b> ${esc(m.cr)} (XP ${esc(m.xp)}; PB ${esc(m.pb)})</div></div>
@@ -200,6 +201,7 @@ function s5Find(kind, name, src) {
   return list.find(x => x.name.toLowerCase() === n && (!src || x.srcCode === src)) || list.find(x => x.name.toLowerCase() === n) || null;
 }
 function s5RenderBlock(b, { pm, idx }) {
+  if (b.t === 's5img') { const f = s5ImgFigure(b.path, 'bkimg ' + (!b.w || b.w > 330 ? 'wide' : 'side'), b.title); return f ? `<div${idx}>${pm}</div>` + f : ''; }
   if (b.t === 's5read') return `<div class="s5read"${idx}>${pm}${renderBlocks(b.blocks)}</div>`;
   if (b.t === 's5inset') return `<aside class="s5inset"${idx}>${pm}${b.title ? `<div class="ah">${esc(b.title)}</div>` : ''}${renderBlocks(b.blocks)}</aside>`;
   if (b.t === 's5mref') {
@@ -231,9 +233,45 @@ function s5ImportsPage() {
     <div class="s5imp-a">${p.chapters.some(c => c.blocks.length) ? `<a class="btn ghost sm" href="#book--${esc(p.id)}">Read</a>` : ''}${(p.monsters || []).length ? `<a class="btn ghost sm" href="#monsters" data-srcfilter="${esc(p.title)}">Monsters</a>` : ''}${p.entities?.spells ? '<a class="btn ghost sm" href="#spells">Spells</a>' : ''}${p.entities?.classes ? '<a class="btn ghost sm" href="#classes">Classes</a>' : ''}</div></div>`;
   $('#main').innerHTML = `<div class="lib s5imps"><h1>Imports <small>${mine.length}</small></h1>
     <p class="note">The books you imported from your own JSON files. Their monsters, spells and classes are also in the lists. <a href="#import">Import more</a> · <a href="#library">Library</a></p>
+    ${s5PicturesCard()}
     ${mine.length ? `<input id="s5-impq" type="search" placeholder="Filter ${mine.length} books…" value="${esc(s5ImpQ)}" autocomplete="off">` : ''}
     ${groups.map(([k, label]) => { const xs = shown.filter(p => (p.kind === k) || (k === 'supplement' && !groups.some(g => g[0] === p.kind))); return xs.length ? `<h2>${label} <small>${xs.length}</small></h2><div class="s5implist">${xs.map(row).join('')}</div>` : ''; }).join('')
     || (mine.length ? '<div class="empty">No book matches.</div>' : '<div class="empty">Nothing imported yet. <a href="#import">Import files</a></div>')}</div>`;
   const f = $('#s5-impq'); if (f) f.oninput = () => { s5ImpQ = f.value; const pos = f.selectionStart; s5ImportsPage(); const n = $('#s5-impq'); n.focus(); n.setSelectionRange(pos, pos); };
+  s5WirePictures(s5ImportsPage);
   document.title = 'Imports — Vanadium';
+}
+
+// ---- pictures in imported books: only paths are stored; they are shown from the owner's picture
+// folder (Imports page → Pictures). Until that is set, no picture is loaded from anywhere.
+const s5ImgBase = () => { const b = String(store.get('imgbase', '') || '').trim(); return /^(javascript|data|vbscript):/i.test(b) ? '' : b; };
+function s5ImgUrl(path) {
+  const base = s5ImgBase(); if (!base || !path) return '';
+  if (/^https?:\/\//i.test(path)) return path;   // a full address in the file (only used once pictures are on)
+  return base.replace(/\/?$/, '/') + String(path).replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
+}
+const S5_IMG_MISSING = `onerror="this.closest('figure,.s5tok')?.classList.add('s5img-missing')"`;   // not on the server: hide, don't show a broken image
+function s5ImgFigure(path, cls, caption) {
+  const u = s5ImgUrl(path); if (!u) return '';
+  return `<figure class="${cls}"><img loading="lazy" src="${esc(u)}" alt="${esc(caption || '')}" data-zoom="1" ${S5_IMG_MISSING}>${caption ? `<figcaption>${esc(caption)}</figcaption>` : ''}</figure>`;
+}
+function s5PicturePaths() {   // every picture path in the imported books, for the settings card
+  const out = []; const walk = bl => { for (const b of bl || []) { if (b.t === 's5img') out.push(b.path); if (b.blocks) walk(b.blocks); } };
+  for (const p of PACKS.filter(p => !p.builtin)) { for (const c of p.chapters || []) walk(c.blocks); for (const m of p.monsters || []) { if (m.token) out.push(m.token); if (m.art) out.push(m.art); } for (const c of (p.entities || {}).classes || []) walk(c.body); }
+  return out;
+}
+function s5PicturesCard() {
+  const paths = s5PicturePaths(), base = s5ImgBase();
+  if (!paths.length) return '';
+  return `<div class="s5card s5pics"><h2>Pictures <span class="s5-sub">${paths.length.toLocaleString('en')} referenced</span></h2>
+    <p class="note">Your imported books refer to pictures, maps and monster tokens by path, for example <code>${esc(paths[0])}</code>. Vanadium doesn’t store or download them. Put the picture folder on your server and enter its address; each picture is shown from that address plus its path.${base ? '' : ' <b>Pictures are off until you set this.</b>'}</p>
+    <div class="s5row"><input id="s5-imgbase" placeholder="/vanadium-img/  or  https://your-site/img/" value="${esc(base)}" autocomplete="off" spellcheck="false"><button class="btn" id="s5-imgsave">Save</button>${base ? '<button class="btn ghost" id="s5-imgoff">Turn pictures off</button>' : ''}</div>
+    ${base ? `<p class="note">Example: <a href="${esc(s5ImgUrl(paths[0]))}" target="_blank" rel="noopener">${esc(s5ImgUrl(paths[0]))}</a>. Pictures that aren’t on the server are simply left out.</p>` : ''}
+    <p class="note">Anything in a public web folder can be opened by anyone who knows its address.</p></div>`;
+}
+function s5WirePictures(rerender) {
+  const save = v => { store.set('imgbase', v); toast(v ? 'Pictures on' : 'Pictures off'); rerender(); };
+  if ($('#s5-imgsave')) $('#s5-imgsave').onclick = () => { const v = $('#s5-imgbase').value.trim(); if (/^(javascript|data|vbscript):/i.test(v)) { toast('That is not a folder address'); return; } save(v); };
+  if ($('#s5-imgbase')) $('#s5-imgbase').onkeydown = e => { if (e.key === 'Enter') $('#s5-imgsave').click(); };
+  if ($('#s5-imgoff')) $('#s5-imgoff').onclick = () => save('');
 }

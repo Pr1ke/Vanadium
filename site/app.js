@@ -1176,7 +1176,7 @@ function classIndex() {
 window.__stSave = (name, blob) => deliverFile(name, blob);
 window.__stGotoPage = pg => gotoPage(String(pg));
 function respitePage() {
-  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=f55fa3499c" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
+  $('#main').innerHTML = `<div class="resp"><div class="resp-bar"><b>Respite &amp; Downtime</b><span class="sp"></span><span class="rlinks">Rules: <a href="#book--heroes--the-basics--respite">Respite</a> · <a href="#book--heroes--downtime-projects">Downtime projects</a> · <a href="#book--heroes--rewards--renown">Renown &amp; followers</a></span></div><iframe id="respframe" src="respite.html?v=abdc1488dd" title="Respite: a Draw Steel downtime companion"></iframe></div>`;
   document.title = 'Respite — Vanadium';
 }
 
@@ -3249,7 +3249,8 @@ function s5RenderMonster(m, opts = {}) {
   const pinned = isPinned('monsters', m.gid);
   const line = (l, v) => v ? `<div><b>${l}</b> ${esc(v)}</div>` : '';
   const sec = (title, list) => list && list.length ? `<div class="s5-sec">${title ? `<h4>${title}</h4>` : ''}${list.map(a => `<p><b><i>${esc(a.name)}.</i></b> ${s5Dicify(a.html, m.name + ': ' + a.name.replace(/\s*\(.*\)$/, ''))}${a.spells ? a.spells.map(x => `<span class="s5-spl">${x}</span>`).join('') : ''}</p>`).join('')}</div>` : '';
-  let h = `<div class="s5mon" data-mon="${m.gid}"><div class="s5-h"><div><div class="s5-n"><a data-go="monsters--${m.gid}">${esc(m.name)}</a></div><div class="s5-t">${esc(m.size)} ${esc(m.type)}, ${esc(m.alignment)}</div></div><button class="ab-pin ${pinned ? 'on' : ''}" data-pin="monsters--${m.gid}" title="Pin">★</button></div>
+  const tok = m.token ? s5ImgUrl(m.token) : '';   // imported monsters: token and artwork from the owner's picture folder
+  let h = `${m.art && !opts.nosrc ? s5ImgFigure(m.art, 'mon-art', '') : ''}<div class="s5mon" data-mon="${m.gid}"><div class="s5-h">${tok ? `<span class="s5tok"><img src="${esc(tok)}" alt="" loading="lazy" data-zoom="1" ${S5_IMG_MISSING}></span>` : ''}<div style="flex:1"><div class="s5-n"><a data-go="monsters--${m.gid}">${esc(m.name)}</a></div><div class="s5-t">${esc(m.size)} ${esc(m.type)}, ${esc(m.alignment)}</div></div><button class="ab-pin ${pinned ? 'on' : ''}" data-pin="monsters--${m.gid}" title="Pin">★</button></div>
     <div class="s5-core"><div><b>AC</b> ${esc(m.ac)}${m.acNote ? ` (${esc(m.acNote)})` : ''}</div><div><b>Initiative</b> <button class="s5-roll" data-dice="1d20${s5Signed(m.init)}" data-lab="${esc(m.name)}: initiative">${esc(m.init)} (${10 + s5Int(m.init)})</button></div><div><b>HP</b> ${esc(m.hp)}${m.hpRoll ? ` (${esc(m.hpRoll)})` : ''}</div><div><b>Speed</b> ${esc(m.speed)}</div></div>
     <div class="s5-abs">${S5_AB.map(([k, l]) => `<div><span>${l}</span><b>${m.ab[k]}</b><button class="s5-roll" data-dice="1d20${s5Signed(s5Mod(m.ab[k]))}" data-lab="${esc(m.name)}: ${l} check" title="Roll a ${l} check">${s5Mod(m.ab[k])}</button><button class="s5-roll s5-save" data-dice="1d20${s5Signed(m.saves[k])}" data-lab="${esc(m.name)}: ${l} save" title="Roll a ${l} saving throw">save ${esc(m.saves[k])}</button></div>`).join('')}</div>
     <div class="s5-lines">${line('Skills', m.skills)}${line('Vulnerabilities', m.vuln)}${line('Resistances', m.resist)}${line('Immunities', m.immune)}${line('Gear', m.gear)}${line('Senses', m.senses)}${line('Languages', m.languages)}<div><b>CR</b> ${esc(m.cr)} (XP ${esc(m.xp)}; PB ${esc(m.pb)})</div></div>
@@ -3414,6 +3415,7 @@ function s5Find(kind, name, src) {
   return list.find(x => x.name.toLowerCase() === n && (!src || x.srcCode === src)) || list.find(x => x.name.toLowerCase() === n) || null;
 }
 function s5RenderBlock(b, { pm, idx }) {
+  if (b.t === 's5img') { const f = s5ImgFigure(b.path, 'bkimg ' + (!b.w || b.w > 330 ? 'wide' : 'side'), b.title); return f ? `<div${idx}>${pm}</div>` + f : ''; }
   if (b.t === 's5read') return `<div class="s5read"${idx}>${pm}${renderBlocks(b.blocks)}</div>`;
   if (b.t === 's5inset') return `<aside class="s5inset"${idx}>${pm}${b.title ? `<div class="ah">${esc(b.title)}</div>` : ''}${renderBlocks(b.blocks)}</aside>`;
   if (b.t === 's5mref') {
@@ -3445,11 +3447,47 @@ function s5ImportsPage() {
     <div class="s5imp-a">${p.chapters.some(c => c.blocks.length) ? `<a class="btn ghost sm" href="#book--${esc(p.id)}">Read</a>` : ''}${(p.monsters || []).length ? `<a class="btn ghost sm" href="#monsters" data-srcfilter="${esc(p.title)}">Monsters</a>` : ''}${p.entities?.spells ? '<a class="btn ghost sm" href="#spells">Spells</a>' : ''}${p.entities?.classes ? '<a class="btn ghost sm" href="#classes">Classes</a>' : ''}</div></div>`;
   $('#main').innerHTML = `<div class="lib s5imps"><h1>Imports <small>${mine.length}</small></h1>
     <p class="note">The books you imported from your own JSON files. Their monsters, spells and classes are also in the lists. <a href="#import">Import more</a> · <a href="#library">Library</a></p>
+    ${s5PicturesCard()}
     ${mine.length ? `<input id="s5-impq" type="search" placeholder="Filter ${mine.length} books…" value="${esc(s5ImpQ)}" autocomplete="off">` : ''}
     ${groups.map(([k, label]) => { const xs = shown.filter(p => (p.kind === k) || (k === 'supplement' && !groups.some(g => g[0] === p.kind))); return xs.length ? `<h2>${label} <small>${xs.length}</small></h2><div class="s5implist">${xs.map(row).join('')}</div>` : ''; }).join('')
     || (mine.length ? '<div class="empty">No book matches.</div>' : '<div class="empty">Nothing imported yet. <a href="#import">Import files</a></div>')}</div>`;
   const f = $('#s5-impq'); if (f) f.oninput = () => { s5ImpQ = f.value; const pos = f.selectionStart; s5ImportsPage(); const n = $('#s5-impq'); n.focus(); n.setSelectionRange(pos, pos); };
+  s5WirePictures(s5ImportsPage);
   document.title = 'Imports — Vanadium';
+}
+
+// ---- pictures in imported books: only paths are stored; they are shown from the owner's picture
+// folder (Imports page → Pictures). Until that is set, no picture is loaded from anywhere.
+const s5ImgBase = () => { const b = String(store.get('imgbase', '') || '').trim(); return /^(javascript|data|vbscript):/i.test(b) ? '' : b; };
+function s5ImgUrl(path) {
+  const base = s5ImgBase(); if (!base || !path) return '';
+  if (/^https?:\/\//i.test(path)) return path;   // a full address in the file (only used once pictures are on)
+  return base.replace(/\/?$/, '/') + String(path).replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
+}
+const S5_IMG_MISSING = `onerror="this.closest('figure,.s5tok')?.classList.add('s5img-missing')"`;   // not on the server: hide, don't show a broken image
+function s5ImgFigure(path, cls, caption) {
+  const u = s5ImgUrl(path); if (!u) return '';
+  return `<figure class="${cls}"><img loading="lazy" src="${esc(u)}" alt="${esc(caption || '')}" data-zoom="1" ${S5_IMG_MISSING}>${caption ? `<figcaption>${esc(caption)}</figcaption>` : ''}</figure>`;
+}
+function s5PicturePaths() {   // every picture path in the imported books, for the settings card
+  const out = []; const walk = bl => { for (const b of bl || []) { if (b.t === 's5img') out.push(b.path); if (b.blocks) walk(b.blocks); } };
+  for (const p of PACKS.filter(p => !p.builtin)) { for (const c of p.chapters || []) walk(c.blocks); for (const m of p.monsters || []) { if (m.token) out.push(m.token); if (m.art) out.push(m.art); } for (const c of (p.entities || {}).classes || []) walk(c.body); }
+  return out;
+}
+function s5PicturesCard() {
+  const paths = s5PicturePaths(), base = s5ImgBase();
+  if (!paths.length) return '';
+  return `<div class="s5card s5pics"><h2>Pictures <span class="s5-sub">${paths.length.toLocaleString('en')} referenced</span></h2>
+    <p class="note">Your imported books refer to pictures, maps and monster tokens by path, for example <code>${esc(paths[0])}</code>. Vanadium doesn’t store or download them. Put the picture folder on your server and enter its address; each picture is shown from that address plus its path.${base ? '' : ' <b>Pictures are off until you set this.</b>'}</p>
+    <div class="s5row"><input id="s5-imgbase" placeholder="/vanadium-img/  or  https://your-site/img/" value="${esc(base)}" autocomplete="off" spellcheck="false"><button class="btn" id="s5-imgsave">Save</button>${base ? '<button class="btn ghost" id="s5-imgoff">Turn pictures off</button>' : ''}</div>
+    ${base ? `<p class="note">Example: <a href="${esc(s5ImgUrl(paths[0]))}" target="_blank" rel="noopener">${esc(s5ImgUrl(paths[0]))}</a>. Pictures that aren’t on the server are simply left out.</p>` : ''}
+    <p class="note">Anything in a public web folder can be opened by anyone who knows its address.</p></div>`;
+}
+function s5WirePictures(rerender) {
+  const save = v => { store.set('imgbase', v); toast(v ? 'Pictures on' : 'Pictures off'); rerender(); };
+  if ($('#s5-imgsave')) $('#s5-imgsave').onclick = () => { const v = $('#s5-imgbase').value.trim(); if (/^(javascript|data|vbscript):/i.test(v)) { toast('That is not a folder address'); return; } save(v); };
+  if ($('#s5-imgbase')) $('#s5-imgbase').onkeydown = e => { if (e.key === 'Enter') $('#s5-imgsave').click(); };
+  if ($('#s5-imgoff')) $('#s5-imgoff').onclick = () => save('');
 }
 
 // ================= 5e tools: encounter builder, initiative tracker, session items =================
@@ -3730,6 +3768,18 @@ function s5iInline(entries) {
   }).join('<br>');
 }
 
+// ---- pictures: references only ----
+// {href: {type: 'internal', path: 'adventure/ToA/x.webp'}} -> a relative path, shown from the owner's picture
+// folder; {type: 'external', url} is kept as a full URL. No image data is stored, nothing is downloaded here.
+function s5iImage(e) {
+  const h = e && e.href; if (!h) return null;
+  const path = h.type === 'internal' ? h.path : h.type === 'external' ? h.url : null;
+  if (!path || /^\s*(javascript|data):/i.test(path)) return null;
+  return { t: 's5img', path, title: e.title ? String(e.title).replace(/\{@\w+\s*([^{}|]*)[^{}]*\}/g, '$1') : '', w: e.width || 0, h: e.height || 0 };
+}
+// 5etools' token naming: img/bestiary/tokens/<SOURCE>/<Name>.webp (accents dropped, quotes removed)
+const s5iTokenPath = (name, src) => `bestiary/tokens/${src}/${String(name).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/Æ/g, 'AE').replace(/æ/g, 'ae').replace(/"/g, '')}.webp`;
+
 // ---- entries -> book blocks ----
 function s5iBlocks(entries, depth, ctx) {
   const out = [];
@@ -3774,7 +3824,10 @@ function s5iBlocks(entries, depth, ctx) {
         const f = ctx.ref && ctx.ref(e); if (f) { out.push(head(f.name)); out.push(...s5iBlocks(f.entries, depth + 1, ctx)); }
         break;
       }
-      case 'image': case 'gallery': case 'hr': break;   // pictures aren't in the files; nothing is fetched
+      // pictures: only the path is kept; the app shows it from the owner's picture folder (Imports page setting)
+      case 'image': { const im = s5iImage(e); if (im) out.push(im); break; }
+      case 'gallery': for (const g of e.images || []) { const im = s5iImage(g); if (im) out.push(im); } break;
+      case 'hr': break;
       case 'item': out.push({ t: 'li', html: `${e.name ? `<b>${s5iText(e.name)}.</b> ` : ''}${s5iInline(e.entries || (e.entry ? [e.entry] : []))}` }); break;
       case 'dice': out.push({ t: 'p', style: 'body', html: (e.toRoll || []).map(d => `<button class="s5-roll" data-dice="${d.number}d${d.faces}${d.modifier ? s5Signed(d.modifier) : ''}">${d.number}d${d.faces}${d.modifier ? s5Signed(d.modifier) : ''}</button>`).join(' + ') }); break;
       default:
@@ -3851,7 +3904,8 @@ function s5iMonster(m, src) {
     traits: [...(m.trait || []).map(ability), ...bucket.trait], actions: [...(m.action || []).map(ability), ...bucket.action],
     bonus: [...(m.bonus || []).map(ability), ...bucket.bonus], reactions: [...(m.reaction || []).map(ability), ...bucket.reaction],
     legendary: [...(m.legendary || []).map(ability), ...bucket.legendary, ...(m.mythic || []).map(a => ({ ...ability(a), name: 'Mythic: ' + ability(a).name }))],
-    group: s5iType(typeof m.type === 'object' ? m.type.type : m.type)
+    group: s5iType(typeof m.type === 'object' ? m.type.type : m.type),
+    token: m.hasToken ? (m.token ? s5iTokenPath(m.token.name, m.token.source) : s5iTokenPath(m.name, m.source || src)) : ''
   };
 }
 // _copy: a monster made from another one plus changes (_mod). Base must be among the imported files.
@@ -3878,6 +3932,7 @@ function s5iApplyCopy(m, index) {
     else if (op.mode === 'replaceOrAppendArr') { const i = arr.findIndex(x => nm(x) === op.replace); if (i >= 0) arr.splice(i, 1, ...items); else arr.push(...items); }
   }
   delete out._copy;
+  out.hasToken = !!m.hasToken; delete out.token;   // a variant's token is its own, never the base monster's
   return out;
 }
 
@@ -3941,6 +3996,11 @@ async function s5ImportFiles(files, progress) {
   const sources = parsed.find(p => /^sources\.json$/i.test(p.name))?.data || {};
   // every raw monster in the batch, for _copy
   const index = new Map(); for (const p of parsed) for (const m of p.data.monster || []) index.set((m.name + '|' + (m.source || '')).toLowerCase(), m);
+  // artwork paths from fluff files in the batch (fluff-bestiary-*: monsterFluff, fluff-class-*: classFluff)
+  const art = new Map();
+  for (const p of parsed) for (const k of ['monsterFluff', 'classFluff']) for (const f of p.data[k] || []) {
+    const im = (f.images || []).map(s5iImage).find(Boolean); if (im) art.set((k + '|' + f.name + '|' + (f.source || '')).toLowerCase(), im);
+  }
   const packs = [];
   const kindTitle = { adventure: 'Adventure', book: 'Book', bestiary: 'Monsters', spells: 'Spells', classes: 'Classes' };
   const newPack = (src, kind) => ({ id: `imp-5et-${s5iSlug(src)}-${kind}`, title: `${src} — ${kindTitle[kind]}`, kind: kind === 'adventure' ? 'adventure' : kind === 'bestiary' ? 'bestiary' : kind === 'book' ? 'book' : 'supplement', source: src, chapters: [], monsters: [], abilities: [], format: '5etools' });
@@ -3959,7 +4019,7 @@ async function s5ImportFiles(files, progress) {
       let skipped = 0;
       for (const raw of data.monster) {
         const m = s5iMonster(raw._copy ? s5iApplyCopy(raw, index) : raw, src);
-        if (m) p.monsters.push(m); else skipped++;
+        if (m) { const a = art.get(('monsterFluff|' + raw.name + '|' + (raw.source || src)).toLowerCase()); if (a) m.art = a.path; p.monsters.push(m); } else skipped++;
       }
       if (skipped) notes.push(`${name}: ${skipped === 1 ? '1 monster is' : skipped + ' monsters are'} based on a monster that isn't in these files and ${skipped === 1 ? 'was' : 'were'} skipped (import that bestiary together with this one)`);
       p.monsters.sort((a, b) => a.name.localeCompare(b.name));
@@ -3975,7 +4035,9 @@ async function s5ImportFiles(files, progress) {
     } else if (data.class) {
       const p = newPack(data.class[0].source + ' ' + data.class[0].name, 'classes');
       p.id = `imp-5et-class-${s5iSlug(data.class[0].name)}`; p.title = `${data.class[0].name} (class)`;
-      p.entities = { classes: s5iClasses(data) }; packs.push(p);
+      p.entities = { classes: s5iClasses(data) };
+      for (const c of p.entities.classes) { const a = art.get(('classFluff|' + c.name + '|' + c.srcCode).toLowerCase()); if (a) c.body.unshift(a); }   // class artwork at the top
+      packs.push(p);
     } else if (!/^(index|fluff-index|sources|foundry)\.json$|^fluff-/i.test(name)) notes.push(`${name}: no adventure, book, monsters, spells or class found, skipped`);
   }
   // two files must never become the same book (one would silently replace the other)
@@ -4808,7 +4870,7 @@ async function buildCardsPdf(opt = {}) {
 // ---- QR codes → public card JPGs (uploaded through sync.php, served by card.php) ----
 let qrLoad = null;
 function loadQr() {  // lib/qrcode.js: qrcode-generator 1.4.4 (MIT), defines window.qrcode
-  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=f55fa3499c'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
+  return qrLoad || (qrLoad = new Promise((res, rej) => { if (window.qrcode) return res(); const s = document.createElement('script'); s.src = 'lib/qrcode.js?v=abdc1488dd'; s.onload = res; s.onerror = () => { qrLoad = null; rej(new Error('could not load the QR code library')); }; document.head.appendChild(s); }));
 }
 // 22-char id from the key's private salt + what the face looks like: stable, but unguessable
 async function cardImageId(salt, content) {

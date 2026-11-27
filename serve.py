@@ -125,7 +125,7 @@ class Updater:
             # drop files the new build no longer has
             keep = {os.path.normcase(os.path.join(SITE, *r.split('/'))) for r in files}
             for dp, dns, fns in os.walk(SITE, topdown=False):
-                if os.path.relpath(dp, SITE).split(os.sep)[0].startswith('.vanadium'):
+                if os.path.relpath(dp, SITE).split(os.sep)[0].startswith('.vanadium') or os.path.relpath(dp, SITE).split(os.sep)[0] in ('img', 'vanadium-img'):   # your own picture folders stay
                     continue  # sync data / updater state, never part of the build
                 for fn in fns:
                     if dp == SITE and fn.startswith('.vanadium'): continue

@@ -70,6 +70,18 @@ function s5iInline(entries) {
   }).join('<br>');
 }
 
+// ---- pictures: references only ----
+// {href: {type: 'internal', path: 'adventure/ToA/x.webp'}} -> a relative path, shown from the owner's picture
+// folder; {type: 'external', url} is kept as a full URL. No image data is stored, nothing is downloaded here.
+function s5iImage(e) {
+  const h = e && e.href; if (!h) return null;
+  const path = h.type === 'internal' ? h.path : h.type === 'external' ? h.url : null;
+  if (!path || /^\s*(javascript|data):/i.test(path)) return null;
+  return { t: 's5img', path, title: e.title ? String(e.title).replace(/\{@\w+\s*([^{}|]*)[^{}]*\}/g, '$1') : '', w: e.width || 0, h: e.height || 0 };
+}
+// 5etools' token naming: img/bestiary/tokens/<SOURCE>/<Name>.webp (accents dropped, quotes removed)
+const s5iTokenPath = (name, src) => `bestiary/tokens/${src}/${String(name).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/Æ/g, 'AE').replace(/æ/g, 'ae').replace(/"/g, '')}.webp`;
+
 // ---- entries -> book blocks ----
 function s5iBlocks(entries, depth, ctx) {
   const out = [];
@@ -114,7 +126,10 @@ function s5iBlocks(entries, depth, ctx) {
         const f = ctx.ref && ctx.ref(e); if (f) { out.push(head(f.name)); out.push(...s5iBlocks(f.entries, depth + 1, ctx)); }
         break;
       }
-      case 'image': case 'gallery': case 'hr': break;   // pictures aren't in the files; nothing is fetched
+      // pictures: only the path is kept; the app shows it from the owner's picture folder (Imports page setting)
+      case 'image': { const im = s5iImage(e); if (im) out.push(im); break; }
+      case 'gallery': for (const g of e.images || []) { const im = s5iImage(g); if (im) out.push(im); } break;
+      case 'hr': break;
       case 'item': out.push({ t: 'li', html: `${e.name ? `<b>${s5iText(e.name)}.</b> ` : ''}${s5iInline(e.entries || (e.entry ? [e.entry] : []))}` }); break;
       case 'dice': out.push({ t: 'p', style: 'body', html: (e.toRoll || []).map(d => `<button class="s5-roll" data-dice="${d.number}d${d.faces}${d.modifier ? s5Signed(d.modifier) : ''}">${d.number}d${d.faces}${d.modifier ? s5Signed(d.modifier) : ''}</button>`).join(' + ') }); break;
       default:
@@ -191,7 +206,8 @@ function s5iMonster(m, src) {
     traits: [...(m.trait || []).map(ability), ...bucket.trait], actions: [...(m.action || []).map(ability), ...bucket.action],
     bonus: [...(m.bonus || []).map(ability), ...bucket.bonus], reactions: [...(m.reaction || []).map(ability), ...bucket.reaction],
     legendary: [...(m.legendary || []).map(ability), ...bucket.legendary, ...(m.mythic || []).map(a => ({ ...ability(a), name: 'Mythic: ' + ability(a).name }))],
-    group: s5iType(typeof m.type === 'object' ? m.type.type : m.type)
+    group: s5iType(typeof m.type === 'object' ? m.type.type : m.type),
+    token: m.hasToken ? (m.token ? s5iTokenPath(m.token.name, m.token.source) : s5iTokenPath(m.name, m.source || src)) : ''
   };
 }
 // _copy: a monster made from another one plus changes (_mod). Base must be among the imported files.
@@ -218,6 +234,7 @@ function s5iApplyCopy(m, index) {
     else if (op.mode === 'replaceOrAppendArr') { const i = arr.findIndex(x => nm(x) === op.replace); if (i >= 0) arr.splice(i, 1, ...items); else arr.push(...items); }
   }
   delete out._copy;
+  out.hasToken = !!m.hasToken; delete out.token;   // a variant's token is its own, never the base monster's
   return out;
 }
 
@@ -281,6 +298,11 @@ async function s5ImportFiles(files, progress) {
   const sources = parsed.find(p => /^sources\.json$/i.test(p.name))?.data || {};
   // every raw monster in the batch, for _copy
   const index = new Map(); for (const p of parsed) for (const m of p.data.monster || []) index.set((m.name + '|' + (m.source || '')).toLowerCase(), m);
+  // artwork paths from fluff files in the batch (fluff-bestiary-*: monsterFluff, fluff-class-*: classFluff)
+  const art = new Map();
+  for (const p of parsed) for (const k of ['monsterFluff', 'classFluff']) for (const f of p.data[k] || []) {
+    const im = (f.images || []).map(s5iImage).find(Boolean); if (im) art.set((k + '|' + f.name + '|' + (f.source || '')).toLowerCase(), im);
+  }
   const packs = [];
   const kindTitle = { adventure: 'Adventure', book: 'Book', bestiary: 'Monsters', spells: 'Spells', classes: 'Classes' };
   const newPack = (src, kind) => ({ id: `imp-5et-${s5iSlug(src)}-${kind}`, title: `${src} — ${kindTitle[kind]}`, kind: kind === 'adventure' ? 'adventure' : kind === 'bestiary' ? 'bestiary' : kind === 'book' ? 'book' : 'supplement', source: src, chapters: [], monsters: [], abilities: [], format: '5etools' });
@@ -299,7 +321,7 @@ async function s5ImportFiles(files, progress) {
       let skipped = 0;
       for (const raw of data.monster) {
         const m = s5iMonster(raw._copy ? s5iApplyCopy(raw, index) : raw, src);
-        if (m) p.monsters.push(m); else skipped++;
+        if (m) { const a = art.get(('monsterFluff|' + raw.name + '|' + (raw.source || src)).toLowerCase()); if (a) m.art = a.path; p.monsters.push(m); } else skipped++;
       }
       if (skipped) notes.push(`${name}: ${skipped === 1 ? '1 monster is' : skipped + ' monsters are'} based on a monster that isn't in these files and ${skipped === 1 ? 'was' : 'were'} skipped (import that bestiary together with this one)`);
       p.monsters.sort((a, b) => a.name.localeCompare(b.name));
@@ -315,7 +337,9 @@ async function s5ImportFiles(files, progress) {
     } else if (data.class) {
       const p = newPack(data.class[0].source + ' ' + data.class[0].name, 'classes');
       p.id = `imp-5et-class-${s5iSlug(data.class[0].name)}`; p.title = `${data.class[0].name} (class)`;
-      p.entities = { classes: s5iClasses(data) }; packs.push(p);
+      p.entities = { classes: s5iClasses(data) };
+      for (const c of p.entities.classes) { const a = art.get(('classFluff|' + c.name + '|' + c.srcCode).toLowerCase()); if (a) c.body.unshift(a); }   // class artwork at the top
+      packs.push(p);
     } else if (!/^(index|fluff-index|sources|foundry)\.json$|^fluff-/i.test(name)) notes.push(`${name}: no adventure, book, monsters, spells or class found, skipped`);
   }
   // two files must never become the same book (one would silently replace the other)
