@@ -560,3 +560,11 @@ body.mob .mdedit{grid-template-columns:1fr}body.mob .mdprev{max-height:none}
 .qacands{max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:6px;margin:8px 0}
 .qac{display:flex;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;opacity:.6}.qac.on{opacity:1}
 .qac div{display:flex;flex-direction:column;gap:2px;font-size:13px}.qac b{font-size:15px;font-family:var(--cond)}.qac span{color:var(--ink2)}.qac em{font-style:normal;color:var(--accent2);font-size:12.5px}
+/* session folders: rows indent by depth (--d); folders get a fold toggle and an item count */
+.sdoc[style*="--d"]{padding-left:calc(var(--d) * 16px)}
+.sfold-t{background:none;border:0;color:var(--ink3);cursor:pointer;font-size:12px;width:18px;padding:0 0 0 6px;flex:none}.sfold-t:hover{color:var(--accent2)}
+.sdoc.sfold a{font-weight:600}.sdoc.sfold a small{margin-left:6px;font-size:11px;color:var(--ink3);background:var(--panel2);border-radius:8px;padding:0 6px;font-weight:400}
+.sadd-in{text-transform:none;letter-spacing:0;color:var(--accent2);font-weight:600}
+.soverview .beitem[style*="--d"]{margin-left:calc(var(--d) * 22px)}
+.soverview .beitem.sfold-o{border-left:3px solid var(--gold)}
+#d-move{background:var(--bg);color:var(--ink);border:1px solid var(--line2);border-radius:4px;padding:5px 6px;font-size:13px;max-width:220px}

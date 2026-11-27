@@ -18,7 +18,7 @@ Features:
     - a player handout with a damage tracker that has big write-in boxes
 - **Negotiation Tracker and Montage Tests.** Step-by-step runners, PDF export, and "delves and dastards" content when a book providing it is imported.
 - **Respite & Downtime.** `site/respite.html`, embedded in the app. Its theme stays in sync with the main app.
-- **Sessions.** One folder per game night. Markdown notes, read-aloud text and linked encounters, montages and negotiations, plus a "print this session" export (merged PDF).
+- **Sessions.** One folder per game night. Markdown notes, read-aloud text and linked encounters, montages and negotiations, plus a "print this session" export (merged PDF). Inside a session, folders (nestable) group items, e.g. a folder "This town" with its lore pages and encounters. Works the same in every system.
 - **Cards.**
   - Treasure, quest, follower and retainer cards in four styles.
   - Customisation: colours, watermark, icon on the back, custom text.
@@ -275,6 +275,13 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
    - **Imports page (`#imports`):** imported books are listed on one page, grouped, with a filter, instead of a home tile or menu item per book.
    - **Support files:** `index.json`, `sources.json`, `foundry.json` and `fluff-*` are never imported as books. Two files that would get the same pack id get distinct ids.
    - **Tests:** `tests/s5import_test.py` runs 37 checks on the fixture, including pictures (addresses, off until set, missing hidden, no other hosts).
+- **Session folders (core, `src/sess.js`, both systems):**
+  - A folder is an item in `S.docs` with `type: 'folder'` (and `collapsed` when closed). Any item's `parent` is the id of the folder it is in; no `parent` (or a folder that no longer exists) means top level. `S.docs` stays one ordered list, so old sessions and synced data need no migration.
+  - Helpers: `sessParent`, `sessChildren`, `sessTree` (depth-first `[doc, depth]` in list order), `sessCount`. ↑/↓ swap an item with its neighbour in the same folder.
+  - New items go into the folder you are in (the folder's page, or an item inside it). Every item's page has a "Move to" menu (`#d-move`); a folder can't move into itself or its sub-folders.
+  - Removing a folder never deletes its contents: they move up one level. A folder's PDF merges everything inside it; the session export prints items in tree order, with folder names as headings in the contents.
+  - System item kinds (`SYS.session.kinds`) need nothing new: `sessAdd` sets `parent` in the `add` callback they already call.
+  - **Tests:** `tests/sessions_test.py` runs 21 checks per system (Draw Steel and 5e).
 
 **Adding a system:**
 1. Create `src/systems/<id>/<id>.js` that calls `registerSystem` with at least `id`, `name`, `data`, `init`, `corePack`, `lists`, `menu`, `home`, `browse`, `renderMonster` and `pdfNotice`.
@@ -327,6 +334,7 @@ Goal: one codebase for several rule systems (Draw Steel now, D&D 5e from the SRD
   - `python tests/systems_test.py`: the system switch and per-system data, using the sample system fixture (needs a build).
   - `python tests/srd5_test.py`: the 5e system: content, links, search, books, pins, attribution in the footer and PDFs, no trademarks (needs a build).
   - `python tests/s5import_test.py [--folder DIR]`: the 5e JSON importer and 5e cards, on the invented fixture; with `--folder`, it also imports a real folder locally.
+  - `python tests/sessions_test.py`: folders in sessions, in both systems: adding into a folder, nesting, moving, reordering, folding, folder PDF, export contents, removing a folder (needs a build).
   - **`python tests/snapshot.py out.json --system srd5`** crawls another system, which is useful for catching JS errors.
   - **`serve.py --site DIR`** serves another folder (used by tests; it never auto-updates).
 - **Older scripts:** serve `site/` on port 8765 first, then `python tests/<name>.py`. Scripts print `errs []` when there are no page errors.
