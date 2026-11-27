@@ -111,14 +111,23 @@ async def main():
             await pg.fill('#s5-pall', '1'); await pg.press('#s5-pall', 'Tab'); await pg.wait_for_timeout(300)
             for _ in range(2): await pg.click('[data-einc="0"]'); await pg.wait_for_timeout(200)
             check('3 Bugbear Warriors (600 XP) are beyond High for 4 level-1 characters', (await text('.s5diff')).startswith('Beyond High'), await text('.s5diff'))
+            toks = await pg.evaluate("[...document.querySelectorAll('.s5ents .stone')].map(s => s.title)")
+            check('token colours: one distinct coloured token per creature', len(toks) == 3 and len(set(toks)) == 3 and all(t.endswith(' token') for t in toks), toks)
+            enc = await pg.evaluate("JSON.parse(localStorage.getItem('st_srd5_enc'))")
+            check('token colours are kept on the encounter', sorted(enc.get('tokens', {})) == ['bugbear-warrior|0', 'bugbear-warrior|1', 'bugbear-warrior|2'], enc.get('tokens'))
+            await pg.click('#s5-tok'); await pg.wait_for_timeout(300)
+            check('🎲 Tokens rerolls but keeps one per creature', len(await pg.evaluate("[...document.querySelectorAll('.s5ents .stone')]")) == 3)
             async with pg.expect_download(timeout=60000) as dl: await pg.click('#s5-pdf')
             pt = subprocess.run(['node', os.path.join(HERE, 'pdftext.mjs'), str(await (await dl.value).path())], capture_output=True, text=True, encoding='utf-8', cwd=HERE).stdout
-            check('encounter PDF: budgets, creatures, stat block, licence line', all(x in pt for x in ['XP budget', '3 × Bugbear Warrior', 'Initiative', 'SRD 5.2 material']), pt[:200])
+            tok1 = (await pg.evaluate("JSON.parse(localStorage.getItem('st_srd5_enc')).tokens['bugbear-warrior|0']"))
+            check('table sheet PDF: turn order, a card per creature with token, HP and conditions, stat blocks, licence', all(x in pt for x in ['XP budget', 'TURN ORDER', 'Bugbear Warrior #1', 'Bugbear Warrior #3', f'{tok1} token', 'MAX HP', 'HIT POINTS', 'bloodied <= 16', 'TEMP HP', 'Concentrating', 'STAT BLOCKS', 'Bugbear Warrior (x3)', 'SRD 5.2 material']), pt[:300])
             # ---- step 4: initiative ----
             await pg.click('#s5-init'); await pg.wait_for_timeout(600)
             rows = await pg.evaluate("[...document.querySelectorAll('.s5irow')].map(r => [r.querySelector('.s5iname').firstElementChild.textContent, r.querySelector('.s5iinit').value])")
             mons = [r for r in rows if r[0].startswith('Bugbear')]
             check('initiative: 4 characters + 3 bugbears, monsters rolled d20 + 2', len(rows) == 7 and len(mons) == 3 and all(3 <= int(v) <= 22 for _, v in mons), rows)
+            itok = await pg.evaluate("[...document.querySelectorAll('.s5irow')].filter(r => r.querySelector('.stone')).map(r => r.querySelector('.stone').title)")
+            check('initiative: each monster shows its token colour', len(itok) == 3 and len(set(itok)) == 3, itok)
             first = rows[0][0]
             for _ in range(7): await pg.click('#i5-next'); await pg.wait_for_timeout(120)
             check('turns cycle and the round advances', 'Round 2' in await text('.s5round') and first in await text('.s5round'), await text('.s5round'))
