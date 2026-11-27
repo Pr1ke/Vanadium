@@ -16,7 +16,11 @@
  */
 
 const REPO = 'Pr1ke/Vanadium';
-const BRANCH = 'main';
+// Which branch this copy follows depends on the folder it is installed in (decided on the
+// server, never from the visitor's request): vanadiumBeta/ follows `beta`, everything else
+// (vanadium/, or any other folder) follows `main`.
+const BRANCHES = ['vanadiumbeta' => 'beta'];
+define('BRANCH', BRANCHES[strtolower(basename(__DIR__))] ?? 'main');
 const COOLDOWN = 300; // seconds
 
 header('Content-Type: application/json');
@@ -25,7 +29,7 @@ header('Cache-Control: no-store');
 $ROOT = __DIR__;
 $STATE = $ROOT . '/.vanadium-update.json';
 
-function done(array $r): void { echo json_encode($r); exit; }
+function done(array $r): void { echo json_encode($r + ['branch' => BRANCH]); exit; }
 
 function http_get(string $url, int $timeout): string {
     if (function_exists('curl_init')) {

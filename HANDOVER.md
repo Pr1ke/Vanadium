@@ -148,6 +148,9 @@ VS Code: **Terminal → Run Build Task** (Ctrl/Cmd+Shift+B) builds. Run the "Ser
 ### Auto-update
 - **PHP hosts (the real server): `site/update.php`**, with its source in `src/update.php`; the build copies it into `site/`. Upload the contents of `site/` to the web root, and make sure PHP can write to that folder.
   - **Needs:** PHP 7.4+, the `zip` extension, and `curl` or `allow_url_fopen`.
+  - **Two live copies, by folder:** the branch comes from the name of the folder `update.php` is installed in (`BRANCHES` in `src/update.php`), never from the request, so a visitor can't switch it. `vanadium/` follows `main`; `vanadiumBeta/` (any letter case) follows `beta`; any other folder follows `main`. Every JSON reply includes `branch`. Each folder has its own cooldown, update state and sync data (`.vanadium-*`).
+  - **Beta workflow:** work happens on feature branches (e.g. `systems`), which are merged into `beta` to try them live, then into `main` to release. Both branches need a build committed (`site/`), because the updater installs `site/` from the branch zip.
+  - **Same domain:** if both folders are on one domain, the browser shares saved data (localStorage) between them, including the sync key, because storage is per domain, not per folder.
   - **Trigger:** the app calls `update.php` with a GET request at most every 5 minutes per browser. The script also has its own **5-minute cooldown shared by all visitors**, plus a lock, stored in `.vanadium-update.json` in the web root.
   - **Update:** it compares `version.json` with the copy on GitHub. If the build differs, it downloads the repo zip from codeload, stages `site/` in `.vanadium-new-*`, moves the files in with `version.json` last, and cleans up.
   - **Deleting old files:** it only deletes files that an earlier run installed and the new build dropped. That list is kept in the same state file, so other files on the host, such as `.htaccess`, are never touched.
